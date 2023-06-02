@@ -60,7 +60,6 @@ end
 #------------------------------------------------------------------------------
 function update_ghost_values_rkfr!(problem, scheme, eq::AbstractEquations{2,1},
                                    grid, aux, op, cache, t)
-   # TODO - Add nvar
    @timeit aux.timer "Update ghost values" begin
    @unpack Fb, ub = cache
    update_ghost_values_periodic!(eq, problem, Fb, ub)
@@ -73,7 +72,7 @@ function update_ghost_values_rkfr!(problem, scheme, eq::AbstractEquations{2,1},
    nx, ny = grid.size
    @unpack degree, xg = op
    nd = degree + 1
-   @unpack nvar = eq
+   nvar = nvariables(eq)
    @unpack dx, dy, xf, yf = grid
    @unpack boundary_value, boundary_condition = problem
    left, right, bottom, top = boundary_condition
@@ -234,7 +233,7 @@ end
 # The D1 part is the cell residual, which we compute here.
 
 function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, scheme,
-                                     aux, t, dt, u1, res, Fb, ub)
+                                     aux, t, dt, u1, res, Fb, ub, cache)
    @unpack timer = aux
    @timeit aux.timer "Cell residual" begin
    @unpack xg, D1, Vl, Vr = op
@@ -284,7 +283,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, scheme,
          multiply_add_to_node_vars!(ub_, Vl[j], u_node, eq, i, 3)
          multiply_add_to_node_vars!(ub_, Vr[j], u_node, eq, i, 4)
       end
-      blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, dx, dy,
+      blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, grid, dx, dy,
                            grid.xf[el_x], grid.yf[el_y], op, u1, u,
                            nothing, res)
 
@@ -300,7 +299,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, scheme,
             # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
             multiply_add_to_node_vars!(Fb_, Vl[i], f_node, eq, j, 1)
             multiply_add_to_node_vars!(Fb_, Vr[i], f_node, eq, j, 2)
-   
+
             # Ub = U * V
             # Ub[i] += ∑_j U[i,j]*V[j]
             multiply_add_to_node_vars!(Fb_, Vl[j], g_node, eq, i, 3)

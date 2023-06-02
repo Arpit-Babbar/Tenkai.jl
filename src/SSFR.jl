@@ -21,7 +21,7 @@ export examples_dir # TODO - Remove this export
 
 # TODO - Move to a file "allmodules.jl"
 include("$fr_dir/Basis.jl")
-include("$grid_dir/Grid.jl")
+include("$grid_dir/CartesianGrids.jl")
 include("$eq_dir/InitialValues.jl")
 include("$eq_dir/Equations.jl")
 
@@ -95,22 +95,24 @@ import .FR: update_ghost_values_periodic!,
             set_blend_dt!,
             fo_blend,
             mh_blend,
-            limit_slope!,
+            zhang_shu_flux_fix,
+            limit_slope,
+            no_upwinding_x,
             is_admissible,
-             conservative_indicator!,
-             apply_hierarchical_limiter!,
-             Hierarchical,
-             setup_arrays_lwfr,
-             setup_arrays_rkfr,
-             solve_lwfr,
-             solve_rkfr,
-             compute_error,
-             initialize_plot,
-             write_soln!,
-             create_aux_cache,
-             write_poly,
-             write_soln!,
-             post_process_soln
+            conservative_indicator!,
+            apply_hierarchical_limiter!,
+            Hierarchical,
+            setup_arrays_lwfr,
+            setup_arrays_rkfr,
+            solve_lwfr,
+            solve_rkfr,
+            compute_error,
+            initialize_plot,
+            write_soln!,
+            create_aux_cache,
+            write_poly,
+            write_soln!,
+            post_process_soln
 )
 
 # TODO - This situation disallows us from doing an allmodules.jl thing
@@ -138,7 +140,9 @@ import .FR1D: update_ghost_values_periodic!,
               set_blend_dt!,
               fo_blend,
               mh_blend,
-              limit_slope!,
+              zhang_shu_flux_fix,
+              limit_slope,
+              no_upwinding_x,
               is_admissible,
               apply_hierarchical_limiter!,
               Hierarchical,
@@ -175,7 +179,8 @@ import .FR2D: update_ghost_values_periodic!,
               mh_blend,
               blending_flux_factors,
               zhang_shu_flux_fix,
-              limit_slope!,
+              limit_slope,
+              no_upwinding_x,
               is_admissible,
               apply_hierarchical_limiter!,
               Hierarchical, # not yet implemented
@@ -193,7 +198,7 @@ import .FR2D: update_ghost_values_periodic!,
 
 # Pack blending methods into containers for user API
 
-# TODO - Putting it here is madness!!
+# KLUDGE - Move reconstruction named tuples to FR.jl
 
 conservative_reconstruction = (;
                                conservative2recon! = conservative2conservative_reconstruction!,
@@ -219,22 +224,10 @@ export conservative_reconstruction, primitive_reconstruction,
        fo_blend, mh_blend
 )
 
-# TODO - Remove the commented exports after some time
 ( # FR API
 export
-      #  compute_time_step,
-      #  apply_bound_limiter!,
-      #  apply_tvb_limiter!,
        setup_limiter_tvb,
        setup_limiter_tvbβ,
-      #  Blend,
-      #  compute_error, # TODO - Remove?
-      #  initialize_plot,
-      #  write_soln!,
-      #  create_aux_cache,
-      #  write_poly,
-      #  write_soln!,
-      #  post_process_soln,
        ParseCommandLine
 )
 

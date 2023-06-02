@@ -4,9 +4,13 @@ using StaticArrays
 using MuladdMacro
 
 using SSFR
+using TimerOutputs
+using SSFR.FR2D: correct_variable!
+using UnPack
 
 # methods to be extended in this module
 import SSFR: flux
+import SSFR.FR: admissibility_tolerance
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -124,6 +128,90 @@ end
 
 function composite2d(x, y)
    return SVector(smooth_hump2d(x, y)+cone2d(x, y)+slotted_disc2d(x, y))
+end
+
+function SSFR.apply_bound_limiter!(eq::LinAdv2D, grid, scheme, param, op, ua,
+                                   u1, aux)
+   if scheme.bound_limit == "no"
+      return nothing
+   end
+   @timeit aux.timer "Bound limiter" begin
+   # variables = (get_density, get_pressure)
+   # for variable in variables
+   #    correct_variable!(eq, variable, op, aux, grid, u1, ua)
+   # end # KLUDGE Fix the type instability and do it with a loop
+   # https://github.com/trixi-framework/Trixi.jl/blob/0fd86e4bd856d894de6a7514edcb9758bf6f8e1e/src/callbacks_stage/positivity_zhang_shu.jl#L39   correct_variable!(eq, get_density,  op, aux, grid, u1, ua)
+
+   # TODO - Allow user to pass these variables
+   correct_variable!(eq, (eq, u) -> first(u), op, aux, grid, u1, ua)
+   correct_variable!(eq, (eq, u) -> 1.0 - first(u), op, aux, grid, u1, ua)
+   return nothing
+   end # timer
+end
+
+function SSFR.limit_slope(eq::LinAdv2D, s, ufl, u_s_l, ufr, u_s_r, ue, xl, xr)
+   eps = 1e-10
+
+   variables = ((eq, u) -> first(u), (eq,u) -> 1.0 - first(u))
+
+   for variable in variables
+      var_star_tuple = (variable(eq, u_s_l), variable(eq, u_s_r))
+      var_low = variable(eq, ue)
+
+      theta = 1.0
+      for var_star in var_star_tuple
+         if var_star < eps
+            # TOTHINK - Replace eps here by 0.1*var_low
+            ratio = abs(0.1*var_low - var_low) / (abs(var_star - var_low) + 1e-13 )
+            theta = min(ratio, theta)
+         end
+      end
+      s *= theta
+      u_s_l = ue + 2.0*theta*xl*s
+      u_s_r = ue + 2.0*theta*xr*s
+   end
+
+   ufl = ue + xl*s
+   ufr = ue + xr*s
+
+   return ufl, ufr
+end
+
+function SSFR.zhang_shu_flux_fix(eq::LinAdv2D,
+                            Fn, fn,                   # high order flux, low order flux
+                            u_prev_ll, u_prev_rr,     # solution at previous time level
+                            u_low_ll, u_low_rr,       # low order updates
+                            fn_inner_ll, fn_inner_rr, # flux from inner solution points
+                            c_ll, c_rr                # c such that unew = u - c*(Fn-f_inner)
+                           )
+   variables = ((eq, u) -> first(u), (eq, u) -> 1.0 - first(u))
+   # TODO - Allow general variables!
+   for variable in variables
+      u_high_ll, u_high_rr = (u_prev_ll - c_ll * (Fn-fn_inner_ll), # high order candidates
+                              u_prev_rr - c_rr * (Fn-fn_inner_rr))
+      var_high_ll, var_high_rr = (variable(eq, u_high_ll), variable(eq, u_high_rr))
+      var_low_ll,  var_low_rr  = (variable(eq, u_low_ll ), variable(eq, u_low_rr ))
+      eps_ll, eps_rr = 0.1*var_low_ll, 0.1*var_low_rr
+      # eps_ll = eps_rr = 0.0
+      # Maybe changing this to 1e-10 will get symmetry?
+      ratio_ll = abs(eps_ll-var_low_ll)/(abs(var_high_ll-var_low_ll)+1e-13)
+      ratio_rr = abs(eps_rr-var_low_rr)/(abs(var_high_rr-var_low_rr)+1e-13)
+      theta    = min(ratio_ll, ratio_rr, 1.0)
+      if theta < 1.0
+         Fn = theta*Fn + (1.0-theta)*fn
+      end
+   end
+   return Fn
+end
+
+function SSFR.is_admissible(eq::LinAdv2D, u::AbstractVector)
+   # Check if the invariant domain in preserved. This has to be
+   # extended in Equation module
+   return u[1] >= 0.0 && u[1] <= 1.0
+end
+
+function admissibility_tolerance(eq::LinAdv2D)
+   return -1e-16
 end
 
 exact_solution_composite2d(x,y,t) = composite2d((x-0.5)*cos(t)+(y-0.5)*sin(t)+0.5,

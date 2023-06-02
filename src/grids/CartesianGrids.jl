@@ -1,9 +1,11 @@
-module Grid
+module CartesianGrids
 
 using Printf
 using UnPack
 using TimerOutputs
 using OffsetArrays
+
+using HDF5: h5open, attributes
 
 struct CartesianGrid1D
    domain::Vector{Float64}   # xmin,xmax
@@ -63,6 +65,29 @@ function make_cartesian_grid(problem, size::Vector{Int64})
    return CartesianGrid2D(domain,size,xc,yc,xf,yf,dx,dy)
 end
 
-export make_cartesian_grid
+function save_mesh_file(mesh::CartesianGrid2D, output_directory)
+   # Create output directory (if it does not exist)
+   mkpath(output_directory)
+
+   xmin, xmax, ymin, ymax = mesh.domain
+
+   filename = joinpath(output_directory, "mesh.h5")
+
+   # Open file (clobber existing content)
+   h5open(filename, "w") do file
+      # Add context information as attributes
+      attributes(file)["mesh_type"] = "StructuredMesh" # For Trixi2Vtk
+      attributes(file)["ndims"] = 2
+      attributes(file)["size"] = mesh.size
+      attributes(file)["xmin"] = xmin
+      attributes(file)["xmax"] = xmax
+      attributes(file)["ymin"] = ymin
+      attributes(file)["ymax"] = ymax
+   end
+
+   return filename
+end
+
+export make_cartesian_grid, save_mesh_file
 
 end

@@ -15,9 +15,7 @@ module Equations1D
    # Export types
    export AbstractEq1D, AbstractEquations, AbstractSystemEq1D
 
-   # Export methods (TODO - Are they called methods or functions)
-   (
-   export is_admissible, con2recon!, recon2con!, limit_slope!
-   )
+   # Export functions
+   export is_admissible, con2recon!, recon2con!, limit_slope
 
 end

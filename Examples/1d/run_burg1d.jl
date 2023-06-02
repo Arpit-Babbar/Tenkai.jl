@@ -1,7 +1,5 @@
 using SSFR
 Eq = SSFR.EqBurg1D
-using Plots
-plotlyjs() # Set backend
 
 #------------------------------------------------------------------------------
 xmin, xmax = 0.0, 2.0*pi
@@ -20,7 +18,7 @@ bflux = evaluate
 numerical_flux = Eq.rusanov
 bound_limit = "no"
 
-nx = 50
+nx = 3200
 cfl = 0.0
 bounds = ([-0.2],[0.2])
 tvbM = 0.0

@@ -359,7 +359,6 @@ function fr_operators(N, sol_pts, cor_fun)
    Dm = diff_mat(xg)
    D1 = Dm - bl * Vl' - br * Vr'
 
-   # TODO - Is this all really needed can't we just replace the later
    DmT = SMatrix{nd,nd}(Dm')
    D1T = SMatrix{nd,nd}(D1')
 

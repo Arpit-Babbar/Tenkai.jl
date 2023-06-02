@@ -22,6 +22,8 @@ using SSFR: get_filename, minmod, @threaded,
             comp_wise_mutiply_node_vars!, AbstractEquations
 )
 
+using SSFR.CartesianGrids: CartesianGrid2D, save_mesh_file
+
 using Polyester
 using StaticArrays
 using LoopVectorization
@@ -30,7 +32,12 @@ using UnPack
 using WriteVTK
 using LinearAlgebra
 using MuladdMacro
+using Printf
+using EllipsisNotation
+using HDF5: h5open, attributes
 using SSFR
+
+using SSFR.FR2D: correct_variable!
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -40,6 +47,7 @@ using SSFR
 
 struct Euler2D{HLLSpeeds <: Function} <: AbstractEquations{2,4}
    γ::Float64
+   γ_minus_1::Float64
    hll_speeds::HLLSpeeds
    nvar::Int64
    name::String
@@ -51,10 +59,11 @@ end
 
 # Extending the flux function
 @inline @inbounds function SSFR.flux(x, y, U, eq::Euler2D, orientation::Integer)
+   @unpack γ_minus_1 = eq
    ρ, ρ_u1, ρ_u2, ρ_e = U
    u1 = ρ_u1 / ρ
    u2 = ρ_u2 / ρ
-   p = (eq.γ - 1.0) * (ρ_e - 0.5 * (ρ_u1 * u1 + ρ_u2 * u2))
+   p = γ_minus_1 * (ρ_e - 0.5 * (ρ_u1 * u1 + ρ_u2 * u2))
    if orientation == 1
       F1 = ρ_u1
       F2 = ρ_u1 * u1 + p
@@ -72,10 +81,11 @@ end
 
 # Extending the flux function
 @inline @inbounds function SSFR.flux(x, y, U, eq::Euler2D)
+   @unpack γ_minus_1 = eq
    ρ, ρ_u1, ρ_u2, ρ_e = U
    u1 = ρ_u1 / ρ
    u2 = ρ_u2 / ρ
-   p = (eq.γ - 1.0) * (ρ_e - 0.5 * (ρ_u1 * u1 + ρ_u2 * u2))
+   p = γ_minus_1 * (ρ_e - 0.5 * (ρ_u1 * u1 + ρ_u2 * u2))
 
    F1 = ρ_u1
    F2 = ρ_u1 * u1 + p
@@ -94,52 +104,48 @@ end
 
 # function converting primitive variables to PDE variables
 function SSFR.prim2con(eq::Euler2D, prim) # primitive, gas constant
-   @unpack γ = eq
+   @unpack γ_minus_1 = eq
    ρ, v1, v2, p = prim
    ρ_v1 = ρ * v1
    ρ_v2 = ρ * v2
-   # TODO - Save 1/(gamma-1)
-   ρ_e  = p/(γ-1.0) + 0.5 * (ρ_v1 * v1 + ρ_v2 * v2)
+   ρ_e  = p/γ_minus_1 + 0.5 * (ρ_v1 * v1 + ρ_v2 * v2)
    return SVector(ρ, ρ_v1, ρ_v2, ρ_e)
 end
 
 function SSFR.prim2con!(eq::Euler2D, ua)
-   @unpack γ = eq
-   # TODO - Optimize
+   @unpack γ, γ_minus_1 = eq
    ρ, v1, v2, p = ua
    ua[2] = ρ_v1 = ρ * v1
    ua[3] = ρ_v2 = ρ * v2
-   ua[4] = p/(γ-1.0) + 0.5*(ρ_v1*v1 + ρ_v2*v2)
+   ua[4] = p/γ_minus_1 + 0.5*(ρ_v1*v1 + ρ_v2*v2)
    return nothing
 end
 
 # function converting pde variables to primitive variables
 function SSFR.con2prim(eq::Euler2D, U)
-   @unpack γ = eq
+   @unpack γ_minus_1 = eq
    ρ, ρ_u1, ρ_u2, ρ_e = U
    u1 = ρ_u1/ρ
    u2 = ρ_u2/ρ
-   p = (γ-1.0)*(ρ_e-0.5*(ρ_u1*u1 + ρ_u2*u2))
+   p = γ_minus_1*(ρ_e-0.5*(ρ_u1*u1 + ρ_u2*u2))
    primitives = SVector(ρ, u1, u2, p)
    return primitives
 end
 
 function SSFR.con2prim!(eq::Euler2D, ua, ua_)
-   @unpack γ = eq
-   # TODO - Optimize?
+   @unpack γ_minus_1 = eq
    ρ, ρ_u1, ρ_u2, ρ_e = ua
    u1, u2 = ρ_u1/ρ, ρ_u2/ρ
-   p = (γ-1.0)*(ρ_e-0.5*(ρ_u1*u1 + ρ_u2*u2))
+   p = γ_minus_1*(ρ_e-0.5*(ρ_u1*u1 + ρ_u2*u2))
    ua_[1], ua_[2], ua_[3], ua_[4] = ( ρ, u1, u2, p )
    return nothing
 end
 
 function SSFR.con2prim!(eq::Euler2D, ua)
-   @unpack γ = eq
-   # TODO - Optimize
+   @unpack γ_minus_1 = eq
    ρ, ρ_u1, ρ_u2, ρ_e = ua
    u1, u2 = ρ_u1/ρ, ρ_u2/ρ
-   p = (γ-1.0)*(ρ_e-0.5*(ρ_u1*u1 + ρ_u2*u2))
+   p = γ_minus_1*(ρ_e-0.5*(ρ_u1*u1 + ρ_u2*u2))
    ua[1], ua[2], ua[3], ua[4] = ( ρ, u1, u2, p )
    return nothing
 end
@@ -150,15 +156,15 @@ end
 end
 
 @inline function get_pressure(eq::Euler2D, u::AbstractArray)
-   @unpack γ = eq
+   @unpack γ_minus_1 = eq
    ρ, ρ_v1, ρ_v2, ρ_e = u
-   p = (γ-1.0) * (ρ_e - 0.5*(ρ_v1*ρ_v1+ρ_v2*ρ_v2)/ρ)
+   p = γ_minus_1 * (ρ_e - 0.5*(ρ_v1*ρ_v1+ρ_v2*ρ_v2)/ρ)
    return p
 end
 
 function SSFR.is_admissible(eq::Euler2D, u::AbstractVector)
    ρ, vel_x, vel_y, p = con2prim(eq, u)
-   if ρ > -1e-12 && p > -1e-12
+   if ρ > 1e-12 && p > 1e-12
       return true
    else
       @debug ρ, p
@@ -179,8 +185,7 @@ function SSFR.compute_time_step(eq::Euler2D, grid, aux, op, cfl, u1, ua)
    corners = ( (0,0), (nx+1,0), (0,ny+1), (nx+1,ny+1) )
    for element in CartesianIndices((0:nx+1, 0:ny+1))
       el_x, el_y = element[1], element[2]
-      # TODO - Temporary hack
-      if (el_x,el_y) ∈ corners
+      if (el_x,el_y) ∈ corners # KLUDGE - Temporary hack
          continue
       end
       u_node = get_node_vars(ua, eq, el_x, el_y)
@@ -188,9 +193,8 @@ function SSFR.compute_time_step(eq::Euler2D, grid, aux, op, cfl, u1, ua)
       c = sqrt(γ*p/rho)
       sx, sy = abs(v1) + c, abs(v2) + c
       den = max(den, abs(sx)/dx[el_x] + abs(sy)/dy[el_y] + 1e-12)
-
       # Code for using polynomial values in place of cell average values
-      # TODO - Decide whether to keep them or not
+      # TOTHINK - Decide whether to keep them or not
       # for j in 1:nd, i in 1:nd
       #    u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
       #    rho, v1, v2, p = con2prim(eq, u_node)
@@ -259,7 +263,7 @@ function isentropic_iv(x,y)
 end
 
 # initial_value_ref, final_time, ic_name = Eq.dwave_data
-function isentropic_exact(x, y,t)
+function isentropic_exact(x, y, t)
    xmin, xmax = -10.0, 10.0
    ymin, ymax = -10.0, 10.0
    Lx = xmax - xmin
@@ -568,6 +572,43 @@ function initial_value_sedov_zhang_shu(x, nx, ny)
    return SVector(ρ, ρ*v1, ρ*v2, E)
 end
 
+rp_datas = ([ (1.0, 0.0, 0.0, 1.0), (0.5197, -0) ], # 1
+            [  ], # 2
+            [  ], # 3
+            [ (1.1, 0, 0, 1.1),  (0.5065, 0.8939, 0, 0.35),
+              (1.1, 0.8939, 0.8939, 1.1), (0.5065, 0, 0.8939, 0.35)], # 4
+            [ (1, -0.75, -0.5, 1), (2, -0.75, 0.5, 1.0),
+              (1, 0.75, 0.5, 1.0), (3, 0.75, -0.5, 1)], # 5
+            [(1, -0.75, -0.5, 1), (2, -0.75, 0.5, 1.0),
+             (1, 0.75, 0.5, 1.0), (3, 0.75, -0.5, 1)], # 6
+             [], # 7
+             [], # 8
+             [], # 9
+             [], # 10
+             [], # 11
+             [(0.5313, 0, 0, 0.4), (1.0, 0.7276, 0, 1.0),
+              (0.8, 0, 0, 1.0), (1.0, 0, 0.7276, 1.0)], # 12
+             [(1, 0, -0.3, 1), (2, 0, 0.3, 1),
+              (1.0625, 0, 0.8145, 0.4), (0.5313, 0, 0.4276, 0.4)], # 13
+             []
+           )
+
+function riemann_problem(x,y, eq::Euler2D,prim_ur, prim_ul, prim_dl, prim_dr)
+   @unpack γ = eq
+   if x >= 0.5 && y >= 0.5
+      ρ, v1, v2, p = prim_ur
+   elseif x <= 0.5 && y >= 0.5
+      ρ, v1, v2, p = prim_ul
+   elseif x <= 0.5 && y <= 0.5
+      ρ, v1, v2, p = prim_dl
+   elseif x >= 0.5 && y <= 0.5
+      ρ, v1, v2, p = prim_dr
+   end
+   ρ_v1 = ρ*v1
+   ρ_v2 = ρ*v2
+   return SVector(ρ, ρ*v1, ρ*v2, p/(γ-1.0) + 0.5*(ρ_v1*v1+ρ_v2*v2))
+end
+
 zs_nx = zs_ny = 160
 
 initial_value_sedov_zhang_shu(x,y) = initial_value_sedov_zhang_shu((x,y), zs_nx, zs_ny)
@@ -594,10 +635,10 @@ function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler2D, dir)
       λ = max(abs(v2_ll), abs(v2_rr)) + max(cl, cr)
       # λ = max(abs(v2_ll)+cl, abs(v2_rr+cr))
    end
-   F1  = 0.5*(Fl[1]+Fr[1]) - 0.5*λ*(Ur[1] - Ul[1]) # TODO - Make in place and efficient
-   F2  = 0.5*(Fl[2]+Fr[2]) - 0.5*λ*(Ur[2] - Ul[2]) # TODO - Make in place and efficient
-   F3  = 0.5*(Fl[3]+Fr[3]) - 0.5*λ*(Ur[3] - Ul[3]) # TODO - Make in place and efficient
-   F4  = 0.5*(Fl[4]+Fr[4]) - 0.5*λ*(Ur[4] - Ul[4]) # TODO - Make in place and efficient
+   F1  = 0.5*(Fl[1]+Fr[1]) - 0.5*λ*(Ur[1] - Ul[1])
+   F2  = 0.5*(Fl[2]+Fr[2]) - 0.5*λ*(Ur[2] - Ul[2])
+   F3  = 0.5*(Fl[3]+Fr[3]) - 0.5*λ*(Ur[3] - Ul[3])
+   F4  = 0.5*(Fl[4]+Fr[4]) - 0.5*λ*(Ur[4] - Ul[4])
    return SVector(F1,F2,F3,F4)
 end
 
@@ -605,17 +646,18 @@ end
 
 @inline @inbounds function hll_speeds(ual, uar, dir, eq)
    # Calculate primitive variables and speed of sound
+   @unpack γ_minus_1 = eq
    rho_ll, rho_v1_ll, rho_v2_ll, rho_e_ll = ual
    rho_rr, rho_v1_rr, rho_v2_rr, rho_e_rr = uar
 
    v1_ll = rho_v1_ll / rho_ll
    v2_ll = rho_v2_ll / rho_ll
-   p_ll = (eq.γ - 1) * (rho_e_ll - 1/2 * rho_ll * (v1_ll*v1_ll + v2_ll*v2_ll))
+   p_ll = γ_minus_1 * (rho_e_ll - 1/2 * rho_ll * (v1_ll*v1_ll + v2_ll*v2_ll))
    c_ll = sqrt(eq.γ*p_ll/rho_ll)
 
    v1_rr = rho_v1_rr / rho_rr
    v2_rr = rho_v2_rr / rho_rr
-   p_rr = (eq.γ - 1) * (rho_e_rr - 1/2 * rho_rr * (v1_rr*v1_rr + v2_rr*v2_rr))
+   p_rr = γ_minus_1 * (rho_e_rr - 1/2 * rho_rr * (v1_rr*v1_rr + v2_rr*v2_rr))
    c_rr = sqrt(eq.γ*p_rr/rho_rr)
 
    # Compute Roe averages
@@ -625,18 +667,18 @@ end
    if dir == 1 # x-direction
       vel_L = v1_ll
       vel_R = v1_rr
-      ekin_roe = (sqrt_rho_ll * v2_ll + sqrt_rho_rr * v2_rr)^2 # TODO - Remove square for @muladd?
+      ekin_roe = (sqrt_rho_ll * v2_ll + sqrt_rho_rr * v2_rr)^2
    elseif dir == 2 # y-direction
       vel_L = v2_ll
       vel_R = v2_rr
-      ekin_roe = (sqrt_rho_ll * v1_ll + sqrt_rho_rr * v1_rr)^2 # TODO - Remove square for @muladd?
+      ekin_roe = (sqrt_rho_ll * v1_ll + sqrt_rho_rr * v1_rr)^2
    end
    vel_roe = (sqrt_rho_ll * vel_L + sqrt_rho_rr * vel_R) / sum_sqrt_rho
    ekin_roe = 0.5 * (vel_roe*vel_roe + ekin_roe / (sum_sqrt_rho*sum_sqrt_rho))
    H_ll = (rho_e_ll + p_ll) / rho_ll
    H_rr = (rho_e_rr + p_rr) / rho_rr
    H_roe = (sqrt_rho_ll * H_ll + sqrt_rho_rr * H_rr) / sum_sqrt_rho
-   c_roe = sqrt((eq.γ - 1) * (H_roe - ekin_roe))
+   c_roe = sqrt(γ_minus_1 * (H_roe - ekin_roe))
    Ssl = min(vel_L - c_ll, vel_roe - c_roe)
    Ssr = max(vel_R + c_rr, vel_roe + c_roe)
 
@@ -644,6 +686,7 @@ end
 end
 
 @inline @inbounds function hllc(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler2D, dir::Integer)
+   @unpack γ_minus_1 = eq
    # Calculate primitive variables and speed of sound
    Ssl, Ssr = hll_speeds(ual, uar, dir, eq)
    rho_ll, rho_v1_ll, rho_v2_ll, rho_e_ll = Ul
@@ -651,12 +694,12 @@ end
    v1_ll = rho_v1_ll / rho_ll
    v2_ll = rho_v2_ll / rho_ll
    e_ll  = rho_e_ll / rho_ll
-   p_ll = (eq.γ - 1) * (rho_e_ll - 1/2 * rho_ll * (v1_ll*v1_ll + v2_ll*v2_ll))
+   p_ll = γ_minus_1 * (rho_e_ll - 1/2 * rho_ll * (v1_ll*v1_ll + v2_ll*v2_ll))
 
    v1_rr = rho_v1_rr / rho_rr
    v2_rr = rho_v2_rr / rho_rr
-   e_rr  = rho_e_rr / rho_rr
-   p_rr = (eq.γ - 1) * (rho_e_rr - 1/2 * rho_rr * (v1_rr*v1_rr + v2_rr*v2_rr))
+   e_rr  = rho_e_rr  / rho_rr
+   p_rr = γ_minus_1 * (rho_e_rr - 1/2 * rho_rr * (v1_rr*v1_rr + v2_rr*v2_rr))
 
    # Obtain left and right fluxes
    if dir == 1 # x-direction
@@ -722,19 +765,19 @@ end
 end
 
 @inline @inbounds function roe_avg(ual, uar, eq, dir)
-   @unpack γ = eq
+   @unpack γ, γ_minus_1 = eq
    # Calculate primitive variables and speed of sound
    rho_ll, rho_v1_ll, rho_v2_ll, rho_e_ll = ual
    rho_rr, rho_v1_rr, rho_v2_rr, rho_e_rr = uar
 
    v1_ll = rho_v1_ll / rho_ll
    v2_ll = rho_v2_ll / rho_ll
-   p_ll = (γ - 1) * (rho_e_ll - 1/2 * rho_ll * (v1_ll*v1_ll + v2_ll*v2_ll))
+   p_ll = γ_minus_1 * (rho_e_ll - 1/2 * rho_ll * (v1_ll*v1_ll + v2_ll*v2_ll))
    c_ll = sqrt(γ*p_ll/rho_ll)
 
    v1_rr = rho_v1_rr / rho_rr
    v2_rr = rho_v2_rr / rho_rr
-   p_rr = (γ - 1) * (rho_e_rr - 1/2 * rho_rr * (v1_rr*v1_rr + v2_rr*v2_rr))
+   p_rr = γ_minus_1 * (rho_e_rr - 1/2 * rho_rr * (v1_rr*v1_rr + v2_rr*v2_rr))
    c_rr = sqrt(γ*p_rr/rho_rr)
 
    # Compute Roe averages
@@ -758,7 +801,7 @@ end
    H_ll = (rho_e_ll + p_ll) / rho_ll
    H_rr = (rho_e_rr + p_rr) / rho_rr
    H_roe = (sqrt_rho_ll * H_ll + sqrt_rho_rr * H_rr) / sum_sqrt_rho
-   c_roe = sqrt((γ - 1.0) * (H_roe - ekin_roe))
+   c_roe = sqrt(γ_minus_1 * (H_roe - ekin_roe))
 
    return density_roe, vn_roe, vel_x_roe, vel_y_roe, H_roe, c_roe, ekin_roe
 end
@@ -777,14 +820,14 @@ end
    v1_ll = rho_v1_ll / rho_ll
    v2_ll = rho_v2_ll / rho_ll
    e_ll  = rho_e_ll  / rho_ll
-   p_ll = (eq.γ - 1) * (rho_e_ll - 0.5 * rho_ll * (v1_ll*v1_ll + v2_ll*v2_ll))
+   p_ll = γ_minus_1 * (rho_e_ll - 0.5 * rho_ll * (v1_ll*v1_ll + v2_ll*v2_ll))
    ekin_l = v1_ll^2 + v2_ll^2
 
    rho_rr, rho_v1_rr, rho_v2_rr, rho_e_rr = Ur
    v1_rr  = rho_v1_rr / rho_rr
    v2_rr  = rho_v2_rr / rho_rr
    e_rr   = rho_e_rr  / rho_rr
-   p_rr   = (eq.γ - 1) * (rho_e_rr - 0.5 * rho_rr * (v1_rr*v1_rr + v2_rr*v2_rr))
+   p_rr   = γ_minus_1 * (rho_e_rr - 0.5 * rho_rr * (v1_rr*v1_rr + v2_rr*v2_rr))
    ekin_r = v1_rr^2 + v2_rr^2
 
    dv_x    = v1_rr - v1_ll
@@ -859,152 +902,21 @@ end
 #------------------------------------------------------------------------------
 # Limiters
 #------------------------------------------------------------------------------
-# TODO - Move this to FR2D.jl
 # Zhang-Shu limiting procedure for one variable
 function SSFR.apply_bound_limiter!(eq::Euler2D, grid, scheme, param, op, ua,
-                                   u1,
-                                   aux)
+                                   u1, aux)
    if scheme.bound_limit == "no"
       return nothing
    end
+   @unpack eps = param
    @timeit aux.timer "Bound limiter" begin
-
-   @unpack γ = eq
-   nvar = nvariables(eq)
-   @unpack Vl, Vr = op
-   @unpack aux_cache = aux
-   @unpack xc, yc = grid
-   nx, ny = grid.size
-   nd = op.degree + 1
-
-   eps = 1.0e-10
-   ρ_avg_min, p_avg_min = 1e20, 1e20
-   for el_y=1:ny, el_x=1:nx
-      # TODO - This ua2_ can prolly be ua_, no type instabiliy will be caused.
-      ua2_ = get_node_vars(ua, eq, el_x, el_y)
-      ρ_avg = ua2_[1]
-      p_avg = get_pressure(eq, ua2_)
-      ρ_avg_min = min(ρ_avg, ρ_avg_min)
-      p_avg_min = min(p_avg, p_avg_min)
-      if ρ_avg_min < 0.0 || p_avg_min < 0.0
-        throw(DomainError((ρ_avg_min, p_avg_min), "Positivity limiter failed"
-                           *"in element $el_x,$el_y with centre"
-                           *"($(xc[el_x]), $(yc[el_y])"))
-      end
-
-   end
-   # If I don't change the name from eps to eps2, I get that Core.Box type instability again
-   eps2 = min(eps, ρ_avg_min, p_avg_min)
-
-   refresh!(u) = fill!(u, zero(eltype(u)))
-
-   @threaded for element in CartesianIndices((1:nx, 1:ny))
-      el_x, el_y = element[1], element[2]
-      ul, ur, ud, uu = aux_cache.bound_limiter_cache[Threads.threadid()]
-      u1_ = @view u1[:,:,:,el_x,el_y]
-
-      ua_ = get_node_vars(ua, eq, el_x, el_y)
-      ρ_avg, p_avg = get_density(eq, ua_), get_pressure(eq, ua_)
-
-      # Correct density
-
-      ρ_min = 1e20
-      refresh!.((ul, ur, ud, uu))
-      # Loop to find minimum over inner points and
-      # perform extrapolation to non-corner face points
-      for j in Base.OneTo(nd), i in Base.OneTo(nd)
-         u_node = get_node_vars(u1_, eq, i, j)
-         ρ_node = get_density(eq, u_node)
-         ul[j] += ρ_node * Vl[i]
-         ur[j] += ρ_node * Vr[i]
-         ud[i] += ρ_node * Vl[j]
-         uu[i] += ρ_node * Vr[j]
-         ρ_min = min(ρ_node, ρ_min)
-      end
-
-      # Now to get the complete minimum, compute ρ_min at face values as well
-      for k in Base.OneTo(nd)
-         ρ_min = min(ρ_min, ul[k], ur[k], ud[k], uu[k])
-      end
-
-      # # Now, we get minimum corner points (NEED TO BE DECIDED)
-      # uld = ulu = urd = uru = 0.0
-      # for j in Base.OneTo(nd)
-      #    uld += 0.5 * (Vl[j] * ul[j] + Vl[j] * ud[j])
-      #    ulu += 0.5 * (Vr[j] * ul[j] + Vl[j] * uu[j])
-      #    urd += 0.5 * (Vl[j] * ur[j] + Vr[j] * ud[j])
-      #    uru += 0.5 * (Vr[j] * ur[j] + Vr[j] * uu[j])
-      # end
-
-      # ρ_min = min(ρ_min, uld, ulu, urd, uru)
-
-      theta = 1.0
-      if ρ_min < eps2
-         ratio = abs(eps2 - ρ_avg)/(abs(ρ_min - ρ_avg) + 1e-13)
-         theta = min(ratio, 1.0)
-      end
-
-      if theta < 1.0
-         for j in Base.OneTo(nd), i in Base.OneTo(nd)
-            u_node = get_node_vars(u1_, eq, i, j)
-            multiply_add_set_node_vars!(u1_,
-                                        theta, u_node,
-                                        1.0 - theta, ua_,
-                                        eq, i, j)
-         end
-      end
-
-      # Now that density is positivity, pressure is a concave function
-      # and we can correct it
-
-      p_min = 1e20
-      refresh!.((ul, ur, ud, uu))
-      # Loop to find minimum over inner points and
-      # perform extrapolation to non-corner face points
-      for j in Base.OneTo(nd), i in Base.OneTo(nd)
-         u_node = get_node_vars(u1_, eq, i, j)
-         p_node = get_pressure(eq, u_node)
-         ul[j] += p_node * Vl[i]
-         ur[j] += p_node * Vr[i]
-         ud[i] += p_node * Vl[j]
-         uu[i] += p_node * Vr[j]
-         p_min = min(p_node, p_min)
-      end
-
-      for k in Base.OneTo(nd)
-         p_min = min(p_min, ul[k], ur[k], ud[k], uu[k])
-      end
-
-      # # Now, we get minimum corner points (NEED TO BE DECIDED)
-      # uld = ulu = urd = uru = 0.0
-      # for j in Base.OneTo(nd)
-      #    uld += 0.5 * (Vl[j] * ul[j] + Vl[j] * ud[j])
-      #    ulu += 0.5 * (Vr[j] * ul[j] + Vl[j] * uu[j])
-      #    urd += 0.5 * (Vl[j] * ur[j] + Vr[j] * ud[j])
-      #    uru += 0.5 * (Vr[j] * ur[j] + Vr[j] * uu[j])
-      # end
-
-      # p_min = min(p_min, uld, ulu, urd, uru)
-
-      theta = 1.0
-      if p_min < eps2
-         ratio = abs(eps2 - p_avg)/(abs(p_min - p_avg) + 1e-13)
-         theta = min(ratio, 1.0)
-      end
-      # Trixi says the following -
-      # We compute the value directly with the mean values, as we assume that
-      # Jensen's inequality holds (e.g. pressure for compressible Euler equations).
-
-      if theta < 1.0
-         for j in Base.OneTo(nd), i in Base.OneTo(nd)
-            u_node = get_node_vars(u1_, eq, i, j)
-            multiply_add_set_node_vars!(u1_,
-                                        theta, u_node,
-                                        1.0 - theta, ua_,
-                                        eq, i, j)
-         end
-      end
-   end
+   # variables = (get_density, get_pressure)
+   # for variable in variables
+   #    correct_variable!(eq, variable, op, aux, grid, u1, ua)
+   # end # KLUDGE Fix the type instability and do it with a loop
+   # https://github.com/trixi-framework/Trixi.jl/blob/0fd86e4bd856d894de6a7514edcb9758bf6f8e1e/src/callbacks_stage/positivity_zhang_shu.jl#L39   correct_variable!(eq, get_density,  op, aux, grid, u1, ua)
+   correct_variable!(eq, get_density, op, aux, grid, u1, ua, eps)
+   correct_variable!(eq, get_pressure, op, aux, grid, u1, ua, eps)
    return nothing
    end # timer
 end
@@ -1014,9 +926,9 @@ end
 
 function eigmatrix(eq::Euler2D, U)
    nvar = nvariables(eq)
-   @unpack γ = eq
+   @unpack γ, γ_minus_1 = eq
 
-   g1   = γ - 1.0
+   g1   = γ_minus_1
    rho  = U[1]
    E    = U[nvar]
    u    = U[2] / rho
@@ -1137,7 +1049,7 @@ function SSFR.apply_tvb_limiterβ!(eq::Euler2D, problem, scheme, grid, param,
          multiply_add_to_node_vars!(ud, Vl[j]*wg[i], u_, eq, 1)
          multiply_add_to_node_vars!(uu, Vr[j]*wg[i], u_, eq, 1)
       end
-      # TODO - Give better names to these quantities
+      # KLUDGE - Give better names to these quantities
       # slopes b/w centres and faces
       ul_ , ur_  = get_node_vars(ul, eq, 1), get_node_vars(ur, eq, 1)
       ud_ , uu_  = get_node_vars(ud, eq, 1), get_node_vars(uu, eq, 1)
@@ -1183,10 +1095,8 @@ function SSFR.apply_tvb_limiterβ!(eq::Euler2D, problem, scheme, grid, param,
          for j in Base.OneTo(nd), i in Base.OneTo(nd)
             multiply_add_set_node_vars!(u1_,
                                         1.0, ua_,
-                                       #  2.0 * (xg[i] - 0.5),
                                         xg[i] - 0.5,
                                         dux_,
-                                       #  2.0 * (xg[j] - 0.5),
                                         xg[j] - 0.5,
                                         duy_,
                                         eq, i, j)
@@ -1237,7 +1147,7 @@ function SSFR.apply_tvb_limiter!(eq::Euler2D, problem, scheme, grid, param, op,
          multiply_add_to_node_vars!(ud, Vl[j]*wg[i], u_, eq, 1)
          multiply_add_to_node_vars!(uu, Vr[j]*wg[i], u_, eq, 1)
       end
-      # TODO - Give better names to these quantities
+      # KLUDGE - Give better names to these quantities
       # slopes b/w centres and faces
       ul_ , ur_  = get_node_vars(ul, eq, 1), get_node_vars(ur, eq, 1)
       ud_ , uu_  = get_node_vars(ud, eq, 1), get_node_vars(uu, eq, 1)
@@ -1314,18 +1224,19 @@ end
 # Blending limiter
 #------------------------------------------------------------------------------
 
-@inbounds @inline function primitive_indicator!(un, ::Euler2D)
+@inbounds @inline function primitive_indicator!(un, eq::Euler2D)
+   @unpack γ_minus_1 = eq # Is this inefficient?
    nd_p2 = size(un, 2)
    for iy=1:nd_p2, ix=1:nd_p2 # loop over dofs and faces
-      @unpack γ = eq # Is this inefficient?
       ρ, ρ_u1, ρ_u2, ρ_e = @view un[:,ix,iy]
       u1, u2 = ρ_u1/ρ, ρ_u2/ρ
-      p = (γ-1.0)*(ρ_e-0.5*(ρ_u1*u1 + ρ_u2*u2))
+      p = γ_minus_1*(ρ_e-0.5*(ρ_u1*u1 + ρ_u2*u2))
       un[:,ix,iy] .= ρ, u1, u2, p
    end
    n_ind_var = nvar
    return n_ind_var
 end
+
 @inbounds @inline function rho_indicator!(ue, ::Euler2D)
    # Use only density as indicating variables
    n_ind_var = 1
@@ -1334,10 +1245,10 @@ end
 
 @inbounds @inline function rho_p_indicator!(un, eq::Euler2D)
    nd_p2 = size(un, 2) # nd + 2
-   @unpack γ = eq # Is this inefficient?
+   @unpack γ_minus_1 = eq # Is this inefficient?
    for iy=1:nd_p2, ix=1:nd_p2 # loop over dofs and faces
       ρ, ρ_v1, ρ_v2, ρ_e = @view un[:,ix,iy] # USE GET NODE VARS!!
-      p = (γ-1.0) * (ρ_e - 0.5*(ρ_v1^2+ρ_v2^2)/ρ)
+      p = γ_minus_1 * (ρ_e - 0.5*(ρ_v1^2+ρ_v2^2)/ρ)
       un[1,ix,iy] = ρ*p
    end
    n_ind_var = 1
@@ -1345,11 +1256,11 @@ end
 end
 
 @inbounds @inline function p_indicator!(un, ::Euler2D)
+   @unpack γ_minus_1 = eq
    nd_p2 = size(un, 2)
    for iy=1:nd_p2, ix=1:nd_p2 # loop over dofs and faces
-      @unpack γ = eq
       ρ, ρ_v1, ρ_v2, ρ_e = @view un[:,ix,iy]
-      p = (γ-1.0) * (ρ_e - 0.5*(ρ_v1^2+ρ_v2^2)/ρ)
+      p = γ_minus_1 * (ρ_e - 0.5*(ρ_v1^2+ρ_v2^2)/ρ)
       un[1,ix,iy] = p
    end
    n_ind_var = 1
@@ -1375,8 +1286,26 @@ function SSFR.blending_flux_factors(eq::Euler2D, ua, dx, dy)
    return λx, λy
 end
 
-function SSFR.limit_slope!(eq::Euler2D, slope, ufl, u_star_l, ufr, u_star_r,
-                           ue, xl, xr)
+function limit_variable_slope(eq, variable, slope, u_star_ll, u_star_rr, ue, xl, xr)
+   # By Jensen's inequality, we can find theta's directly for the primitives
+   var_star_ll, var_star_rr = variable(eq, u_star_ll), variable(eq, u_star_rr)
+   var_low = variable(eq, ue)
+   threshold = 0.1*var_low
+   eps = 1e-10
+   if var_star_ll < eps || var_star_rr < eps
+      ratio_ll = abs(threshold - var_low) / (abs(var_star_ll - var_low) + 1e-13)
+      ratio_rr = abs(threshold - var_low) / (abs(var_star_rr - var_low) + 1e-13)
+      theta = min(ratio_ll, ratio_rr, 1.0)
+      slope *= theta
+      u_star_ll = ue + 2.0*theta*xl*slope
+      u_star_rr = ue + 2.0*theta*xr*slope
+   end
+   return slope, u_star_ll, u_star_rr
+end
+
+function SSFR.limit_slope(eq::Euler2D, slope, ufl, u_star_ll, ufr, u_star_rr,
+                           ue, xl, xr, el_x = nothing, el_y = nothing)
+
    # The MUSCL-Hancock scheme is guaranteed to be admissibility preserving if
    # slope is chosen so that
    # u_star_l = ue + 2.0*slope*xl, u_star_r = ue+2.0*slope*xr are admissible
@@ -1386,59 +1315,16 @@ function SSFR.limit_slope!(eq::Euler2D, slope, ufl, u_star_l, ufr, u_star_r,
    # u_star_l = ue + 2.0*theta*s*xl.
    # Thus, we simply have to update the slope by multiplying by theta.
 
-   # By Jensen's inequality, we can find theta's directly for the primitives
+   slope, u_star_ll, u_star_rr = limit_variable_slope(
+      eq, get_density, slope, u_star_ll, u_star_rr, ue, xl, xr)
 
-   # First we limit u_star_l. We keep limiting u_star_r at the same time
-   # in case it already becomes admissible in the process
-
-   # TODO - Avoid this repetition
-
-   @unpack γ = eq
-   ρ_low, ρ_star = get_density(eq, ue), get_density(eq, u_star_l)
-   eps = 0.1*ρ_low
-   ratio = abs(eps-ρ_low)/(abs(ρ_low-ρ_star)+1e-13)
-   theta = min(ratio, 1.0)
-   if theta < 1.0
-      slope = theta*slope # Limit slope accordingly
-      # Update u_star_l, u_star_r with new slope
-      u_star_l = ue + 2.0*slope*xl
-      u_star_r = ue + 2.0*slope*xr
-   end
-   p_low, p_star = get_pressure(eq, ue), get_pressure(eq, u_star_l)
-   eps = 0.1*p_low
-   ratio = abs(eps-p_low)/(abs(p_low-p_star)+1e-13)
-   theta = min(ratio, 1.0)
-   if theta < 1.0
-      slope = theta*slope # Limit slope accordingly
-      # Update u_star_l, u_star_r with new slope
-      u_star_l = ue + 2.0*slope*xl
-      u_star_r = ue + 2.0*slope*xr
-   end
-
-   ρ_star = get_density(eq, u_star_r)
-   ratio = abs(eps-ρ_low)/(abs(ρ_low-ρ_star)+1e-13)
-   theta = min(ratio, 1.0)
-   if theta < 1.0
-      slope = theta*slope # Limit slope accordingly
-      # Update u_star_l, u_star_r with new slope
-      # u_star_l = ue + 2.0*slope*xl
-      u_star_r = ue + 2.0*slope*xr
-   end
-   p_star = get_pressure(eq, u_star_r)
-   eps = 0.1*p_low
-   ratio = abs(eps-p_low)/(abs(p_low-p_star)+1e-13)
-   theta = min(ratio, 1.0)
-   if theta < 1.0
-      slope = theta*slope # Limit slope accordingly
-      # Update u_star_l, u_star_r with new slope
-      # u_star_l = ue + 2.0*slope*xl
-      u_star_r = ue + 2.0*slope*xr
-   end
+   slope, u_star_ll, u_star_rr = limit_variable_slope(
+      eq, get_pressure, slope, u_star_ll, u_star_rr, ue, xl, xr)
 
    ufl = ue + slope*xl
    ufr = ue + slope*xr
 
-   return ufl, ufr
+   return ufl, ufr, slope
 end
 
 function SSFR.zhang_shu_flux_fix(eq::Euler2D,
@@ -1459,7 +1345,7 @@ function SSFR.zhang_shu_flux_fix(eq::Euler2D,
    end
    uhigh = uprev - c * (Fn - fn_inner) # Second candidate for uhigh
    p_low, p_high = get_pressure(eq, ulow), get_pressure(eq, uhigh)
-   eps = 0.1*p_low
+   eps   = 0.1*p_low
    ratio = abs(eps-p_low)/(abs(p_high-p_low) + 1e-13)
    theta = min(ratio, 1.0)
    if theta < 1.0
@@ -1467,6 +1353,8 @@ function SSFR.zhang_shu_flux_fix(eq::Euler2D,
    end
    return Fn
 end
+
+
 
 #------------------------------------------------------------------------------
 # Ghost values functions
@@ -1644,7 +1532,7 @@ end
 function SSFR.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
                                         grid, aux, op, cache, t, dt)
    @timeit aux.timer "Update ghost values" begin
-   @unpack Fb, Ub = cache
+   @unpack Fb, Ub, ua = cache
    update_ghost_values_periodic!(eq, problem, Fb, Ub)
 
    @unpack periodic_x, periodic_y = problem
@@ -1660,7 +1548,6 @@ function SSFR.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
   @unpack boundary_condition, boundary_value = problem
   left, right, bottom, top = boundary_condition
 
-  # TODO - Make nvar independent
   refresh!(u) = fill!(u, zero(eltype(u)))
 
   pre_allocated = cache.ghost_cache
@@ -1694,6 +1581,17 @@ function SSFR.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
             fb_node = get_node_vars(fb, eq, 1)
             set_node_vars!(Ub, ub_node, eq, k, 2, 0, j)
             set_node_vars!(Fb, fb_node, eq, k, 2, 0, j)
+
+            # # Put hllc flux values
+            # Ul = get_node_vars(Ub, eq, k, 2, 0, j)
+            # Fl = get_node_vars(Fb, eq, k, 2, 0, j)
+            # Ur = get_node_vars(Ub, eq, k, 1, 1, j)
+            # Fr = get_node_vars(Fb, eq, k, 1, 1, j)
+            # ual, uar = get_node_vars(ua, eq, 0, j), get_node_vars(ua, eq, 1, j)
+            # X = SVector{2}(x1, y1)
+            # Fn = hllc(X, ual, uar, Fl, Fr, Ul, Ur, eq, 1)
+            # set_node_vars!(Ub, ub_node, eq, k, 1, 1, j)
+            # set_node_vars!(Fb, Fn     , eq, k, 1, 1, j)
 
             # Purely upwind at boundary
             # if abs(y1) < 0.055
@@ -1889,7 +1787,7 @@ function wall_double_mach_reflection_fb_ub!(grid, eq, op, Fb, Ub, aux)
    @threaded for i=1:nx
       for k in Base.OneTo(nd)
          # Outflow upto [0,1/6]
-         # TODO - Don't do this, it's stupid.
+         # KLUDGE - Don't do this, it's stupid.
          # This is only needed when handling non-linear
          # kernels. LoopVectorization is the right way for this
          Ub_node = get_node_vars(Ub, eq, k, 3, i, 1)
@@ -1926,18 +1824,18 @@ function wall_double_mach_reflection_ua!(grid, eq, ua)
 end
 
 function wall_double_mach_reflection_u1!(op, grid, u1)
-   @unpack xf = grid
-
-   @unpack dx = grid
+   @unpack xf, dx = grid
    nx, ny = grid.size
    @unpack degree, xg = op
-   nd = degree+1
+   nd = degree + 1
    u1[:, :, :, :, 0] .= @view u1[:, :, :, :, 1]
    for i=1:nx
       for ix=1:nd
          x  = xf[i] + ix*dx[i]*xg[ix]
          if x >= 1.0/6.0
-            u1[3, :, :, i, 0] .*= -1.0
+            for jy=1:nd
+               u1[3, ix, jy, i, 0] *= -1.0
+            end
          end
       end
    end
@@ -1948,11 +1846,86 @@ double_mach_bottom = (wall_double_mach_reflection_fb_ub!,
                       wall_double_mach_reflection_ua!,
                       wall_double_mach_reflection_u1!)
 
+
+# Perform HLLC upwinding in x flux of MUSCL-Hancock reconstruction
+function hllc_upwinding_super_x(u1, eq, op, xf, y, jy, el_x, el_y, Fn)
+   if el_x > 20
+      return Fn
+   else
+      @unpack xg, Vl = op
+      nd = length(xg)
+      ul = get_node_vars(u1, eq, nd, jy, el_x-1, el_y)
+      # ur = get_node_vars(u1, eq, 1 , jy, el_x  , el_y)
+      u = @view u1[:,:,jy,el_x,el_y]
+      # ur = get_node_vars(Ub, eq, jy, 1, el_x, el_y)
+      @views ur = SVector{nvariables(eq)}(dot(u[n,:], Vl) for n in eachvariable(eq))
+      if !(SSFR.is_admissible(eq, ur))
+         ur = get_node_vars(u1, eq, 1, jy, el_x, el_y)
+      end
+      fl, fr = flux(xf, y, ul, eq, 1), flux(xf, y, ur, eq, 1)
+      X = SVector(xf, y)
+      # fn = fl
+      fn = hllc(X, ul, ur, fl, fr, ul, ur, eq, 1)
+      # Repetetition block
+      # Fn2 = get_blended_flux_x(el_x, el_y, jy, eq, dt, grid,
+      #                          blend, scheme, xf, y, u1, ua, fn2, Fn, op)
+      return fn
+   end
+end
+
+function hllc_upwinding_normal_x(u1, eq, op, xf, y, jy, el_x, el_y, Fn)
+   if el_x > 2
+      return Fn
+   else
+      @unpack xg, Vl = op
+      nd = length(xg)
+      ul = get_node_vars(u1, eq, nd, jy, el_x-1, el_y)
+      ur = get_node_vars(u1, eq, 1 , jy, el_x  , el_y)
+      # u = @view u1[:,:,jy,el_x,el_y]
+      # ur = get_node_vars(Ub, eq, jy, 1, el_x, el_y)
+      # @views ur = SVector{nvariables(eq)}(dot(u[n,:], Vl) for n in eachvariable(eq))
+      # if !(SSFR.is_admissible(eq, ur))
+      #    ur = get_node_vars(u1, eq, 1, jy, el_x, el_y)
+      # end
+      fl, fr = flux(xf, y, ul, eq, 1), flux(xf, y, ur, eq, 1)
+      X = SVector(xf, y)
+      # fn = fl
+      fn = hllc(X, ul, ur, fl, fr, ul, ur, eq, 1)
+      # Repetetition block
+      # Fn2 = get_blended_flux_x(el_x, el_y, jy, eq, dt, grid,
+      #                          blend, scheme, xf, y, u1, ua, fn2, Fn, op)
+      return fn
+   end
+end
+
+function hllc_upwinding_weak_x(u1, eq, op, xf, y, jy, el_x, el_y, Fn)
+   if el_x > 1
+      return Fn
+   else
+      @unpack xg, Vl = op
+      nd = length(xg)
+      ul = get_node_vars(u1, eq, nd, jy, el_x-1, el_y)
+      # ur = get_node_vars(u1, eq, 1 , jy, el_x  , el_y)
+      u = @view u1[:,:,jy,el_x,el_y]
+      # ur = get_node_vars(Ub, eq, jy, 1, el_x, el_y)
+      @views ur = SVector{nvariables(eq)}(dot(u[n,:], Vl) for n in eachvariable(eq))
+      if !(SSFR.is_admissible(eq, ur))
+         ur = get_node_vars(u1, eq, 1, jy, el_x, el_y)
+      end
+      fl, fr = flux(xf, y, ul, eq, 1), flux(xf, y, ur, eq, 1)
+      X = SVector(xf, y)
+      # fn = fl
+      fn = hllc(X, ul, ur, fl, fr, ul, ur, eq, 1)
+      # Repetetition block
+      # Fn2 = get_blended_flux_x(el_x, el_y, jy, eq, dt, grid,
+      #                          blend, scheme, xf, y, u1, ua, fn2, Fn, op)
+      return fn
+   end
+end
 #-------------------------------------------------------------------------------
 # Write solution to a vtk file
 #-------------------------------------------------------------------------------
-# TODO - Create VTK file here, and just update its values later
-function SSFR.initialize_plot(eq::Euler2D, op, grid, problem, scheme, aux, u1, ua)
+function SSFR.initialize_plot(eq::Euler2D, op, grid, problem, scheme, timer, u1, ua)
    return nothing
 end
 
@@ -1991,7 +1964,6 @@ function write_poly(eq::Euler2D, grid, op, u1, fcount)
    u = zeros(nu)
    for j=1:ny
       for i=1:nx
-         # TODO - Don't do this, use all values in the cell
          # to get values in the equispaced thing
          for jy=1:nd
             i_min = (i-1)*nu + 1
@@ -2010,16 +1982,18 @@ function write_poly(eq::Euler2D, grid, op, u1, fcount)
    out = vtk_save(vtk_sol)
 end
 
-function SSFR.write_soln!(base_name, fcount, iter, time, eq::Euler2D,
-                     grid, problem, param, op,
-                     z, u1, aux, ndigits=3)
+function SSFR.write_soln!(base_name, fcount, iter, time, dt, eq::Euler2D,
+                          grid, problem, param, op,
+                          z, u1, aux, ndigits=3)
    @timeit aux.timer "Write solution" begin
    @unpack final_time = problem
    # Clear and re-create output directory
    if fcount == 0
       run(`rm -rf output`)
       run(`mkdir output`)
+      save_mesh_file(grid, "output")
    end
+
    nx, ny = grid.size
    @unpack exact_solution = problem
    exact(x) = exact_solution(x[1],x[2],time)
@@ -2028,17 +2002,21 @@ function SSFR.write_soln!(base_name, fcount, iter, time, eq::Euler2D,
    # filename = string("output/", filename)
    vtk = vtk_grid(filename, xc, yc)
    xy = [ [xc[i], yc[j]] for i=1:nx,j=1:ny ]
-   # TODO - Do it efficiently
+   # KLUDGE - Do it efficiently
    prim = @views copy(z[:,1:nx,1:ny])
    exact_data = exact.(xy)
    for j=1:ny,i=1:nx
       @views con2prim!(eq, z[:,i,j], prim[:,i,j])
    end
-   @views vtk["sol"] = prim[1,1:nx,1:ny]
-   @views vtk["Density"] = prim[1,1:nx,1:ny]
-   @views vtk["Velocity_x"] = prim[2,1:nx,1:ny]
-   @views vtk["Velocity_y"] = prim[3,1:nx,1:ny]
-   @views vtk["Pressure"] = prim[4,1:nx,1:ny]
+   density_arr = prim[1,1:nx,1:ny]
+   velx_arr = prim[2,1:nx,1:ny]
+   vely_arr = prim[3,1:nx,1:ny]
+   pres_arr = prim[4,1:nx,1:ny]
+   vtk["sol"] = density_arr
+   vtk["Density"] = density_arr
+   vtk["Velocity_x"] = velx_arr
+   vtk["Velocity_y"] = vely_arr
+   vtk["Pressure"] = pres_arr
    for j=1:ny,i=1:nx
       @views con2prim!(eq, exact_data[i,j], prim[:,i,j])
    end
@@ -2059,9 +2037,88 @@ function SSFR.write_soln!(base_name, fcount, iter, time, eq::Euler2D,
       cp("$filename.vtr","./output/avg.vtr")
       println("Wrote final average solution to avg.vtr.")
    end
+
    fcount += 1
+
+   # HDF5 file
+   element_variables = Dict()
+   element_variables[:density] = vec(density_arr)
+   element_variables[:velocity_x] = vec(velx_arr)
+   element_variables[:velocity_y] = vec(vely_arr)
+   element_variables[:pressure] = vec(pres_arr)
+   # element_variables[:indicator_shock_capturing] = vec(aux.blend.cache.alpha[1:nx,1:ny])
+   filename = save_solution_file(u1, time, dt, iter, grid, eq, op, element_variables) # Save h5 file
+   println("Wrote ", filename)
    return fcount
    end # timer
+end
+
+function save_solution_file(u_, time, dt, iter,
+                            mesh,
+                            equations, op,
+                            element_variables=Dict{Symbol,Any}();
+                            system="")
+   # Filename without extension based on current time step
+   output_directory = "output"
+   if isempty(system)
+      filename = joinpath(output_directory, @sprintf("solution_%06d.h5", iter))
+   else
+      filename = joinpath(output_directory, @sprintf("solution_%s_%06d.h5", system, iter))
+   end
+
+   solution_variables(u) = con2prim(equations, u) # For broadcasting
+
+   nx, ny = mesh.size
+   u = @view u_[:,:,:,1:nx, 1:ny] # Don't plot ghost cells
+
+   # Convert to different set of variables if requested
+   # Reinterpret the solution array as an array of conservative variables,
+   # compute the solution variables via broadcasting, and reinterpret the
+   # result as a plain array of floating point numbers
+   # OffsetArray(reinterpret(eltype(ua), con2prim_.(reinterpret(SVector{nvariables(equation), eltype(ua)}, ua))))
+   u_static_reinter = reinterpret(SVector{nvariables(equations),eltype(u)}, u)
+   data = Array(reinterpret(eltype(u), solution_variables.(u_static_reinter)))
+
+   # Find out variable count by looking at output from `solution_variables` function
+   n_vars = size(data, 1)
+
+   # Open file (clobber existing content)
+   h5open(filename, "w") do file
+      # Add context information as attributes
+      attributes(file)["ndims"] = 2
+      attributes(file)["equations"] = "2D Euler Equations"
+      attributes(file)["polydeg"] = op.degree
+      attributes(file)["n_vars"] = n_vars
+      attributes(file)["n_elements"] = nx * ny
+      attributes(file)["mesh_type"] = "StructuredMesh" # For Trixi2Vtk
+      attributes(file)["mesh_file"] = "mesh.h5"
+      attributes(file)["time"] = convert(Float64, time) # Ensure that `time` is written as a double precision scalar
+      attributes(file)["dt"] = convert(Float64, dt) # Ensure that `dt` is written as a double precision scalar
+      attributes(file)["timestep"] = iter
+
+      # Store each variable of the solution data
+      var_names = ("Density", "Velocity x", "Velocity y", "Pressure")
+      for v in 1:n_vars
+         # Convert to 1D array
+         file["variables_$v"] = vec(data[v, .., :])
+
+         # Add variable name as attribute
+         var = file["variables_$v"]
+         attributes(var)["name"] = var_names[v]
+      end
+
+      # Store element variables
+      for (v, (key, element_variable)) in enumerate(element_variables)
+         # Add to file
+         file["element_variables_$v"] = element_variable
+
+         # Add variable name as attribute
+         var = file["element_variables_$v"]
+         attributes(var)["name"] = string(key)
+      end
+   end
+
+   return filename
 end
 
 function get_equation(γ; hll_wave_speeds="toro")
@@ -2075,7 +2132,7 @@ function get_equation(γ; hll_wave_speeds="toro")
       @assert false
    end
    fprime(x) = nothing
-   return Euler2D(γ, hll_speeds, nvar, name, initial_values, numfluxes)
+   return Euler2D(γ, γ-1, hll_speeds, nvar, name, initial_values, numfluxes)
 end
 
 (

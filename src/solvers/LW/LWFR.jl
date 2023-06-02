@@ -116,7 +116,7 @@ function solve_lwfr(eq, problem, scheme, param, grid, op, aux, cache)
    iter, t, fcount = 0, 0.0, 0
 
    # Save initial solution to file
-   fcount = write_soln!("sol", fcount, iter, t, eq, grid, problem, param, op,
+   fcount = write_soln!("sol", fcount, iter, t, 0.0, eq, grid, problem, param, op,
                          ua, u1, aux)
 
    # Choose CFL number
@@ -149,7 +149,7 @@ function solve_lwfr(eq, problem, scheme, param, grid, op, aux, cache)
       t += dt; iter += 1
       @printf("iter,dt,t = %5d %12.4e %12.4e\n", iter, dt, t)
       if save_solution(problem, param, t, iter)
-         fcount = write_soln!("sol", fcount, iter, t, eq, grid, problem, param,
+         fcount = write_soln!("sol", fcount, iter, t, dt, eq, grid, problem, param,
                               op, ua, u1, aux)
       end
       if (compute_error_interval > 0 && mod(iter,compute_error_interval) == 0)
@@ -160,7 +160,8 @@ function solve_lwfr(eq, problem, scheme, param, grid, op, aux, cache)
    post_process_soln(eq, aux, problem, param)
 
    return Dict("u" => u1, "ua" => ua, "errors" => error_norm,
-               "plot_data" => aux.plot_data)
+               "plot_data" => aux.plot_data, "grid" => grid,
+               "op" => op)
 end
 
 end # @muladd

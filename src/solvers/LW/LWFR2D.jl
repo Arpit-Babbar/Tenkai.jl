@@ -105,7 +105,7 @@ function setup_arrays_lwfr(grid, scheme, eq::AbstractEquations{2})
 
    ghost_cache = alloc_for_threads(Marr, 2)
 
-   # TODO - Rename this to LWFR cache
+   # KLUDGE - Rename this to LWFR cache
    cache = (; u1, ua, res, Fb, Ub, eval_data, cell_arrays, ghost_cache)
    return cache
 end
@@ -122,29 +122,28 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2,1},
    end
 
    nx, ny = grid.size
-   @unpack nvar = eq
+   nvar = nvariables(eq)
    @unpack degree, xg, wg = op
    nd = degree + 1
    @unpack dx, dy, xf, yf = grid
    @unpack boundary_condition, boundary_value = problem
    left, right, bottom, top = boundary_condition
 
-   # TODO - Make nvar independent
    refresh!(u) = fill!(u, 0.0)
 
    # For Dirichlet bc, use upwind flux at faces by assigning both physical
    # and ghost cells through the bc.
    if left == dirichlet
-      pre_allocated = [ (zeros(nvar) for _=1:4) for _=1:Threads.nthreads() ]
+      pre_allocated = [ (zeros(nvar) for _=1:2) for _=1:Threads.nthreads() ]
       @threaded for j=1:ny
          x = xf[1]
          for k=1:nd
             y  = yf[j] + xg[k] * dy[j]
-            # TODO - Don't allocate so much!
-            ub, fb, ubvalue, fbvalue = pre_allocated[Threads.threadid()]
+            # KLUDGE - Don't allocate so much!
+            ub, fb  = pre_allocated[Threads.threadid()]
             for l=1:nd
                tq = t + xg[l]*dt
-               ubvalue = boundary_value(x,y, tq)
+               ubvalue = boundary_value(x, y, tq)
                fbvalue = flux(x, y, ubvalue, eq, 1)
                for n=1:nvar
                   ub[n] += ubvalue[n] * wg[l]
@@ -178,13 +177,13 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2,1},
    end
 
    if right == dirichlet
-      pre_allocated = [ (zeros(nvar) for _=1:4) for _=1:Threads.nthreads() ]
+      pre_allocated = [ (zeros(nvar) for _=1:2) for _=1:Threads.nthreads() ]
       @threaded for j=1:ny
          x  = xf[nx+1]
          for k=1:nd
             y  = yf[j] + xg[k] * dy[j]
-            # TODO - Improve
-            ub, fb, ubvalue, fbvalue = pre_allocated[Threads.threadid()]
+            # KLUDGE - Improve
+            ub, fb  = pre_allocated[Threads.threadid()]
             for l=1:nd
                tq = t + xg[l]*dt
                ubvalue = boundary_value(x, y, tq)
@@ -221,12 +220,12 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2,1},
    end
 
    if bottom == dirichlet
-      pre_allocated = [ (zeros(nvar) for _=1:4) for _=1:Threads.nthreads() ]
+      pre_allocated = [ (zeros(nvar) for _=1:2) for _=1:Threads.nthreads() ]
       @threaded for i=1:nx
          y = yf[1]
          for k=1:nd
             x  = xf[i] + xg[k] * dx[i]
-            ub, fb, ubvalue, fbvalue = pre_allocated[Threads.threadid()]
+            ub, fb = pre_allocated[Threads.threadid()]
             for l=1:nd
                tq = t + xg[l]*dt
                ubvalue = boundary_value(x, y, tq)
@@ -265,12 +264,12 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2,1},
       bc!(grid, eq, op, Fb, Ub)
    end
    if top == dirichlet
-      pre_allocated = [ (zeros(nvar) for _=1:4) for _=1:Threads.nthreads() ]
+      pre_allocated = [ (zeros(nvar) for _=1:2) for _=1:Threads.nthreads() ]
       @threaded for i=1:nx
          y = yf[ny+1]
          for k=1:nd
             x  = xf[i] + xg[k] * dx[i]
-            ub, fb, ubvalue, fbvalue = pre_allocated[Threads.threadid()]
+            ub, fb = pre_allocated[Threads.threadid()]
             for l=1:nd
                tq = t + xg[l]*dt
                ubvalue = boundary_value(x, y, tq)
@@ -378,7 +377,7 @@ function eval_bflux1!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
       gd = flux(x, yd, ud_node, eq, 2)
       gu = flux(x, yu, uu_node, eq, 2)
 
-      # TODO - Indices order needs to be changed, or something else
+      # KLUDGE - Indices order needs to be changed, or something else
       # needs to be done to avoid cache misses
       set_node_vars!(Fb, fl, eq, i, 1)
       set_node_vars!(Fb, fr, eq, i, 2)
@@ -484,7 +483,7 @@ function eval_bflux2!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
       gd = flux(x, yd, ud_node, eq, 2)
       gu = flux(x, yu, uu_node, eq, 2)
 
-      # TODO - Indices order needs to be changed!!
+      # KLUDGE - Indices order needs to be changed!!
       set_node_vars!(Fb, fl, eq, i, 1)
       set_node_vars!(Fb, fr, eq, i, 2)
       set_node_vars!(Fb, gd, eq, i, 3)
@@ -624,7 +623,7 @@ function eval_bflux3!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
       gd = flux(x, yd, ud_node, eq, 2)
       gu = flux(x, yu, uu_node, eq, 2)
 
-      # TODO - Indices order needs to be changed!!
+      # KLUDGE - Indices order needs to be changed!!
       set_node_vars!(Fb, fl, eq, i, 1)
       set_node_vars!(Fb, fr, eq, i, 2)
       set_node_vars!(Fb, gd, eq, i, 3)
@@ -828,7 +827,7 @@ function eval_bflux4!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
       gd = flux(x, yd, ud_node, eq, 2)
       gu = flux(x, yu, uu_node, eq, 2)
 
-      # TODO - Indices order needs to be changed!!
+      # KLUDGE - Indices order needs to be changed!!
       set_node_vars!(Fb, fl, eq, i, 1)
       set_node_vars!(Fb, fr, eq, i, 2)
       set_node_vars!(Fb, gd, eq, i, 3)
@@ -1120,7 +1119,7 @@ function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, scheme,
             multiply_add_to_node_vars!(r1, lamy*D1[jj,j], G_node, eq, i, jj)
          end
 
-         # TODO - update to v1.8 and call with @inline
+         # KLUDGE - update to v1.8 and call with @inline
          # Give u1_ or U depending on dissipation model
          U_node = get_dissipation_node_vars(u1_, U, eq, i, j)
 
@@ -1135,7 +1134,7 @@ function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, scheme,
          multiply_add_to_node_vars!(Ub_, Vr[j], U_node, eq, i, 4)
       end
       u = @view u1[:,:,:,el_x,el_y]
-      blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, dx, dy,
+      blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, grid, dx, dy,
                            grid.xf[el_x], grid.yf[el_y], op, u1, u, f, res)
       # Interpolate to faces
       @views cell_data = (u1_, up, um, el_x, el_y)
@@ -1274,7 +1273,7 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, scheme,
             multiply_add_to_node_vars!(r1, lamy*D1[jj,j], G_node, eq, i, jj)
          end
 
-         # TODO - update to v1.8 and call with @inline
+         # KLUDGE - update to v1.8 and call with @inline
          # Give u1_ or U depending on dissipation model
          U_node = get_dissipation_node_vars(u1_, U, eq, i, j)
 
@@ -1289,7 +1288,7 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, scheme,
          multiply_add_to_node_vars!(Ub_, Vr[j], U_node, eq, i, 4)
       end
       u = @view u1[:,:,:,el_x,el_y]
-      blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, dx, dy,
+      blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, grid, dx, dy,
                            grid.xf[el_x], grid.yf[el_y], op, u1, u, f, res)
       # computes ftt, gtt and puts them in respective place; no need to store
       cell_data = (u1_, up, um, el_x, el_y)
@@ -1510,13 +1509,11 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, scheme,
          multiply_add_to_node_vars!(Ub, Vr[j], U_, eq, i, 4, el_x, el_y)
       end
       u = @view u1[:,:,:,el_x,el_y]
-      blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, dx, dy,
+      blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, grid, dx, dy,
                            grid.xf[el_x], grid.yf[el_y], op, u1, u, f, res)
       @views cell_data = (u1_, up, um, upp, umm, el_x, el_y)
       @views compute_bflux!(eq, grid, cell_data, eval_data, xg, Vl, Vr,
                             F, G, Fb[:,:,:,el_x,el_y], aux)
-      # blend.blend_cell_residual!(i, j, eq, scheme, aux, lamx, dt, dx, dy,
-      #                            grid.xf[i], grid.yf[j], op, u1, u, f, r)
    end
    return nothing
 end
@@ -1800,7 +1797,7 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, scheme,
          multiply_add_to_node_vars!(Ub, Vr[j], U_node, eq, i, 4, el_x, el_y)
       end
       u = @view u1[:, :, :, el_x, el_y]
-      blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, dx, dy,
+      blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, grid, dx, dy,
                            grid.xf[el_x], grid.yf[el_y], op, u1, u, f, res)
 
       @views cell_data = (u, up, um, upp, umm, el_x, el_y)

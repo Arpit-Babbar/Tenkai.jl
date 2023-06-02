@@ -2,7 +2,6 @@ import Roots.find_zero
 using SSFR
 # Submodules
 Eq = SSFR.EqBurg1D
-plotlyjs() # Set backend
 
 #------------------------------------------------------------------------------
 xmin, xmax = -2.0, 2.0
@@ -14,14 +13,14 @@ exact_solution = Eq.exact_solution_hat
 boundary_value = exact_solution
 
 degree = 4
-solver = "rkfr"
-solution_points = "gl"
+solver = "lwfr"
+solution_points = "gll"
 correction_function = "radau"
 bflux = evaluate
-numerical_flux = Eq.roe
+numerical_flux = Eq.rusanov
 bound_limit = "no"
 
-nx = 50
+nx = 100
 cfl = 0.0
 bounds = ([-0.2],[0.2])
 tvbM = 0.0
@@ -35,14 +34,14 @@ domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                      final_time, exact_solution)
 equation = Eq.get_equation()
-# limiter = setup_limiter_blend(
-#                                  blend_type = FR.mh_blend,
-#                                  indicating_variables = FR.conservative_indicator!,
-#                                  reconstruction_variables = FR.conservative_reconstruction,
-#                                  indicator_model = "gassner",
-#                                  debug_blend = false
-#                                 )
-# limiter = setup_limiter_none()
+limiter = setup_limiter_blend(
+                                 blend_type = fo_blend(equation),
+                                 indicating_variables = conservative_indicator!,
+                                 reconstruction_variables = conservative_reconstruction,
+                                 indicator_model = "gassner",
+                                 debug_blend = false
+                                )
+limiter = setup_limiter_none()
 limiter = setup_limiter_tvb(equation; tvbM = tvbM)
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)

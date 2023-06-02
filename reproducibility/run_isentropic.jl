@@ -12,23 +12,23 @@ boundary_condition = (periodic, periodic, periodic, periodic)
 initial_value  = Eq.isentropic_iv
 exact_solution = Eq.isentropic_exact
 
-degree              = 1
+degree              = 4
 solver              = "lwfr"
 solution_points     = "gl"
 correction_function = "radau"
-numerical_flux      = Eq.hllc
-bound_limit         = "yes"
+numerical_flux      = Eq.rusanov
+bound_limit         = "no"
 bflux               = evaluate
-final_time          = 1.0 # 20 * sqrt(2.0) / 0.5
+final_time          = 20 * sqrt(2.0) / 0.5
 
-nx, ny = 120, 120
+nx, ny = 160, 160
 cfl = 0.0
 bounds = ([-Inf],[Inf]) # Not used in Euler
 tvbM = 0.0
 save_iter_interval = 0
-save_time_interval = 0.0 # final_time / 5.0
-animate = true # Factor on save_iter_interval or save_time_interval
+save_time_interval = final_time
 compute_error_interval = 0
+cfl_safety_factor = 0.95
 
 #------------------------------------------------------------------------------
 grid_size = [nx, ny]
@@ -36,27 +36,29 @@ domain = [xmin, xmax, ymin, ymax]
 equation = Eq.get_equation(γ)
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
-# limiter = setup_limiter_tvb(equation; tvbM = tvbM)
-limiter = setup_limiter_blend(
+
+blend = setup_limiter_blend(
                               blend_type = mh_blend(equation),
                               indicating_variables = Eq.rho_p_indicator!,
                               reconstruction_variables = conservative_reconstruction,
-                              indicator_model = "gassner",
-                              debug_blend = false,
-                              pure_fv = true,
-                              tvbM = Inf
+                              indicator_model = "gassner"
                              )
-# limiter = setup_limiter_none()
+no_limiter = setup_limiter_none()
+limiter = no_limiter
 scheme = Scheme(solver, degree, solution_points, correction_function,
-                numerical_flux, bound_limit, limiter, bflux,
-                2)
+                numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
-                   animate = animate)
+                   cfl_safety_factor = cfl_safety_factor)
 #------------------------------------------------------------------------------
-# problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
-#                                           ARGS)
-#------------------------------------------------------------------------------
+ARGS = ["--degree", "4", "--solver", "lwfr", "--solution_points", "gl", "--correction_function",
+        "radau", "--bflux", "evaluate", "--cfl_safety_factor", "0.95", "--bound_limit", "yes",
+        "--cfl_style", "optimal", "--dissipation", "2",
+        "--grid_size", "40", "40",
+        "--final_time", "56.568542494923804",
+ "--save_time_interval", "56.568542494923804", "--save_iter_interval", "0", "--animate", "true"]
+
+problem2, scheme2, param2 = ParseCommandLine(problem, param, scheme, equation, ARGS)
 sol = SSFR.solve(equation, problem, scheme, param);
 
 println(sol["errors"])

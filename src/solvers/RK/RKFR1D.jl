@@ -18,7 +18,7 @@ using ..FR: @threaded
 using ..Equations: AbstractEquations, nvariables, eachvariable
 
 (
-using ..SSFR: update_ghost_values_periodic! # TODO - Should this be taken from FR?
+using ..SSFR: update_ghost_values_periodic! # KLUDGE - Should this be taken from FR?
 )
 
 (
@@ -142,7 +142,7 @@ end
 
 #------------------------------------------------------------------------------
 function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op,
-                                     scheme, aux, t, dt, u1, res, Fb, ub)
+                                     scheme, aux, t, dt, u1, res, Fb, ub, cache)
    @timeit aux.timer "Cell residual" begin
    @unpack xg, D1, Vl, Vr = op
    @unpack blend = aux
@@ -167,9 +167,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op,
             # Compute flux at all solution points
             flux1 = flux(x, u_node, eq)
             set_node_vars!(f, flux1, eq, ix)
-            # blend.blend_cell_residual!(i, eq, scheme, aux, lamx, dt, dx,
-            #                            grid.xf[i], op, u1, u, f, r)
-            # TODO - Remove dx, xf arguments. just pass grid and i
+            # KLUDGE - Remove dx, xf arguments. just pass grid and i
             for iix in 1:nd
                multiply_add_to_node_vars!(res, lamx * D1[iix,ix], flux1, eq,
                                           iix, cell)
@@ -189,7 +187,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op,
          u = @view u1[:,:,cell]
          r = @view res[:,:,cell]
          blend.blend_cell_residual!(cell, eq, scheme, aux, lamx, dt, dx,
-                                    grid.xf[cell], op, u1 , u, f, r)
+                                    grid.xf[cell], op, u1 , u, cache.ua, f, r)
       end
    end # timer
    return nothing

@@ -15,10 +15,12 @@ using JSON3
 using SSFR
 using SSFR.Basis
 
+import SSFR.FR: admissibility_tolerance
+
 ( # Methods to be extended
 import SSFR: flux, prim2con, prim2con!, con2prim, con2prim!,
              eigmatrix,
-             limit_slope!,
+             limit_slope, zhang_shu_flux_fix,
              apply_tvb_limiter!, apply_bound_limiter!, initialize_plot,
              write_soln!, compute_time_step, post_process_soln
 )
@@ -201,8 +203,8 @@ function SSFR.compute_time_step(eq::Euler1D, grid, aux, op, cfl, u1, ua)
    dx = grid.dx
    den = 0.0
    for i=1:nx
-      u = @view ua[:,i]
-      rho, v, p = con2prim(eq, u) # TODO - Make in-place
+      u = get_node_vars(ua, eq, i)
+      rho, v, p = con2prim(eq, u)
       c = sqrt(eq.γ*p/rho)
       smax = abs(v) + c
       den = max(den, smax/dx[i])
@@ -248,12 +250,14 @@ function sedov_iv(x, dx)
    return U
 end
 
-xmin_sedov, xmax_sedov = -1.0, 1.0
+xmin_sedov, xmax_sedov = -2.0, 2.0
 nx_sedov = 201
 dx_sedov = (xmax_sedov - xmin_sedov) / 201
 
+sedov1d(x) = sedov_iv(x, dx_sedov)
+
 sedov_data = (xmin_sedov, xmax_sedov, nx_sedov, dx_sedov,
-              x -> sedov_iv(x, dx_sedov), (x,t) -> sedov_iv(x, dx_sedov))
+              sedov1d, (x,t) -> sedov_iv(x, dx_sedov))
 
 function shuosher(x)
    γ = 1.4
@@ -270,10 +274,10 @@ function shuosher(x)
    return U
 end
 
-exact_solution_shuosher(x,t) = shuosher(x)
+exact_solution_shuosher(x, t) = shuosher(x)
 
 function riemann_problem(ul, ur, xs, x)
-   γ=1.4
+   γ = 1.4
    if x < xs
       prim = ul
    else
@@ -324,6 +328,7 @@ for data in [lax_data, sod_data, toro5_data, dwave_data]
    initial_value, exact_solution, final_time, name = data
    initial_values[name] = initial_value
 end
+initial_values["sedov1d"] = sedov1d
 initial_values["blast"], initial_values["shuosher"] = blast, shuosher
 initial_values["double_rarefaction"] = double_rarefaction_iv
 initial_values["leblanc"] = leblanc_iv
@@ -618,79 +623,68 @@ end
 #-------------------------------------------------------------------------------
 # Limiters
 #-------------------------------------------------------------------------------
-function SSFR.apply_bound_limiter!(eq::Euler1D, grid, scheme, param, op, ua, u1,
-                                   aux)
+function SSFR.apply_bound_limiter!(eq::Euler1D, grid, scheme, param, op, ua,
+                                   u1, aux)
    if scheme.bound_limit == "no"
       return nothing
    end
+
    @timeit aux.timer "Positivity limiter" begin
    @unpack Vl, Vr = op
    nx   = grid.size
-   @unpack γ, nvar = eq
+   @unpack γ = eq
    nd   = op.degree + 1
-   rho_min, pres_min = 1.0e20, 1.0e20
+
+   variables = (get_density, get_pressure)
+
+   # Looping over tuple of functions like this is only type stable if
+   # there are only two. For tuples with than two functions, see
+   # https://github.com/trixi-framework/Trixi.jl/blob/0fd86e4bd856d894de6a7514edcb9758bf6f8e1e/src/callbacks_stage/positivity_zhang_shu.jl#L39
+
+   # Find a minimum for all variables
    eps = 1e-10
-   for i=1:nx
-      ua_ = get_node_vars(ua, eq, i)
-      density  = ua_[1]
-      pressure = (γ-1.0) * (ua_[3] - 0.5*ua_[2]^2/ua_[1])
-      rho_min = min(rho_min, density)
-      pres_min = min(pres_min, pressure)
+   for variable in variables
+      for i=1:nx
+         ua_ = get_node_vars(ua, eq, i)
+         var = variable(eq, ua_)
+         eps = min(eps, var)
+      end
+      if eps < 0.0
+         println("Fatal: Negative states in cell averages")
+         @show variable
+         println("       minimum cell average = $eps")
+         throw(DomainError(eps, "Positivity limiter failed"))
+      end
    end
 
-   eps = min(eps, rho_min)
-   eps = min(eps, pres_min)
-   if rho_min < 0.0 || pres_min < 0.0
-      println("Fatal: Negative states")
-      println("       rho_min = $rho_min")
-      println("       pres_min = $pres_min")
-      throw(DomainError((rho_min, pres_min), "Positivity limiter failed"))
-   end
-   for element in 1:nx
-      ua_ = get_node_vars(ua, eq, element)
-      ul = ur = 0.0
-      rho_min = 1e20
-      for i in Base.OneTo(nd)
-         u_node = get_node_vars(u1, eq, i, element)
-         # TODO - Use get_density
-         rho = get_density(eq, u_node)
-         ul += u_node[1] * Vl[i]
-         ur += u_node[1] * Vr[i]
-         rho_min = min(rho_min, u_node[1])
-      end
-      rho_min = min(rho_min, ul, ur)
-      ratio = abs(eps - ua_[1])/(abs(rho_min - ua_[1]) + 1e-13)
-      theta = min(ratio, 1.0) # theta for preserving positivity of density
-      if theta < 1.0
-         for i=1:nd
-            u_node = get_node_vars(u1, eq, i, element)
-            set_node_vars!(u1, theta * u_node + (1-theta) * ua_,
-                           eq, i, element)
-                           # TODO - Use multiply_add_set_node_vars!
-         end
-      end
-      pres_min = 1e20
-      ul = ur = 0.0
-      for i in Base.OneTo(nd)
-         u_node = get_node_vars(u1, eq, i, element)
-         # TODO - replace with get_pressure
-         pres = (γ-1.0) * (u_node[3] - 0.5*u_node[2]^2/u_node[1])
-         ul += pres * Vl[i]
-         ur += pres * Vr[i]
-         pres_min = min(pres_min, pres)
-      end
-      pres_min = min(pres_min, ul, ur)
-      pres_avg = (γ-1.0) * (ua_[3] - 0.5 * ua_[2]^2/ua_[1])
-      ratio = abs(eps - pres_avg)/(abs(pres_min - pres_avg) + 1e-13)
-      theta = min(ratio, 1.0)
-      if theta < 1.0
+   for variable in variables
+      for element in 1:nx
+         var_ll = var_rr = 0.0
+         var_min = 1e20
          for i in Base.OneTo(nd)
             u_node = get_node_vars(u1, eq, i, element)
-            set_node_vars!(u1, theta * u_node + (1-theta) * ua_,
-                           eq, i, element)
+            var = variable(eq, u_node)
+            var_ll += var * Vl[i]
+            var_rr += var * Vr[i]
+            var_min = min(var_min, var)
+         end
+         var_min = min(var_min, var_ll, var_rr)
+         ua_ = get_node_vars(ua, eq, element)
+         var_avg = variable(eq, ua_)
+         ratio = abs(eps - var_avg)/(abs(var_min - var_avg) + 1e-13)
+         theta = min(ratio, 1.0) # theta for preserving positivity of density
+         if theta < 1.0
+            for i=1:nd
+               u_node = get_node_vars(u1, eq, i, element)
+               multiply_add_set_node_vars!(u1,
+                                           theta, u_node,
+                                           1-theta, ua_,
+                                           eq, i, element)
+            end
          end
       end
    end
+
    end # timer
 end
 
@@ -709,91 +703,85 @@ function SSFR.apply_tvb_limiter!(eq::Euler1D, problem, scheme, grid, param, op, 
     dulm,durm, du ) = cache
 
    # Loop over cells
-   @timeit aux.timer "TVB limiter loop" begin
-      for cell in 1:nx
-         ual, ua_, uar = (get_node_vars(ua, eq, cell-1),
-                          get_node_vars(ua, eq, cell),
-                          get_node_vars(ua, eq, cell+1))
-         R, L = eigmatrix(eq, ua_)
-         for ix in 1:nd
-            fill!(uimh, zero(eltype(uimh))); fill!(uiph, zero(eltype(uiph)))
-            Mdx2 = tvbM * grid.dx[cell]^2
-            if left_bc == neumann && right_bc == neumann && (cell == 1 || cell == nx)
-               Mdx2 = 0.0 # Force TVD on boundary for Shu-Osher
-            end
-            # end # timer
-            for ii=1:nd
-               u_ = get_node_vars(u1, eq, ii, cell)
-               multiply_add_to_node_vars!(uimh, Vl[ii], u_, eq, 1)
-               multiply_add_to_node_vars!(uiph, Vr[ii], u_, eq, 1)
-            end
-            # Get views of needed cell averages
-            # slopes b/w centres and faces
+   for cell in 1:nx
+      ual, ua_, uar = (get_node_vars(ua, eq, cell-1),
+                       get_node_vars(ua, eq, cell),
+                       get_node_vars(ua, eq, cell+1))
+      R, L = eigmatrix(eq, ua_)
+      fill!(uimh, zero(eltype(uimh))); fill!(uiph, zero(eltype(uiph)))
+      Mdx2 = tvbM * grid.dx[cell]^2
+      if left_bc == neumann && right_bc == neumann && (cell == 1 || cell == nx)
+         Mdx2 = 0.0 # Force TVD on boundary for Shu-Osher
+      end
+      # end # timer
+      for ii=1:nd
+         u_ = get_node_vars(u1, eq, ii, cell)
+         multiply_add_to_node_vars!(uimh, Vl[ii], u_, eq, 1)
+         multiply_add_to_node_vars!(uiph, Vr[ii], u_, eq, 1)
+      end
+      # Get views of needed cell averages
+      # slopes b/w centres and faces
 
-            uimh_ = get_node_vars(uimh, eq, 1)
-            uiph_ = get_node_vars(uiph, eq, 1)
+      uimh_ = get_node_vars(uimh, eq, 1)
+      uiph_ = get_node_vars(uiph, eq, 1)
 
-            # We will set
-            # Δul[n] = ua_[n] - uimh[n]
-            # Δur[n] = uiph[n] - ua_[n]
-            # Δual[n] = ua_[n] - ual[n]
-            # Δuar[n] = uar[n] - ua_[n]
+      # We will set
+      # Δul[n] = ua_[n] - uimh[n]
+      # Δur[n] = uiph[n] - ua_[n]
+      # Δual[n] = ua_[n] - ual[n]
+      # Δuar[n] = uar[n] - ua_[n]
 
-            set_node_vars!(Δul ,  ua_ , eq, 1)
-            set_node_vars!(Δur , uiph_, eq, 1)
-            set_node_vars!(Δual,  ua_ , eq, 1)
-            set_node_vars!(Δuar,  uar , eq, 1)
+      set_node_vars!(Δul ,  ua_ , eq, 1)
+      set_node_vars!(Δur , uiph_, eq, 1)
+      set_node_vars!(Δual,  ua_ , eq, 1)
+      set_node_vars!(Δuar,  uar , eq, 1)
 
+      subtract_from_node_vars!(Δul,  uimh_, eq)
+      subtract_from_node_vars!(Δur,  ua_   , eq)
+      subtract_from_node_vars!(Δual, ual   , eq)
+      subtract_from_node_vars!(Δuar, ua_   , eq)
 
-            subtract_from_node_vars!(Δul,  uimh_, eq)
-            subtract_from_node_vars!(Δur,  ua_   , eq)
-            subtract_from_node_vars!(Δual, ual   , eq)
-            subtract_from_node_vars!(Δuar, ua_   , eq)
+      Δul_  = get_node_vars(Δul, eq, 1)
+      Δur_  = get_node_vars(Δur, eq, 1)
+      Δual_ = get_node_vars(Δual, eq, 1)
+      Δuar_ = get_node_vars(Δuar, eq, 1)
+      mul!(char_Δul, L, Δul_)   # char_Δul = L*Δul
+      mul!(char_Δur, L, Δur_)   # char_Δur = L*Δur
+      mul!(char_Δual, L, Δual_) # char_Δual = L*Δual
+      mul!(char_Δuar, L, Δuar_) # char_Δuar = L*Δuar
 
-            # TODO - Optimize this mul! as well
-            Δul_  = get_node_vars(Δul, eq, 1)
-            Δur_  = get_node_vars(Δur, eq, 1)
-            Δual_ = get_node_vars(Δual, eq, 1)
-            Δuar_ = get_node_vars(Δuar, eq, 1)
-            mul!(char_Δul, L, Δul_)   # char_Δul = L*Δul
-            mul!(char_Δur, L, Δur_)   # char_Δur = L*Δur
-            mul!(char_Δual, L, Δual_) # char_Δual = L*Δual
-            mul!(char_Δuar, L, Δuar_) # char_Δuar = L*Δuar
+      char_Δul_ = get_node_vars(char_Δul, eq, 1)
+      char_Δur_ = get_node_vars(char_Δur, eq, 1)
+      char_Δual_ = get_node_vars(char_Δual, eq, 1)
+      char_Δuar_ = get_node_vars(char_Δuar, eq, 1)
+      for n in eachvariable(eq)
+         dulm[n] = minmod(char_Δul_[n], char_Δual_[n], char_Δuar_[n], Mdx2)
+         durm[n] = minmod(char_Δur_[n], char_Δual_[n], char_Δuar_[n], Mdx2)
+      end
 
-            char_Δul_ = get_node_vars(char_Δul, eq, 1)
-            char_Δur_ = get_node_vars(char_Δur, eq, 1)
-            char_Δual_ = get_node_vars(char_Δual, eq, 1)
-            char_Δuar_ = get_node_vars(char_Δuar, eq, 1)
-            for n in eachvariable(eq)
-               dulm[n] = minmod(char_Δul_[n], char_Δual_[n], char_Δuar_[n], Mdx2)
-               durm[n] = minmod(char_Δur_[n], char_Δual_[n], char_Δuar_[n], Mdx2)
-            end
+      # limit if jumps are detected
+      dulm_ = get_node_vars(dulm, eq, 1)
+      durm_ = get_node_vars(durm, eq, 1)
+      jump_l = jump_r = 0.0
+      for n=1:nvar
+         jump_l += abs(char_Δul_[n]-dulm_[n])
+         jump_r += abs(char_Δur_[n]-durm_[n])
+      end
+      jump_l /= nvar
+      jump_r /= nvar
 
-            # limit if jumps are detected
-            dulm_ = get_node_vars(dulm, eq, 1)
-            durm_ = get_node_vars(durm, eq, 1)
-            jump_l = jump_r = 0.0
-            for n=1:nvar
-               jump_l += abs(char_Δul_[n]-dulm_[n])
-               jump_r += abs(char_Δur_[n]-durm_[n])
-            end
-            jump_l /= nvar
-            jump_r /= nvar
-
-            if jump_l > 1e-06 || jump_r > 1e-06
-               add_to_node_vars!(durm, dulm_, eq, 1) # durm = durm + dulm
-               # We want durm = 0.5 * (dul + dur), we adjust 0.5 later
-               mul!(du, R, durm)            # du = R * (dulm+durm)
-               for ii in Base.OneTo(nd)
-                  du_ = get_node_vars(du, eq, 1)
-                  set_node_vars!(u1, ua_ + (xg[ii] - 0.5) * du_, # 2.0 adjusted with 0.5 above
-                                 eq, ii,
-                                 cell)
-               end
-            end
+      if jump_l > 1e-06 || jump_r > 1e-06
+         add_to_node_vars!(durm, dulm_, eq, 1) # durm = durm + dulm
+         # We want durm = 0.5 * (dul + dur), we adjust 0.5 later
+         mul!(du, R, durm)            # du = R * (dulm+durm)
+         for ii in Base.OneTo(nd)
+            du_ = get_node_vars(du, eq, 1)
+            set_node_vars!(u1, ua_ + (xg[ii] - 0.5) * du_, # 2.0 adjusted with 0.5 above
+                           eq, ii,
+                           cell)
          end
       end
-   end # timer
+   end
    return nothing
    end # timer
 end
@@ -844,71 +832,77 @@ function SSFR.is_admissible(eq::Euler1D, u::AbstractVector)
 end
 
 function SSFR.conservative2characteristic_reconstruction!(mode, ua, eq::Euler1D)
-   R, L = eigmatrix(eq, ua)
-   # TODO - Optimize!!
-   temp = L * mode
-   mode .= temp
+   # R, L = eigmatrix(eq, ua)
+   # temp = L * mode
+   # mode .= temp
+   @assert false "not implemented"
 end
 
 function SSFR.characteristic2conservative_reconstruction!(mode, ua, eq::Euler1D)
-   R, L = eigmatrix(eq, ua)
-   # TODO - Optimize!!
-   temp = R * mode
-   mode .= temp
+   # R, L = eigmatrix(eq, ua)
+   # temp = R * mode
+   # mode .= temp
+   @assert false "not implemented"
 end
 
-function SSFR.limit_slope!(eq::Euler1D, s, ufl, u_s_l, ufr, u_s_r, ue, xl, xr)
+admissibility_tolerance(eq::Euler1D) = 1e-10
+
+function SSFR.limit_slope(eq::Euler1D, s, ufl, u_s_l, ufr, u_s_r, ue, xl, xr)
    @unpack γ = eq
-   eps = 1e-10
-   ρ, v, pres = con2prim(eq, ue)
-   eps = min(eps, ρ)
-   eps = min(eps, pres)
+   eps = admissibility_tolerance(eq)
 
-   ρ_star = u_s_l[1]
-   theta1 = 1.0
-   if ρ_star < eps
-      ratio = abs(eps - ρ)/( abs(ρ_star - ρ) + 1e-13)
-      theta1 = min(ratio, 1.0)
-   end
-   if theta1 < 1.0
-      u_s_l .= theta1*u_s_l + (1.0-theta1)*ue
-   end
-   pres_star = (γ-1.0)*(u_s_l[3]-0.5*u_s_l[2]^2/u_s_l[1])
-   theta1 = 1.0
-   if pres_star < eps
-      ratio = abs(eps - pres)/( abs(pres_star - pres) )
-      theta1 = min(ratio, 1.0)
-   end
-   if theta1 < 1.0
-      u_s_l .= theta1*u_s_l + (1.0-theta1)*ue
+   variables = (get_density, get_pressure)
+
+   for variable in variables
+      var_star_tuple = (variable(eq, u_s_l), variable(eq, u_s_r))
+      var_low = variable(eq, ue)
+
+      theta = 1.0
+      for var_star in var_star_tuple
+         if var_star < eps
+            # TOTHINK - Replace eps here by 0.1*var_low
+            ratio = abs(0.1*var_low - var_low) / (abs(var_star - var_low) + 1e-13 )
+            theta = min(ratio, theta)
+         end
+      end
+      s *= theta
+      u_s_l = ue + 2.0*theta*xl*s
+      u_s_r = ue + 2.0*theta*xr*s
    end
 
-   ρ_star = u_s_r[1]
-   theta2 = 1.0
-   if ρ_star < eps
-      ratio = abs(eps - ρ)/( abs(ρ_star - ρ) + 1e-13)
-      theta2 = min(ratio, 1.0)
-   end
-   if theta2 < 1.0
-      u_s_r .= theta2*u_s_r + (1.0-theta2)*ue
-   end
-   pres_star = (γ-1.0)*(u_s_r[3]-0.5*u_s_r[2]^2/u_s_r[1])
-   theta2 = 1.0
-   if pres_star < eps
-      ratio = abs(eps - pres)/( abs(pres_star - pres) )
-      theta2 = min(ratio, 1.0)
-   end
-   if theta2 < 1.0
-      u_s_r .= theta2*u_s_r + (1.0-theta2)*ue
-   end
+   ufl = ue + xl*s
+   ufr = ue + xr*s
 
-   theta = min(theta1, theta2)
-
-   # TODO - Does taking minimum of theta like this work?
-
-   ufl .= ue + theta*xl*s
-   ufr .= ue + theta*xr*s
+   return ufl, ufr
 end
+
+function SSFR.zhang_shu_flux_fix(eq::Euler1D,
+                                 uprev,    # Solution at previous time level
+                                 ulow,     # low order update
+                                 Fn,       # Blended flux candidate
+                                 fn_inner, # Inner part of flux
+                                 fn,       # low order flux
+                                 c         # c is such that unew = u - c(fr-fl)
+                                 )
+   uhigh = uprev - c * (Fn-fn_inner) # First candidate for high order update
+   ρ_low, ρ_high = get_density(eq, ulow), get_density(eq, uhigh)
+   eps = 0.1*ρ_low
+   ratio = abs(eps-ρ_low)/(abs(ρ_high-ρ_low)+1e-13)
+   theta = min(ratio, 1.0)
+   if theta < 1.0
+      Fn = theta*Fn + (1.0-theta)*fn # Second candidate for flux
+   end
+   uhigh = uprev - c * (Fn - fn_inner) # Second candidate for uhigh
+   p_low, p_high = get_pressure(eq, ulow), get_pressure(eq, uhigh)
+   eps = 0.1*p_low
+   ratio = abs(eps-p_low)/(abs(p_high-p_low) + 1e-13)
+   theta = min(ratio, 1.0)
+   if theta < 1.0
+      Fn = theta*Fn + (1.0-theta)*fn # Final flux
+   end
+   return Fn
+end
+
 
 #-------------------------------------------------------------------------------
 # Plotting functions
@@ -953,9 +947,9 @@ function SSFR.initialize_plot(eq::Euler1D, op, grid, problem, scheme, timer, u1,
 
    # Set up p_u1 to contain polynomial approximation as a different curve
    # for each cell
-   x = LinRange(xf[1], xf[2], nu)
+   x   = LinRange(xf[1], xf[2], nu)
    up1 = zeros(nvar, nd)
-   u = zeros(nu)
+   u   = zeros(nu)
    for ii=1:nd
       @views con2prim!(eq, u1[:,ii,1],up1[:,ii]) # store prim form in up1
    end
@@ -987,7 +981,7 @@ function SSFR.initialize_plot(eq::Euler1D, op, grid, problem, scheme, timer, u1,
    end # timer
 end
 
-function SSFR.write_soln!(base_name, fcount, iter, time, eq::Euler1D, grid,
+function SSFR.write_soln!(base_name, fcount, iter, time, dt, eq::Euler1D, grid,
                           problem, param, op, ua, u1, aux, ndigits=3)
    @timeit aux.timer "Write solution" begin
    @unpack plot_data = aux
@@ -1009,7 +1003,7 @@ function SSFR.write_soln!(base_name, fcount, iter, time, eq::Euler1D, grid,
    for i=1:nx
       @views con2prim!(eq, ua[:,i],up_) # store primitve form in up_
       @printf(avg_file, "%e %e %e %e\n", xc[i], up_[1], up_[2], up_[3])
-      # TODO - Check efficiency of printf
+      # TOTHINK - Check efficiency of printf
       for n=1:eq.nvar
          p_ua[n+1][1][:y][i] = @views up_[n]    # Update y-series
          ylims[n][1] = min(ylims[n][1], up_[n]) # Compute ymin
@@ -1091,6 +1085,9 @@ function exact_solution_data(test_case)
       temp = copy(exact_data[:,3])
       exact_data[:,3] = copy(exact_data[:,4])
       exact_data[:,4] = temp
+   elseif test_case == "sedov1d"
+      file = GZip.open("$data_dir/sedov1d.dat.gz")
+      exact_data = readdlm(file)
    elseif test_case == "blast"
       file = GZip.open("$data_dir/blast.dat.gz")
       exact_data = readdlm(file)
@@ -1169,9 +1166,9 @@ function SSFR.post_process_soln(eq::Euler1D, aux, problem, param)
       end
       mkpath(saveto)
       for file in readdir("./output")
-         cp("./error.txt", "$saveto/error.txt", force=true) # TODO - should this be outside loop?
          cp("./output/$file", "$saveto/$file", force=true)
       end
+      cp("./error.txt", "$saveto/error.txt", force=true)
       println("Saved output files to $saveto")
    end
 

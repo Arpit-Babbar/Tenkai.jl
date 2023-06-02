@@ -9,7 +9,7 @@
 
 ## Setup (5-10 minutes)
 
-Set parameters in any of the `run` files, for example `run_const_linadv1d.jl`. Some of the options we have are
+Set parameters in any of the `run` files in `Examples` directly, like `run_const_linadv1d.jl` in `Examples/1d`. Some of the options we have are
 
 Scheme: RKFR, LWFR
 
@@ -35,7 +35,7 @@ julia> using SSFR
 
 At this point, in principle you can exit the REPL and always run your code directly through the shell as
 ```shell
-julia --project=. run_const_linadv1d.jl
+julia --project=. Examples/1d/run_const_linadv1d.jl
 ```
 
 However, since Julia uses a Just-In-Time (JIT) compiler, this is not recommended. If you wish to run this file again or run a different file, Julia will have to compile most of the code again. The recommended way to use Julia is within the Julia REPL where, within each session, the compiled code is stored in memory.

@@ -16,7 +16,7 @@ initial_value = Eq.blast
 exact_solution = Eq.exact_blast # dummy function
 boundary_value = Eq.exact_blast # dummy function
 
-degree = 3
+degree = 4
 solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
@@ -24,7 +24,7 @@ numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
 
-nx = 400
+nx = 200
 cfl = 0.0
 bounds = ([-Inf],[Inf]) # Not used in Euler
 tvbM = 300.0
@@ -45,13 +45,14 @@ problem = Problem(domain, initial_value, boundary_value,
                   boundary_condition, final_time, exact_solution)
 equation = Eq.get_equation(γ)
 limiter = setup_limiter_blend(
-                              blend_type = fo_blend(equation),
+                              blend_type = mh_blend(equation),
                               # indicating_variables = Eq.rho_p_indicator!,
                               indicating_variables = Eq.rho_p_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = indicator_model,
                               debug_blend = debug_blend,
-                              pure_fv = pure_fv
+                              pure_fv = pure_fv,
+                              numflux = Eq.rusanov
                              )
 # limiter = setup_limiter_tvb(equation; tvbM = tvbM)
 # limiter = setup_limiter_hierarchical(alpha = 1.0,

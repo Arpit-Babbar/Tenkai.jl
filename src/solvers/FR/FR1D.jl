@@ -6,7 +6,8 @@ using ..SSFR: fr_dir, lwfr_dir, rkfr_dir, eq_dir, src_dir
 using ..SSFR: update_ghost_values_periodic!, flux, con2prim
 (
 using ..FR: Scheme, Problem, Parameters, @threaded, PlotData,
-            get_filename, minmod, prim2con!, con2prim!, save_solution
+            get_filename, minmod, prim2con!, con2prim!, save_solution,
+            finite_differences, zhang_shu_flux_fix
 )
 using ..Equations: AbstractEquations, nvariables, eachvariable
 using ..Basis: Vandermonde_lag, weights_and_points, nodal2modal, nodal2modal_krivodonova, Vandermonde_leg_krivodonova
@@ -32,7 +33,8 @@ import ..SSFR: update_ghost_values_periodic!,
                Blend,
                fo_blend,
                mh_blend,
-               limit_slope!,
+               limit_slope,
+               no_upwinding_x,
                is_admissible,
                set_blend_dt!,
                compute_error,
@@ -64,9 +66,10 @@ using DelimitedFiles
 using LinearAlgebra: dot, mul!, BLAS, axpby!, I
 using WriteVTK
 using JSON3
+using LoopVectorization
 import Trixi
 
-# TODO - Consider using named tuples in place of all structs on which dispatch
+# TOTHINK - Consider using named tuples in place of all structs on which dispatch
 # isn't done
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
@@ -117,7 +120,6 @@ function compute_cell_average!(ua, u1, t, eq::AbstractEquations{1}, grid, proble
          ua[n,nx+1] = ua[n,1]
       end
    else
-      # TODO - Fix this, use nvar as first index
       for n=1:nvar
          ua[n,0] = ua[n,1]
          ua[n,nx+1] = ua[n,nx]
@@ -145,7 +147,7 @@ function get_cfl(eq::AbstractEquations{1}, scheme, param)
    os_vector(v) = OffsetArray(v, OffsetArrays.Origin(0))
    if solver == "lwfr" || cfl_style == "lw"
       if dissipation == get_second_node_vars # Diss 2
-         cfl_radau = os_vector([1.0, 0.333, 0.170, 0.103, 0.069]) # TODO: check
+         cfl_radau = os_vector([1.0, 0.333, 0.170, 0.103, 0.069])
          cfl_g2    = os_vector([1.0, 1.000, 0.333, 0.170, 0.103])
          if solver == "rkfr"
             println("Using LW-D2 CFL with RKFR")
@@ -153,7 +155,7 @@ function get_cfl(eq::AbstractEquations{1}, scheme, param)
             println("Using LW-D2 CFL with LW-D2")
          end
       elseif dissipation == get_first_node_vars # Diss 1
-         cfl_radau = os_vector([1.0, 0.226, 0.117, 0.072, 0.049]) # TODO: check
+         cfl_radau = os_vector([1.0, 0.226, 0.117, 0.072, 0.049])
          cfl_g2    = os_vector([1.0, 0.465, 0.204, 0.116, 0.060])
          if solver == "rkfr"
             println("Using LW-D1 CFL with RKFR")
@@ -231,9 +233,6 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, scheme,
    @unpack dx, xf = grid
    num_flux = scheme.numerical_flux
    @unpack blend = aux
-   nvar = eq.nvar
-
-   Fn = Array{Float64}(undef,nvar)
 
    # Vertical faces, x flux
    for i=1:nx+1
@@ -242,13 +241,13 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, scheme,
       @views Fn = num_flux(x, ua[:,i-1], ua[:,i],
                            Fb[:,2,i-1], Fb[:,1,i],
                            Ub[:,2,i-1], Ub[:,1,i], eq, 1)
-      Fn, blend_fac = blend.blend_face_residual!(i, x, u1, eq,
-                                                              dt, grid, op,
-                                                              scheme, param,
-                                                              Fn, aux, nothing,
-                                                              res)
+      Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq,
+                                                 dt, grid, op,
+                                                 scheme, param,
+                                                 Fn, aux, nothing,
+                                                 res)
       for ix=1:nd
-         for n=1:nvar
+         for n=1:nvariables(eq)
             res[n,ix,i-1] += dt/dx[i-1] * blend_fac[1] * Fn[n] * br[ix]
             res[n,ix,i]   += dt/dx[i]   * blend_fac[2] * Fn[n] * bl[ix]
          end
@@ -261,7 +260,7 @@ end
 #-------------------------------------------------------------------------------
 # Fill some data in ghost cells using periodicity
 #-------------------------------------------------------------------------------
-function update_ghost_values_u1!(eq::AbstractEquations{1}, problem, grid, op, u1, t)
+function update_ghost_values_u1!(eq::AbstractEquations{1}, problem, grid, op, u1, aux, t)
    nx = grid.size
    nd = op.degree+1
    nvar = size(u1,1)
@@ -484,7 +483,7 @@ function apply_hierarchical_limiter!(eq::AbstractEquations{1}, # 1D equations
    end
 
    # Convert to reconstruction variables
-   # TODO - Note that this is changing each variable
+   # FIXME - Note that this is changing each variable
    # locally, unlike the TVD limiter. This may not work
    # because you'd end up comparing characteristic variables
    # corresponding to different matrices!!
@@ -531,7 +530,7 @@ function apply_hierarchical_limiter!(eq::AbstractEquations{1}, # 1D equations
          @views conservative2recon!(Dc[:,i], ua_, eq)
       end
       to_limit = true
-      for i=nd:-1:2 # TODO - ix = 1 isn't touched, so modes_new initial is never updated
+      for i=nd:-1:2 # FIXME: - ix = 1 isn't touched, so modes_new initial is never updated
          if to_limit == true
             for n in eachvariable(eq)
                dcn[n] = minmod(Dc[n, i], alpha*df[n, i-1], alpha*db[n, i-1], 0.0)
@@ -555,6 +554,7 @@ function apply_hierarchical_limiter!(eq::AbstractEquations{1}, # 1D equations
       #    @views u1[n,:,i] .= M2Pn * modes[n,:,i]
       # end
    end
+   return nothing
 end
 
 function modal_smoothness_indicator(eq::AbstractEquations{1}, t, iter, fcount,
@@ -578,7 +578,6 @@ function modal_smoothness_indicator(eq::AbstractEquations{1}, t, iter, fcount,
    end
 end
 
-# TODO - Remove number of arguments
 function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
                                         fcount, dt, grid, scheme, problem,
                                         param, aux, op, u1, ua)
@@ -707,7 +706,7 @@ function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
          else
             @assert indicator_model == "draconian" "Incorrect indicator model"
          end
-         # TODO - Do this properly!!
+         # KLUDGE - Do this properly!!
          if indicator_model != "model5"
             ind[n] = 0.0
 
@@ -716,7 +715,7 @@ function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
             end
          end
       end
-      E[i] = maximum(ind) # TODO - is the variable 'ind' really needed?
+      E[i] = maximum(ind) # KLUDGE - is the variable 'ind' really needed?
       if indicator_model != "draconian"
          if E[i] < E0
             alpha[i] = 0.0
@@ -744,7 +743,7 @@ function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
                   ind[n] = 0.0
                end
             end
-            E[i] = maximum(ind) # TODO - is the variable 'ind' really needed?
+            E[i] = maximum(ind) # KLUDGE - is the variable 'ind' really needed?
             if E[i] < E0[m]
                alpha_[m] = 0.0
             elseif E[i] > E1[m]
@@ -798,7 +797,7 @@ function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
 
    blend.lamx .= alpha .* dt ./ dx
 
-   # TODO - Should this be in apply_limiter! function?
+   # KLUDGE - Should this be in apply_limiter! function?
    debug_blend_limiter!(eq, grid, problem, scheme, param, aux, op,
                         dt, t, iter, fcount, ua, u1)
    end # timer
@@ -879,11 +878,11 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
       end
       E[i] = maximum(ind) # maximum content among all indicating variables
 
-      T = a * 10^( -c * nd^(0.25) ) # TODO - Should we have something other than N+1 here?
+      T = a * 10^( -c * nd^(0.25) )
       s = log( (1.0 - 0.0001)/0.0001 )  # chosen to ensure so that E = 0 => alpha = amin
       alpha[i] = 1.0 / (1.0 + exp( (-s/T) * (E[i] - T) ))
 
-      if alpha[i] < amin # amin = 0.0001. TODO - Will this ever even happen?
+      if alpha[i] < amin # amin = 0.0001
          alpha[i] = 0.0
       elseif alpha[i] > 1.0 - amin
          alpha[i] = 1.0
@@ -932,7 +931,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
 
    blend.lamx .= alpha .* dt ./ dx
 
-   # TODO - Should this be in apply_limiter! function?
+   # KLUDGE - Should this be in apply_limiter! function?
    debug_blend_limiter!(eq, grid, problem, scheme, param, aux, op,
                         dt, t, iter, fcount, ua, u1)
    end # timer
@@ -989,7 +988,7 @@ function modal_smoothness_indicator_gassner_new(eq::AbstractEquations{1}, t,
       ind_nd, ind_nd_m_1, ind_nd_m_2 = zeros(n_ind_nvar), zeros(n_ind_nvar), zeros(n_ind_nvar)
       for n=1:n_ind_nvar
 
-         @views um[n,1] *= 0.1 # TODO - Replace with 0.1*cell_max/global_max
+         @views um[n,1] *= 0.1 # FIXME - Replace with 0.1*cell_max/global_max
 
          # Last node
          ind_den = @views sum(um[n,1:end].^2)      # Gassner takes constant node
@@ -1047,7 +1046,7 @@ function modal_smoothness_indicator_gassner_new(eq::AbstractEquations{1}, t,
       alpha_nd_m_2 = 0.0
       alpha[i] = max(alpha_nd, alpha_nd_m_1, alpha_nd_m_2)
 
-      if alpha[i] < amin # amin = 0.0001. TODO - Will this ever even happen?
+      if alpha[i] < amin # amin = 0.0001
          alpha[i] = 0.0
       elseif alpha[i] > 1.0 - amin
          alpha[i] = 1.0
@@ -1103,7 +1102,7 @@ function modal_smoothness_indicator_gassner_new(eq::AbstractEquations{1}, t,
 
    blend.lamx .= alpha .* dt ./ dx
 
-   # TODO - Should this be in apply_limiter! function?
+   # KLUDGE - Should this be in apply_limiter! function?
    debug_blend_limiter!(eq, grid, problem, scheme, param, aux, op,
                         dt, t, iter, fcount, ua, u1)
    end # timer
@@ -1234,7 +1233,7 @@ function modal_smoothness_indicator_gassner_face(eq, t, iter, fcount, dt, grid,
       alpha_nd_m_3 = 1.0 / (1.0 + exp( (-s/T_m_3) * (E_m_3 - T_m_3) ))
       alpha[i] = max(alpha_nd, alpha_nd_m_1, alpha_nd_m_2, alpha_nd_m_3)
 
-      if alpha[i] < amin # amin = 0.0001. TODO - Will this ever even happen?
+      if alpha[i] < amin # amin = 0.0001
          alpha[i] = 0.0
       elseif alpha[i] > 1.0 - amin
          alpha[i] = 1.0
@@ -1290,7 +1289,7 @@ function modal_smoothness_indicator_gassner_face(eq, t, iter, fcount, dt, grid,
 
    blend.lamx .= alpha .* dt ./ dx
 
-   # TODO - Should this be in apply_limiter! function?
+   # KLUDGE - Should this be in apply_limiter! function?
    debug_blend_limiter!(eq, grid, problem, scheme, param, aux, op,
                         dt, t, iter, fcount, ua, u1)
    end # timer
@@ -1329,7 +1328,7 @@ function debug_blend_limiter!(eq::AbstractEquations{1}, grid, problem, scheme,
          p_u1[1][i][:y] .= ua_min + (alpha[i])*d_ua
       end
    end
-   if nvariables(eq) > 1 # TODO - Create a p
+   if nvariables(eq) > 1 # KLUDGE - Create a p
       ua_min, ua_max = [1e20, 1e20, 1e20], [-1e20, -1e20, -1e20]
       for i=1:nx
          @views up = con2prim(eq, ua[:,i])
@@ -1355,7 +1354,7 @@ function debug_blend_limiter!(eq::AbstractEquations{1}, grid, problem, scheme,
    if save_solution(problem, param, t, iter) == true || t < 1e-12 || final_time - (t+dt) < 1e-10
       alpha_ = @view alpha[1:nx]
       @unpack xc = grid
-      ndigits = 3 # TODO - Add option to change
+      ndigits = 3 # KLUDGE - Add option to change
       alpha_filename = get_filename("output/alpha", ndigits, fcount)
       energy_filename = get_filename("output/energy", ndigits, fcount)
       alpha_file = open("$alpha_filename.txt", "w")
@@ -1398,8 +1397,8 @@ end
 # 1st order FV cell residual
 @inbounds @inline function blend_cell_residual_fo!(cell, eq::AbstractEquations{1},
                                                    scheme, aux, lamx,
-                                                   dt, dx, xf, op, u1, u, f, r)
-   @timeit aux.timer "Blending limiter" begin # TODO - Check the overhead, it's supposed
+                                                   dt, dx, xf, op, u1, u, ua, f, r)
+   @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead, it's supposed
                                               # to be 0.25 microseconds
    @unpack blend = aux
    # if blend.alpha[i] < 1e-12
@@ -1436,11 +1435,11 @@ end
    end # timer
 end
 
-@inbounds @inline function blend_face_residual_fo!(i, xf, u1,
+@inbounds @inline function blend_face_residual_fo!(i, xf, u1, ua,
                                                    eq::AbstractEquations{1},
                                                    dt, grid, op, scheme, param,
                                                    Fn, aux, lamx, res)
-   @timeit aux.timer "Blending limiter" begin # TODO - Check the overhead,
+   @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead,
                                     # it's supposed to be 0.25 microseconds
    @unpack blend = aux
    alpha = blend.alpha # factor of non-smooth part
@@ -1465,7 +1464,11 @@ end
    fr = flux(xf, ur, eq)
    fn = num_flux(xf, ul, ur, fl, fr, ul, ur, eq, 1)
 
-   alp = test_alp(i, eq, dt, grid, blend, scheme, xf, u1, fn, Fn, lamx, op, alp)
+   # alp = test_alp(i, eq, dt, grid, blend, scheme, xf, u1, fn, Fn, lamx, op, alp)
+
+   Fn = (1.0 - alp) * Fn + alp * fn
+
+   Fn = get_blended_flux(i, eq, dt, grid, blend, scheme, xf, u1, fn, Fn, lamx, op, alp)
 
    # Blend low and higher order flux
    # for n=1:nvar
@@ -1495,7 +1498,6 @@ end
    #    Fn[n] = (1.0-alp)*Fn[n] + alp*fn[n]
    # end
 
-   Fn = (1.0 - alp) * Fn + alp * fn
    # Fn_ = fn
 
    r = @view res[:, :, i-1]
@@ -1519,19 +1521,17 @@ end
    end # timer
 end
 
-function limit_slope!(::AbstractEquations{1, 1}, s, ufl, u_s_l, ufr, u_s_r,
+function limit_slope(::AbstractEquations{1, 1}, s, ufl, u_s_l, ufr, u_s_r,
                       ue, xl, xr)
-   nothing
+   ufl, ufr
 end
 
 # MUSCL-hancock cell residual
 @inbounds @inline function blend_cell_residual_muscl!(cell,
                                                       eq::AbstractEquations{1},
                                                       scheme, aux, lamx, dt,
-                                                      dx, xf, op, u1, u, f, r)
-   # TODO - Get these arguments through
-   # op
-   @timeit aux.timer "Blending limiter" begin # TODO - Check the overhead, it's supposed
+                                                      dx, xf, op, u1, u, ua, f, r)
+   @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead, it's supposed
                                     # to be 0.25 microseconds
    @unpack blend = aux
    # if blend.alpha[cell] < 1e-12
@@ -1540,8 +1540,8 @@ end
    fn_low = @view blend.fn_low[:,:,cell]
    @unpack Vl, Vr, xg, wg = op
    nd = length(xg)
-   num_flux = scheme.numerical_flux
-   @unpack nvar = eq
+   num_flux = blend.numflux
+   nvar = nvariables(eq)
    @unpack xxf, xe, ufl, ufr = blend # re-use values
    # Get subcell faces
    xxf[0] = xf
@@ -1551,14 +1551,13 @@ end
    # @unpack beta = blend
    beta = 2.0 - blend.alpha[cell]
 
-   # TODO - account for non-uniform grids.
    # Get solution points
    xe[0] = xf - dx*(1.0-xg[nd])     # Last solution point of left cell
-   xe[1:nd] = xf .+ dx*xg[:]        # Solution points on cell
+   @turbo xe[1:nd] .= xf .+ dx*xg        # Solution points on cell
    xe[nd+1] = xf + dx*(1.0 + xg[1]) # First solution point on right cell
 
    # Force cell-centred approach
-   # TODO - Get concrete evidence that this force cell-centred is bad
+   # TOTHINK - Get concrete evidence that this force cell-centred is bad
    # for ii=1:nd
    #    xe[ii] = 0.5 * (xxf[ii-1] + xxf[ii])
    # end
@@ -1568,9 +1567,11 @@ end
    # Get solution point values
    ue = blend.ue          # u extended to faces
    unph = blend.unph      # u at time n+1/2
-   @views ue[:,1:nd] = u1[:,:,cell]    # values from current cell
-   @views ue[:,0] = u1[:,nd,cell-1]    # value from left neighbour cells
-   @views ue[:,nd+1] = u1[:,1,cell+1]  # value from right neighbour cells
+   @views begin
+      @turbo ue[:,1:nd] .= u1[:,:,cell]    # values from current cell
+      @turbo ue[:,0]    .= u1[:,nd,cell-1]    # value from left neighbour cells
+      @turbo ue[:,nd+1] .= u1[:,1,cell+1]  # value from right neighbour cells
+   end
 
    # @views ue[:,0] = u1[:,:,i] * Vl    # value from left neighbour cells
    # @views ue[:,nd+1] = u1[:,:,i] * Vr  # value from right neighbour cells
@@ -1578,45 +1579,60 @@ end
    # Convert to variables used for reconstruction, like prim or char.
    # If we are using conservative variables, this function does nothing
 
-   # TODO - Get cell averages correctly!!
-   ua = zeros(3)
-   for ii=1:nd
-      for n=1:nvar
-         ua[n] += wg[ii]*u1[n,ii,cell]
-      end
-   end
+
+   ua_node = get_node_vars(ua, eq, cell)
 
    for ix=0:nd+1
-      @views blend.conservative2recon!(ue[:,ix], ua, eq)
+      ue_node = get_node_vars(ue, eq, ix)
+      ue_recon = blend.conservative2recon!(ue_node, ua_node, eq)
+      set_node_vars!(ue, ue_recon, eq, ix)
+      # @views blend.conservative2recon!(ue[:,ix], ua_node, eq)
    end
-   u_s_l, u_s_r = zeros(nvar), zeros(nvar)
-   slope = zeros(nvar)
+   # u_s_l, u_s_r = zeros(nvar), zeros(nvar)
+   # slope = zeros(nvar)
    # Evolve all cells to time level n+1/2
    for ii=1:nd # loop over (sub)cells
       # slope of linear approximation in cell
-      for n=1:nvar
-         h1, h2 = xe[ii]-xe[ii-1], xe[ii+1] - xe[ii]
-         a,b,c = -( h2/(h1*(h1+h2)) ), (h2-h1)/(h1*h2), ( h1/(h2*(h1+h2)) )
-         cent_diff = ( a * ue[n,ii-1] + b * ue[n,ii] + c * ue[n,ii+1]  )
-         # TODO - Confirm that cent_diff is giving benefit in some case.
-         # In linear advection, smooth test, it gave no advantage
-         slope[n] = minmod( beta*(ue[n,ii]-ue[n,ii-1])/(xe[ii]-xe[ii-1]),
-                            cent_diff,
-                           #  (ue[n,ii+1]-ue[n,ii-1])/(xe[ii+1]-xe[ii-1]),
-                            beta*(ue[n,ii+1]-ue[n,ii])/(xe[ii+1]-xe[ii]),
-                            0.0) # parameter M = 0.0
-         ufl[n] = ue[n,ii] + slope[n]*(xxf[ii-1] - xe[ii]) # left face value u_j^{n,-}
-         ufr[n] = ue[n,ii] + slope[n]*(xxf[ii]   - xe[ii]) # right face value u_j^{n,+}
-         u_s_l[n] = ue[n,ii] + slope[n]*2.0*(xxf[ii-1] - xe[ii]) # u_j^{*,-}
-         u_s_r[n] = ue[n,ii] + slope[n]*2.0*(xxf[ii]   - xe[ii]) # u_j^{*,+}
-      end
+      ul = get_node_vars(ue, eq, ii-1)
+      u_ = get_node_vars(ue, eq, ii)
+      ur = get_node_vars(ue, eq, ii+1)
+
+      h1, h2 = xe[ii]-xe[ii-1], xe[ii+1] - xe[ii]
+      back, cent, fwd = finite_differences(h1, h2, ul, u_, ur)
+
+      slope_tuple = (minmod(cent[n], back[n], fwd[n], beta, 0.0)
+                     for n in eachvariable(eq))
+
+      slope = SVector{nvar}(slope_tuple)
+
+      ufl   = u_ + slope*(xxf[ii-1] - xe[ii]) # left face value u_j^{n,-}
+      ufr   = u_ + slope*(xxf[ii]   - xe[ii]) # right face value u_j^{n,+}
+      u_s_l = u_ + slope*2.0*(xxf[ii-1] - xe[ii]) # u_j^{*,-}
+      u_s_r = u_ + slope*2.0*(xxf[ii]   - xe[ii]) # u_j^{*,+}
+      # for n=1:nvar
+      #    h1, h2 = xe[ii]-xe[ii-1], xe[ii+1] - xe[ii]
+      #    a,b,c = -( h2/(h1*(h1+h2)) ), (h2-h1)/(h1*h2), ( h1/(h2*(h1+h2)) )
+      #    cent_diff = ( a * ue[n,ii-1] + b * ue[n,ii] + c * ue[n,ii+1]  )
+      #    # TOTHINK - Confirm that cent_diff is giving benefit in some case.
+      #    # In linear advection, smooth test, it gave no advantage
+      #    slope[n] = minmod(
+      #                       cent_diff,
+      #                       beta*(ue[n,ii]-ue[n,ii-1])/(xe[ii]-xe[ii-1]),
+      #                      #  (ue[n,ii+1]-ue[n,ii-1])/(xe[ii+1]-xe[ii-1]),
+      #                       beta*(ue[n,ii+1]-ue[n,ii])/(xe[ii+1]-xe[ii]),
+      #                       0.0) # parameter M = 0.0
+      #    ufl[n] = ue[n,ii] + slope[n]*(xxf[ii-1] - xe[ii]) # left face value u_j^{n,-}
+      #    ufr[n] = ue[n,ii] + slope[n]*(xxf[ii]   - xe[ii]) # right face value u_j^{n,+}
+      #    u_s_l[n] = ue[n,ii] + slope[n]*2.0*(xxf[ii-1] - xe[ii]) # u_j^{*,-}
+      #    u_s_r[n] = ue[n,ii] + slope[n]*2.0*(xxf[ii]   - xe[ii]) # u_j^{*,+}
+      # end
 
       # Convert back to conservative for update
-      blend.recon2conservative!(ufl, ua, eq); blend.recon2conservative!(ufr, ua, eq)
-      blend.recon2conservative!(u_s_l, ua, eq); blend.recon2conservative!(u_s_r, ua, eq)
+      recon2cons(u) = blend.recon2conservative!(u, ua, eq)
+      ufl, ufr, u_s_l, u_s_r = recon2cons.((ufl, ufr, u_s_l, u_s_r))
 
-      @views limit_slope!(eq, slope, ufl, u_s_l, ufr, u_s_r, ue[:,ii],
-                          xxf[ii-1] - xe[ii], xxf[ii] - xe[ii])
+      ufl, ufr =  limit_slope(eq, slope, ufl, u_s_l, ufr, u_s_r, u_,
+                              xxf[ii-1] - xe[ii], xxf[ii] - xe[ii])
       fl = flux(xxf[ii-1], ufl, eq)        # f(u_j^{n,-})
       fr = flux(xxf[ii], ufr, eq)          # f(u_j^{n,+})
       # Use finite difference to evolve face values to time level n+1/2
@@ -1630,15 +1646,15 @@ end
    end
    resl = blend.resl # resl pre-stored.
 
-
-   # TODO - Store one for each thread
    fill!(resl, zero(eltype(resl)))
 
    # Final update using mid-point FVM and mid-point quadrature by a face loop
    # Only residuals of inner face is added, outer face in blend_face_residual!
-    for ii=2:nd
+   for ii=2:nd
       xx = xxf[ii]
-      @views ul, ur = unph[:,2,ii-1], unph[:,1,ii]
+      # @views ul, ur = unph[:,2,ii-1], unph[:,1,ii]
+      ul = get_node_vars(unph, eq, 2, ii-1)
+      ur = get_node_vars(unph, eq, 1, ii)
       fl = flux(xx, ul, eq)
       fr = flux(xx, ur, eq)
       # numerical flux between subcell j-1 and j
@@ -1650,22 +1666,34 @@ end
    end
 
    # Store numerical fluxes for positivity correction of high order numerical flux.
-   @views fn_low[:,1] .=  wg[1]   * resl[:,1]
-   @views fn_low[:,2] .= -wg[end] * resl[:,end]
+   @views begin
+      fn_l = wg[1] * get_node_vars(resl, eq, 1)
+      set_node_vars!(fn_low, fn_l, eq, 1)
+      # @turbo fn_low[:,1] .=  wg[1]   * resl[:,1] Somehow, this caused allocations
+      # @turbo fn_low[:,2] .= -wg[end] * resl[:,nd]
+      fn_r = -wg[end] * get_node_vars(resl, eq, nd)
+      set_node_vars!(fn_low, fn_r, eq, 2)
+   end
 
-   # Here, blend.lamx[i] = dt/dx[i]*alpha[i]. TODO - Can this be avoided?
-   axpby!(blend.lamx[cell], resl, 1.0-blend.alpha[cell], r)
+   # Here, blend.lamx[i] = dt/dx[i]*alpha[i]. KLUDGE - Can this be avoided?
+   @turbo for ix in 1:nd, n in 1:nvar
+      r[n,ix] = blend.lamx[cell]*resl[n,ix] + (1.0-blend.alpha[cell])*r[n,ix]
+   end
+   # Somehow, broadcasting or
+   # axpby!(blend.lamx[cell], resl, 1.0-blend.alpha[cell], r)
+   # caused allocations
+
    end # timer
 end
 
 
 # Merge this with blend_cell_residual
-@inbounds @inline function blend_face_residual_muscl!(i, xf, u1,
+@inbounds function blend_face_residual_muscl!(i, xf, u1, ua,
                                                       eq::AbstractEquations{1},
                                                       dt, grid, op, scheme,
                                                       param, Fn, aux, lamx,
                                                       res)
-   @timeit aux.timer "Blending limiter" begin # TODO - Check the overhead
+   @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead
    @unpack blend = aux
    # if blend.alpha[i] < 1e-12 && blend.alpha[i-1] < 1e-12
    #    return Fn, 1.0, 1.0
@@ -1673,14 +1701,14 @@ end
    alpha = blend.alpha # factor of non-smooth part
    @unpack xg, wg = op
    nd = length(xg)
-   num_flux = scheme.numerical_flux
-   nvar = eq.nvar
+   num_flux = blend.numflux
+   # num_flux = scheme.numerical_flux
+   nvar = nvariables(eq)
    alp = 0.5*(alpha[i-1]+alpha[i])
 
    dx = grid.dx
    # Reuse arrays to save memory
    unph = @view blend.unph[:,:,1]
-   @unpack ufl, ufr, fl, fr, fn = blend
    beta = 2.0 - alp
 
    # The lower order residual of blending scheme comes from lower order
@@ -1698,58 +1726,51 @@ end
    x  = grid.xf[i] - dx[i-1] + xg[nd]*dx[i-1]   # sol point of subcell
    xr = grid.xf[i]   + xg[1]*dx[i]              # sol point of right subcell
 
-   @views um1, u_, up1 = u1[:,nd-1,i-1], u1[:,nd,i-1], u1[:,1,i]
+   um1 = get_node_vars(u1, eq, nd-1, i-1)
+   u_  = get_node_vars(u1, eq, nd,   i-1)
+   up1 = get_node_vars(u1, eq, 1,    i)
 
    # Convert to variables used for reconstruction, like prim or char.
    # If we are using conservative variables, this function does nothing
 
-   ual = zeros(3)
-    for ii=1:nd
-      for n=1:nvar
-         ual[n] += wg[ii]*u1[n,ii,i-1]
-      end
-   end
+   ual = get_node_vars(ua, eq, i-1)
+   uar = get_node_vars(ua, eq, i)
 
-   uar = zeros(3)
-   for ii = 1:nd
-      for n = 1:nvar
-         uar[n] += wg[ii]*u1[n,ii,i]
-      end
-   end
+   con2recon_l(u) = blend.conservative2recon!(u, ual, eq)
 
-   blend.conservative2recon!(um1, ual, eq)
-   blend.conservative2recon!(u_, ual, eq)
-   blend.conservative2recon!(up1, ual, eq)
+   um1, u_, up1 = con2recon_l.( (um1, u_, up1) )
 
-   u_s_l, u_s_r = zeros(nvar), zeros(nvar)
-   slope = zeros(nvar)
+   h1, h2 = x - xl, xr - x
+   back, cent, fwd = finite_differences(h1, h2, um1, u_, up1)
 
-   for n=1:nvar
-      h1, h2 = x - xl, xr - x
-      a,b,c = -( h2/(h1*(h1+h2)) ), (h2-h1)/(h1*h2), ( h1/(h2*(h1+h2)) )
-      cent_diff = ( a * um1[n] + b * u_[n] + c * up1[n]  )
-      slope[n] = minmod( beta * ( u_[n]  - um1[n] ) / (x-xl),  # u-um1
-                         cent_diff,
-                         beta * ( up1[n] - u_[n]  ) / (xr-x),  # up1-u
-                         0.0 )
-      # left, right face values at current time level
-      ufl[n], ufr[n] = u_[n] + slope[n]*(xfl-x), u_[n] + slope[n]*(xfr-x)
-      u_s_l[n], u_s_r[n] = u_[n] + 2.0*slope[n]*(xfl-x), u_[n] + 2.0*slope[n]*(xfr-x)
-   end
+   slope_tuple = (minmod(cent[n], back[n], fwd[n], beta, 0.0)
+                  for n in eachvariable(eq))
 
-   # Change u1 back to conservative form
-   blend.recon2conservative!(um1, ual, eq)
-   blend.recon2conservative!(u_, ual, eq)
-   blend.recon2conservative!(up1, ual, eq)
+   slope = SVector{nvar}(slope_tuple)
 
-   # Convert face values back to conservative variables for evolution
-   blend.recon2conservative!(ufl, ual, eq)
-   blend.recon2conservative!(ufr, ual, eq)
+   # left, right face values at current time level
+   ufl, ufr = u_ + slope*(xfl-x), u_ + slope*(xfr-x)
+   u_s_l, u_s_r = u_ + 2.0*slope*(xfl-x), u_ + 2.0*slope*(xfr-x)
 
-   blend.recon2conservative!(u_s_l, ual, eq)
-   blend.recon2conservative!(u_s_r, ual, eq)
+   # for n=1:nvar
+   #    h1, h2 = x - xl, xr - x
+   #    a,b,c = -( h2/(h1*(h1+h2)) ), (h2-h1)/(h1*h2), ( h1/(h2*(h1+h2)) )
+   #    cent_diff = ( a * um1[n] + b * u_[n] + c * up1[n]  )
+   #    slope[n] = minmod(
+   #                       cent_diff,
+   #                       beta * ( u_[n]  - um1[n] ) / (x-xl),  # u-um1
+   #                       beta * ( up1[n] - u_[n]  ) / (xr-x),  # up1-u
+   #                       0.0 )
+   #    # left, right face values at current time level
+   #    ufl[n], ufr[n] = u_[n] + slope[n]*(xfl-x), u_[n] + slope[n]*(xfr-x)
+   #    u_s_l[n], u_s_r[n] = u_[n] + 2.0*slope[n]*(xfl-x), u_[n] + 2.0*slope[n]*(xfr-x)
+   # end
 
-   @views limit_slope!(eq, slope, ufl, u_s_l, ufr, u_s_r, u_, xfl-x, xfr-x)
+   recon2cons_l(u) = blend.recon2conservative!(u, ual, eq)
+
+   ufl, ufr, u_s_l, u_s_r = recon2cons_l.((ufl, ufr, u_s_l, u_s_r))
+
+   ufl, ufr = limit_slope(eq, slope, ufl, u_s_l, ufr, u_s_r, u_, xfl-x, xfr-x)
 
    # left, right face fluxes at current time level
    fl = flux(xfl, ufl, eq)
@@ -1768,67 +1789,64 @@ end
    x  = grid.xf[i] + xg[1]*dx[i]              # solution point of subcell
    xr = grid.xf[i] + xg[2]*dx[i]              # solution point of right subcell
 
-   @views um1, u_, up1 = u1[:,nd,i-1], u1[:,1,i], u1[:,2,i]
+   um1 = get_node_vars(u1, eq, nd, i-1)
+   u_  = get_node_vars(u1, eq, 1,  i)
+   up1 = get_node_vars(u1, eq, 2,  i)
 
    # Convert to variables used for reconstruction, like prim or char.
    # If we are using conservative variables, this function does nothing
 
-   blend.conservative2recon!(um1, uar, eq)
-   blend.conservative2recon!(u_, uar, eq)
-   blend.conservative2recon!(up1, uar, eq)
+   con2recon_r(u) = blend.conservative2recon!(u, uar, eq)
 
-   for n=1:nvar
-      h1, h2 = x - xl, xr - x
-      a,b,c = -( h2/(h1*(h1+h2)) ), (h2-h1)/(h1*h2), ( h1/(h2*(h1+h2)) )
-      cent_diff = ( a * um1[n] + b * u_[n] + c * up1[n]  )
-      slope[n] = minmod( beta * ( u_[n]  - um1[n] ) / (x-xl),  # u-um1
-                        cent_diff,
-                        # ( up1[n] - um1[n] ) / (xr-xl), # up1-um1
-                         beta * ( up1[n] - u_[n]  ) / (xr-x),  # up1-u
-                         0.0 )
-      # left, right face values at current time level
-      ufl[n], ufr[n] = u_[n] + slope[n]*(xfl-x), u_[n] + slope[n]*(xfr-x)
-      u_s_l[n], u_s_r[n] = u_[n] + 2.0*slope[n]*(xfl-x), u_[n] + 2.0*slope[n]*(xfr-x)
-   end
+   um1, u_, up1 = con2recon_r.( (um1, u_, up1) )
 
-   # Change u1 back to conservative form
-   blend.recon2conservative!(um1, uar, eq)
-   blend.recon2conservative!(u_, uar, eq)
-   blend.recon2conservative!(up1, uar, eq)
+   h1, h2 = x - xl, xr - x
+   back_, cent_, fwd_ = finite_differences(h1, h2, um1, u_, up1)
 
-   # Convert face values back to conservative variables for evolution
-   blend.recon2conservative!(ufl, uar, eq)
-   blend.recon2conservative!(ufr, uar, eq)
+   slope_tuple = (minmod(cent_[n], back_[n], fwd_[n], beta, 0.0)
+                  for n in eachvariable(eq))
 
-   blend.recon2conservative!(u_s_l, uar, eq)
-   blend.recon2conservative!(u_s_r, uar, eq)
+   slope = SVector{nvar}(slope_tuple)
 
-   @views limit_slope!(eq, slope, ufl, u_s_l, ufr, u_s_r, u_, xfl-x, xfr-x)
+   # left, right face values at current time level
+   ufl, ufr = u_ + slope*(xfl-x), u_ + slope*(xfr-x)
+   u_s_l, u_s_r = u_ + 2.0*slope*(xfl-x), u_ + 2.0*slope*(xfr-x)
+
+   recon2cons_r(u) = blend.recon2conservative!(u, uar, eq)
+
+   ufl, ufr, u_s_l, u_s_r = recon2cons_r.((ufl, ufr, u_s_l, u_s_r))
+
+   ufl_, ufr_ = limit_slope(eq, slope, ufl, u_s_l, ufr, u_s_r, u_, xfl-x, xfr-x)
 
    # left, right face fluxes at current time level
-   fl = flux(xl, ufl, eq)
-   fr = flux(xr, ufr, eq)
+   fl_ = flux(xl, ufl_, eq)
+   fr_ = flux(xr, ufr_, eq)
    for n=1:nvar
       # perform update to get u^{n+1/2,+} with finite difference method
-      unph[n,2] = ufl[n] + 0.5*blend.dt[1]*(fl[n]-fr[n])/(xfr-xfl)
+      unph[n,2] = ufl_[n] + 0.5*blend.dt[1]*(fl_[n]-fr_[n])/(xfr-xfl)
    end
 
    # left, right fluxes at i^th face at time level n+1/2
-   @views fl = flux(xf, unph[:,1], eq)
-   @views fr = flux(xf, unph[:,2], eq)
+   unph_l = get_node_vars(unph, eq, 1)
+   unph_r = get_node_vars(unph, eq, 2)
+   @views fl = flux(xf, unph_l, eq)
+   @views fr = flux(xf, unph_r, eq)
 
-   fn = @views num_flux(xf, unph[:,1], unph[:,2], fl, fr, unph[:,1], unph[:,2],
-                        eq, 1)
+   fn = num_flux(xf, unph_l, unph_r, fl, fr, unph_l, unph_r, eq, 1)
+
 
    # If positivity fails, set
-   alp = test_alp(i, eq, dt, grid, blend, scheme, xf, u1, fn, Fn, lamx, op, alp)
+   # it's supposed to be 0.25 microseconds
+   # alp = test_alp(i, eq, dt, grid, blend, scheme, xf, u1, fn, Fn, lamx, op, alp)
 
+   Fn = (1.0-alp)*Fn + alp*fn
+
+   Fn = get_blended_flux(i, eq, dt, grid, blend, scheme, xf, u1, fn, Fn, lamx, op, alp)
    # Blend low and higher order flux
    # for n=1:nvar
    #    Fn[n] = (1.0-alp)*Fn[n] + alp*fn[n]
    # end
 
-   Fn = (1.0-alp)*Fn + alp*fn
 
    # Fn_ = (1.0 - alp) * Fn + alp * fn
    # Fn_ = fn
@@ -1836,22 +1854,25 @@ end
    r = @view res[:, :, i-1]
    # For the sub-cells which have same interface as super-cells, the same
    # numflux Fn is used in place of the lower order flux
-   for n=1:nvar
+   for n in eachvariable(eq)
       # r[n,nd] += alpha[i-1] * dt/dx[i-1] * Fn_[n]/wg[nd] # alpha[i-1] already in blend.lamx
       r[n,nd] += dt/dx[i-1] * alpha[i-1] * Fn[n]/wg[nd] # alpha[i-1] already in blend.lamx
    end
 
    r = @view res[:,:, i]
-   for n=1:nvar
+   for n in eachvariable(eq)
       # r[n,1] -= alpha[i] * dt/dx[i] * Fn_[n]/wg[1] # alpha[i-1] already in blend.lamx
       r[n,1] -= dt/dx[i] * alpha[i] * Fn[n]/wg[1] # alpha[i-1] already in blend.lamx
    end
+
+
    return Fn, (1.0 - alpha[i-1], 1.0 - alpha[i])
+
    end # limiter
 end
 
 @inline function trivial_cell_residual(i, eq::AbstractEquations{1}, num_flux,
-                                       aux, lamx, dt, dx, xf, op, u1, u, f, r)
+                                       aux, lamx, dt, dx, xf, op, u1, u, ua, f, r)
    return nothing
 end
 
@@ -1863,24 +1884,68 @@ function test_alp(i, eq::AbstractEquations{1}, dt, grid,
    @unpack fn_low = blend
    @unpack dx = grid
 
+   nd = length(op.xg)
+
    # Check if the end point of left cell is updated with postiivity
-   fn_ = @view fn_low[:,2,i-1]
-   @views  tmp = u1[:,end,i-1] - (dt/dx[i-1])/wg[end] * ((1-alp)*Fn+alp*fn - fn_ )
-   if is_admissible(eq, tmp) == false
+   fn_ll = get_node_vars(fn_low, eq, 2, i-1)
+   u = get_node_vars(u1, eq, nd, i-1)
+   @views  test_ll = u - (dt/dx[i-1])/wg[end] * ( (1-alp)*Fn+alp*fn - fn_ll )
+   if is_admissible(eq, test_ll) == false
       return 1.0
    end
 
    # Check if the first point of right cell is updated with postiivity
-   fn_ = @view fn_low[:,1,i]
-   @views tmp = u1[:,1,i] - (dt/dx[i])/wg[1] * (fn_ - ((1-alp)*Fn+alp*fn))
-   if is_admissible(eq, tmp) == false
+   fn_rr = get_node_vars(fn_low, eq, 1, i)
+   u_ = get_node_vars(u1, eq, 1, i)
+   @views test_rr = u_ - (dt/dx[i])/wg[1] * (fn_rr - ((1-alp)*Fn + alp*fn))
+   if is_admissible(eq, test_rr) == false
       return 1.0
    end
    return alp
 end
 
+function get_blended_flux(el_x, eq::AbstractEquations{1}, dt, grid,
+                          blend, scheme, xf, u1, fn, Fn,
+                          lamx, op, alp)
+   @unpack wg = op
+   @unpack fn_low = blend
+   @unpack dx = grid
 
-@inline function trivial_face_residual(i, x, u1, eq::AbstractEquations{1},
+   nd = length(op.xg)
+
+   # Check if the end point of left cell is updated with postiivity
+   fn_inner_left_cell = get_node_vars(fn_low, eq, 2, el_x-1)
+   u_node             = get_node_vars(u1, eq, nd, el_x-1)
+
+   c_ll = dt / (dx[el_x-1]*wg[end]) # c is such that unew = u - c(Fn-fn_inner)
+
+   test_update_ll        = u_node - c_ll * ( Fn - fn_inner_left_cell )
+   lower_order_update_ll = u_node - c_ll * ( fn - fn_inner_left_cell )
+   if is_admissible(eq, test_update_ll) == false
+      @debug "Using first order flux at" el_x, xf
+      Fn = zhang_shu_flux_fix(eq, u_node, lower_order_update_ll,
+                              Fn, fn_inner_left_cell, fn, c_ll)
+   end
+
+   # Check if the first point of right cell is updated with postiivity
+   fn_inner_right_cell = get_node_vars(fn_low, eq, 1, el_x)
+   u_node_             = get_node_vars(u1, eq, 1, el_x)
+
+   c_rr = - (dt/dx[el_x])/wg[1] # c is such that unew = u - c(Fn-fn_inner)
+
+   test_rr               = u_node_ - c_rr * (Fn - fn_inner_right_cell)
+   lower_order_update_rr = u_node_ - c_rr * (fn - fn_inner_right_cell)
+
+   if is_admissible(eq, test_rr) == false
+      @debug "Using first order flux at" el_x, xf
+      Fn = zhang_shu_flux_fix(eq, u_node_, lower_order_update_rr,
+                              Fn, fn_inner_right_cell, fn, c_rr)
+   end
+   return Fn
+end
+
+
+@inline function trivial_face_residual(i, x, u1, ua, eq::AbstractEquations{1},
                                        dt, grid, op, scheme, param, Fn, aux,
                                        lamx, res)
    return Fn, (1.0, 1.0)
@@ -1892,8 +1957,6 @@ function is_admissible(::AbstractEquations{1,<:Any}, ::AbstractVector)
    return true
 end
 
-# TODO - Make it a named tuple
-
 @inbounds @inline function characteristic_reconstruction!(ue, ua,
                                                           eq::AbstractEquations{1})
    @assert false "Not implemented"
@@ -1904,7 +1967,7 @@ end
    @assert false "Not implemented"
 end
 
-struct Blend1D{F1, F2, F3, F4, F5 <: Function, Parameters}
+struct Blend1D{F1, F2, F3, F4, F5, F6 <: Function, Parameters}
    alpha::OffsetVector{Float64, Vector{Float64}}
    # alpha_prev::Vector{Float64}
    space_time_alpha::ElasticArray{Float64, 2, 1, Array{Float64, 1}}
@@ -1939,6 +2002,11 @@ struct Blend1D{F1, F2, F3, F4, F5 <: Function, Parameters}
    get_indicating_variables!::F3
    conservative2recon!::F4
    recon2conservative!::F5
+   numflux::F6
+end
+
+@inbounds @inline function no_upwinding_x(u1, eq, op, xf, element, Fn)
+   return Fn
 end
 
 # Create Blend1D struct
@@ -1946,7 +2014,7 @@ function Blend(eq::AbstractEquations{1}, op, grid,
                problem::Problem,
                scheme::Scheme,
                param::Parameters,
-               plot_data)
+               plot_data, bc_x = no_upwinding_x)
    @unpack xc, xf, dx = grid
    nx = grid.size
    @unpack degree, xg = op
@@ -1961,14 +2029,20 @@ function Blend(eq::AbstractEquations{1}, op, grid,
    end
    println("Setting up blending limiter...")
 
-   # TODO - Add strings with names to these parameters like
+   # KLUDGE - Add strings with names to these parameters like
    # indicating_variables, reconstruction_variables, etc
-   @unpack ( blend_type, indicating_variables, reconstruction_variables, smooth_alpha,
+   @unpack ( blend_type, indicating_variables, reconstruction_variables,
+             smooth_alpha,
              amax, constant_node_factor, constant_node_factor2, c, a, amin,
-             indicator_model, debug_blend, pure_fv ) = limiter
-   parameters = (; c, a, amin, smooth_alpha, constant_node_factor, constant_node_factor2)
+             indicator_model, debug_blend, pure_fv,
+             numflux ) = limiter
+   parameters = (; c, a, amin, smooth_alpha, constant_node_factor,
+                   constant_node_factor2)
    nd = degree + 1
    nvar = nvariables(eq)
+   if numflux === nothing
+      numflux = scheme.numerical_flux
+   end
 
    # Choose E1 for which E > E1 implies non-smoothness
    if indicator_model == "model1"
@@ -2075,7 +2149,7 @@ function Blend(eq::AbstractEquations{1}, op, grid,
            zeros(1), E, beta_muscl, debug_blend, a0, a1, idata,
            blend_cell_residual!,
            blend_face_residual!, indicating_variables, conservative2recon!,
-           recon2conservative!)
+           recon2conservative!, numflux)
 end
 
 function Hierarchical(eq::AbstractEquations{1}, op, grid,
@@ -2096,7 +2170,7 @@ function Hierarchical(eq::AbstractEquations{1}, op, grid,
    local_cache = ( MArray{Tuple{nvar,nd}}(zeros(nvar,nd)) for _=1:3 )
 
    hierarchical = (; modes_cache, local_cache, alpha, conservative2recon!, recon2conservative! )
-   # TODO - Move nodal2modal, modal2nodal here
+   # FIXME - Move nodal2modal, modal2nodal here
    return hierarchical
 end
 
@@ -2129,7 +2203,6 @@ function compute_error(problem, grid, eq::AbstractEquations{1}, aux, op, u1, t)
    @unpack xg = op
    nd         = length(xg)
 
-   # TODO: Assuming periodicity
    @unpack exact_solution = problem
 
    nq     = nd + 10    # number of quadrature points in each direction
@@ -2225,7 +2298,7 @@ function initialize_plot(eq::AbstractEquations{1, 1}, op, grid, problem, scheme,
    end # timer
 end
 
-function write_soln!(base_name, fcount, iter, time,
+function write_soln!(base_name, fcount, iter, time, dt,
                      eq::AbstractEquations{1, 1}, grid,
                      problem, param, op, ua, u1, aux; ndigits=3)
    @timeit aux.timer "Write solution" begin
@@ -2331,7 +2404,7 @@ function post_process_soln(eq::AbstractEquations{1, 1}, aux, problem, param)
    plot(p_ua); plot(p_u1);
    close(error_file)
 
-   # TODO - also write a file explaining all the parameters.
+   # TOTHINK - also write a file explaining all the parameters.
    # Ideally write a file out of args_dict
 
    end # timer
@@ -2349,14 +2422,11 @@ function post_process_soln(eq::AbstractEquations{1, 1}, aux, problem, param)
       end
       mkpath(saveto)
       for file in readdir("./output")
-         cp("./error.txt", "$saveto/error.txt", force=true) # TODO - should this be outside loop?
+         cp("./error.txt", "$saveto/error.txt", force=true) # KLUDGE/TOTHINK - should this be outside loop?
          cp("./output/$file", "$saveto/$file", force=true)
       end
       println("Saved output files to $saveto")
    end
-
-
-
    return nothing
 end
 

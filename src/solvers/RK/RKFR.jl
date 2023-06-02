@@ -51,7 +51,7 @@ function compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, t,
    pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme, param,
                         aux, op, u1, ua)
    compute_cell_residual_rkfr!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb,
-                               ub)
+                               ub, cache)
    update_ghost_values_rkfr!(problem, scheme, eq, grid, aux, op, cache, t)
    compute_face_residual!(eq, grid, op, scheme, param, aux, t, dt, u1, Fb, ub,
                           ua, res)
@@ -83,7 +83,7 @@ function dtFE(u, p, t)
    set_blend_dt!(eq, aux, dt) # Set dt used by MUSCL-Hancock
    @printf("iter,dt,t   = %5d %12.4e %12.4e \n", iter, dt, t)
    if save_solution(problem, param, t, iter)
-      global fcount = write_soln!("sol", fcount, iter, t, eq, grid, problem,
+      global fcount = write_soln!("sol", fcount, iter, t, dt, eq, grid, problem,
                                   param, op, ua, u, aux)
    end
    if (compute_error_interval > 0 &&
@@ -95,7 +95,7 @@ function dtFE(u, p, t)
 end
 
 # DiffEq limiter functions
-# TODO - Pass dt through integrator
+# KLUDGE - Pass dt through integrator
 function stage_limiter!(u, integrator, p, t)
    eq, problem, scheme, param, cfl, grid, aux, op, cache, Fb, ub, ua, res = p
    compute_cell_average!(ua, u, t, eq, grid, problem, scheme, aux, op)
@@ -425,7 +425,7 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
    end
 
    # Save initial solution to file
-   fcount = write_soln!("sol", fcount, iter, t, eq, grid, problem, param, op,
+   fcount = write_soln!("sol", fcount, iter, t, 0.0, eq, grid, problem, param, op,
                         ua, u1, aux)
 
    # Compute initial error norm
@@ -441,7 +441,7 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
       t += dt; iter += 1
       @printf("iter,dt,t = %5d %12.4e %12.4e\n", iter, dt, t)
       if save_solution(problem, param, t, iter)
-         fcount = write_soln!("sol", fcount, iter, t, eq, grid, problem, param, op,
+         fcount = write_soln!("sol", fcount, iter, t, dt, eq, grid, problem, param, op,
                                ua, u1, aux)
       end
       if (compute_error_interval > 0 &&

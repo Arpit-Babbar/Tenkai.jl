@@ -53,7 +53,6 @@ function setup_arrays_lwfr(grid, scheme, eq::AbstractEquations{1})
    Fb  = gArray(nvar, 2, nx)
    Ub  = gArray(nvar, 2, nx)
 
-   # TODO - Multi-thread here
    if degree == 1
       cell_data_size = 6
       eval_data_size = 6
@@ -102,8 +101,7 @@ function update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache,
    left, right = boundary_condition
    refresh!(u) = fill!(u,0.0)
 
-   ub, fb, ubvalue, fbvalue = (zeros(nvar), zeros(nvar), zeros(nvar),
-                               zeros(nvar))
+   ub, fb = zeros(nvar), zeros(nvar)
 
    # For Dirichlet bc, use upwind flux at faces by assigning both physical
    # and ghost cells through the bc.
@@ -111,8 +109,8 @@ function update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache,
       x = xf[1]
       for l=1:nd
          tq = t + xg[l]*dt
-         ubvalue .= boundary_value(x,tq) # TODO - Make in-place
-         fbvalue .= flux(x, ubvalue, eq)
+         ubvalue = boundary_value(x,tq)
+         fbvalue = flux(x, ubvalue, eq)
          for n=1:nvar
             ub[n] += ubvalue[n] * wg[l]
             fb[n] += fbvalue[n] * wg[l]
@@ -140,13 +138,13 @@ function update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache,
       @assert false
    end
 
-   refresh!.((ub, fb, ubvalue, fbvalue))
+   refresh!.((ub, fb))
    if right == dirichlet
       x  = xf[nx+1]
       for l=1:nd
          tq = t + xg[l]*dt
-         ubvalue .= boundary_value(x,tq) # TODO - Make in-place version
-         fbvalue .= flux(x, ub, eq)
+         ubvalue = boundary_value(x,tq)
+         fbvalue = flux(x, ub, eq)
          for n=1:nvar
             ub[n] += ubvalue[n] * wg[l]
             fb[n] += fbvalue[n] * wg[l]
@@ -272,7 +270,7 @@ function compute_cell_residual_1!(eq::AbstractEquations{1}, grid, op, scheme,
       u = @view u1[:,:,el_x]
       r = @view res[:,:,el_x]
       blend.blend_cell_residual!(el_x, eq, scheme, aux, lamx, dt, dx,
-                                 grid.xf[el_x], op, u1 , u, f, r)
+                                 grid.xf[el_x], op, u1 , u, cache.ua, f, r)
       # Interpolate to faces
       for i in Base.OneTo(nd)
          U_node = get_node_vars(U, eq, i)
@@ -287,7 +285,6 @@ function compute_cell_residual_1!(eq::AbstractEquations{1}, grid, op, scheme,
             multiply_add_to_node_vars!(Fb, Vr[i], Fr_node, eq, 2, el_x)
          end
       else
-         # TODO - These fl, fml, etc. are not needed
          ul, ur, upl, upr, uml, umr = eval_data[Threads.threadid()]
          refresh!.((ul,ur,upl,uml,umr,upr))
          xl, xr = grid.xf[el_x], grid.xf[el_x+1]
@@ -302,7 +299,7 @@ function compute_cell_residual_1!(eq::AbstractEquations{1}, grid, op, scheme,
             multiply_add_to_node_vars!(uml, Vl[i], um_node, eq, 1)
             multiply_add_to_node_vars!(umr, Vr[i], um_node, eq, 1)
          end
-         # TODO - Try this in TVB limiter as well
+         # IDEA - Try this in TVB limiter as well
          ul_node  = get_node_vars(ul,  eq, 1)
          ur_node  = get_node_vars(ur,  eq, 1)
          upl_node = get_node_vars(upl, eq, 1)
@@ -372,9 +369,9 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, scheme,
 
       for i in Base.OneTo(nd)
          ut_node = get_node_vars(ut, eq, i)
-         multiply_add_to_node_vars!(up,  1.0, # TODO - Avoid redundant multiplication
+         multiply_add_to_node_vars!(up,  1.0, # KLUDGE - Avoid redundant multiplication
                                     ut_node, eq, i)
-         multiply_add_to_node_vars!(um, -1.0, # TODO - Avoid redundant multiplication
+         multiply_add_to_node_vars!(um, -1.0, # KLUDGE - Avoid redundant multiplication
                                     ut_node, eq, i)
       end
 
@@ -412,7 +409,6 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, scheme,
          um_node = get_node_vars(um, eq, i)
          fp = flux(x_, up_node, eq)
          fm = flux(x_, um_node, eq)
-         # TODO - Try making an add_svector function
          f_node = get_node_vars(f, eq, i)
          multiply_add_to_node_vars!(F, # ftt = fp - 2.0*f + fm; F += 1/6*ftt
                                     -1.0/3.0, f_node,
@@ -430,16 +426,16 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, scheme,
       u = @view u1[:,:,cell]
       r = @view res[:,:,cell]
       blend.blend_cell_residual!(cell, eq, scheme, aux, lamx, dt, dx,
-                                 grid.xf[cell], op, u1 , u, f, r)
+                                 grid.xf[cell], op, u1 , u, cache.ua, f, r)
       # Interpolate to faces
-      # TODO - Make this into a function
+      # KLUDGE - Make this into a function
       for i in Base.OneTo(nd)
          U_node = get_node_vars(U, eq, i)
          multiply_add_to_node_vars!(Ub, Vl[i], U_node, eq, 1, cell)
          multiply_add_to_node_vars!(Ub, Vr[i], U_node, eq, 2, cell)
       end
       if bflux_ind == extrapolate
-         # TODO - Make this into a function
+         # KLUDGE - Make this into a function
          for i in Base.OneTo(nd)
             Fl_node = get_node_vars(F, eq, i)
             Fr_node = get_node_vars(F, eq, i)
@@ -541,9 +537,9 @@ function compute_cell_residual_3!(eq::AbstractEquations{1}, grid, op, scheme,
       for i in Base.OneTo(nd) # Loop over solution points
          x_ = xc - 0.5 * dx + xg[i] * dx
          ut_node = get_node_vars(ut, eq, i)
-         multiply_add_to_node_vars!(um, -1.0, # TODO - Avoid redundant multiplication
+         multiply_add_to_node_vars!(um, -1.0, # KLUDGE - Avoid redundant multiplication
                                     ut_node, eq, i)
-         multiply_add_to_node_vars!(up,  1.0, # TODO - Avoid redundant multiplication
+         multiply_add_to_node_vars!(up,  1.0, # KLUDGE - Avoid redundant multiplication
                                     ut_node, eq, i)
          multiply_add_to_node_vars!(umm, -2.0,
                                     ut_node, eq, i)
@@ -561,7 +557,7 @@ function compute_cell_residual_3!(eq::AbstractEquations{1}, grid, op, scheme,
          multiply_add_to_node_vars!(ft,  1.0/12.0, -1.0, fpp, 8.0 , fp,
                                                    -8.0, fm , 1.0 , fmm,
                                     eq, i)
-         # TODO - Can you avoid redundant mutiplication by 1.0?
+         # KLUDGE - Can you avoid redundant mutiplication by 1.0?
          ft_node = get_node_vars(ft, eq, i)
          ut_node = get_node_vars(ut, eq, i)
          multiply_add_to_node_vars!(F, 0.5, ft_node, eq, i) # F += 0.5*ft
@@ -589,7 +585,6 @@ function compute_cell_residual_3!(eq::AbstractEquations{1}, grid, op, scheme,
          um_node = get_node_vars(um, eq, i)
          fp = flux(x_, up_node, eq)
          fm = flux(x_, um_node, eq)
-         # TODO - Try making an add_svector function
          f_node = get_node_vars(f, eq, i)
          # ftt = fp - 2.0*f + fm
          multiply_add_to_node_vars!(ftt, 1.0, fp, -2.0 , f_node, 1.0, fm, eq, i)
@@ -646,7 +641,7 @@ function compute_cell_residual_3!(eq::AbstractEquations{1}, grid, op, scheme,
       u = @view u1[:,:,cell]
       r = @view res[:,:,cell]
       blend.blend_cell_residual!(cell, eq, scheme, aux, lamx, dt, dx,
-                                 grid.xf[cell], op, u1 , u, f, r)
+                                 grid.xf[cell], op, u1 , u, cache.ua, f, r)
       # Interpolate to faces
       for i in Base.OneTo(nd)
          U_node = get_node_vars(U, eq, i)
@@ -797,9 +792,9 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, scheme,
       for i in Base.OneTo(nd) # Loop over solution points
          x_ = xc - 0.5 * dx + xg[i] * dx
          ut_node = get_node_vars(ut, eq, i)
-         multiply_add_to_node_vars!(um, -1.0, # TODO - Avoid redundant multiplication
+         multiply_add_to_node_vars!(um, -1.0, # KLUDGE - Avoid redundant multiplication
                                     ut_node, eq, i)
-         multiply_add_to_node_vars!(up,  1.0, # TODO - Avoid redundant multiplication
+         multiply_add_to_node_vars!(up,  1.0, # KLUDGE - Avoid redundant multiplication
                                     ut_node, eq, i)
          multiply_add_to_node_vars!(umm, -2.0,
                                     ut_node, eq, i)
@@ -817,7 +812,7 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, scheme,
          multiply_add_to_node_vars!(ft,  1.0/12.0, -1.0, fpp, 8.0 , fp,
                                                    -8.0, fm , 1.0 , fmm,
                                     eq, i)
-         # TODO - Can you avoid redundant mutiplication by 1.0?
+         # KLUDGE - Can you avoid redundant mutiplication by 1.0?
          ft_node = get_node_vars(ft, eq, i)
          ut_node = get_node_vars(ut, eq, i)
          multiply_add_to_node_vars!(F, 0.5, ft_node, eq, i) # F += 0.5*ft
@@ -856,7 +851,6 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, scheme,
          fm = flux(x_, um_node, eq)
          fpp = flux(x_, upp_node, eq)
          fmm = flux(x_, umm_node, eq)
-         # TODO - Try making an add_svector function
          f_node = get_node_vars(f, eq, i)
          # ftt = fp - 2.0*f + fm
          multiply_add_to_node_vars!(ftt,  1.0/12.0, -1.0 , fpp, 16.0 , fp,
@@ -949,7 +943,7 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, scheme,
       u = @view u1[:,:,cell]
       r = @view res[:,:,cell]
       blend.blend_cell_residual!(cell, eq, scheme, aux, lamx, dt, dx,
-                                 grid.xf[cell], op, u1 , u, f, r)
+                                 grid.xf[cell], op, u1 , u, cache.ua, f, r)
       # Interpolate to faces
       for i in Base.OneTo(nd)
          U_node = get_node_vars(U, eq, i)

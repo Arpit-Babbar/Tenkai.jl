@@ -10,14 +10,14 @@ boundary_condition = (periodic, periodic, periodic, periodic)
 final_time = 1.0
 
 degree = 4
-solver = "rkfr"
+solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "no"
 bflux = extrapolate
 
-nx, ny = 10, 10
+nx, ny = 120, 120
 bounds = ([-Inf],[Inf])
 cfl = 0.0
 tvbM = 0.0
@@ -30,17 +30,18 @@ domain = [xmin, xmax, ymin, ymax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
 equation = Eq.get_equation(velocity)
-# limiter = setup_limiter_blend(
-#                               blend_type = mh_blend(equation),
-#                               indicating_variables = conservative_indicator!,
-#                               reconstruction_variables = conservative_reconstruction,
-#                               indicator_model = "gassner",
-#                               debug_blend = false,
-#                               pure_fv = true
-#                              )
+limiter = setup_limiter_blend(
+                              blend_type = mh_blend(equation),
+                              indicating_variables = conservative_indicator!,
+                              reconstruction_variables = conservative_reconstruction,
+                              indicator_model = "gassner",
+                              debug_blend = false,
+                              pure_fv = true,
+                              tvbM = Inf
+                             )
 # limiter = setup_limiter_tvbβ(equation; tvbM = tvbM, beta = 1.0)
 # limiter = setup_limiter_tvb(equation; tvbM = tvbM, beta = 1.0)
-limiter = setup_limiter_none()
+# limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux, 2)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
@@ -49,4 +50,6 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
                                           ARGS)
 #------------------------------------------------------------------------------
-SSFR.solve(equation, problem, scheme, param);
+sol = SSFR.solve(equation, problem, scheme, param);
+println(sol["errors"])
+return sol

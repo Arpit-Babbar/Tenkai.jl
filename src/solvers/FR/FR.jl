@@ -1,7 +1,7 @@
 module FR
 
 using ..Basis
-using ..Grid
+using ..CartesianGrids
 using ..Equations: AbstractEquations, nvariables, eachvariable
 
 import SSFR
@@ -127,7 +127,7 @@ end
 
 function diss_arg2method(dissipation)
    @assert dissipation in ("1","2",1,2,
-                           get_first_node_vars, # TODO - This is bad design
+                           get_first_node_vars, # kludge
                            get_second_node_vars) "dissipation = $dissipation"
    if dissipation in ("1",1)
       get_dissipation_node_vars = get_first_node_vars
@@ -203,6 +203,7 @@ struct Parameters{T1 <: Union{Int64,Vector{Int64}}}
    time_scheme::String # Time integration used by Runge-Kutta
    cfl_safety_factor::Float64
    cfl_style::String
+   eps::Float64
 end
 
 # Constructor
@@ -211,7 +212,8 @@ function Parameters(grid_size, cfl, bounds, save_iter_interval,
                     animate = false, cfl_safety_factor = 0.98,
                     time_scheme="by degree",
                     saveto = "none",
-                    cfl_style = "optimal")
+                    cfl_style = "optimal",
+                    eps = 1e-12)
    @assert (cfl >= 0.0) "cfl must be >= 0.0"
    @assert (save_iter_interval >= 0) "save_iter_interval must be >= 0"
    @assert (save_time_interval >= 0.0) "save_time_interval must be >= 0.0"
@@ -221,7 +223,7 @@ function Parameters(grid_size, cfl, bounds, save_iter_interval,
 
    Parameters(grid_size, cfl, bounds, save_iter_interval,
               save_time_interval, compute_error_interval, animate,
-              saveto, time_scheme, cfl_safety_factor, cfl_style)
+              saveto, time_scheme, cfl_safety_factor, cfl_style, eps)
 end
 
 #------------------------------------------------------------------------------
@@ -237,6 +239,7 @@ con2prim!(eq, U, prim) = @assert false "method not defined for equation"
 eigmatrix(eq, u) = @assert false "method not defined for equation"
 fo_blend(eq) = @assert false "method not defined for equation"
 mh_blend(eq) = @assert false "method not defined for equation"
+no_upwinding_x() = @assert false "method not defined"
 
 #-------------------------------------------------------------------------------
 # Apply given command line arguments
@@ -250,7 +253,7 @@ function ParseCommandLine(problem, param, scheme, eq, args;
    @unpack ( grid_size, cfl, bounds, cfl_safety_factor,
              save_time_interval, save_iter_interval,
              compute_error_interval, saveto, time_scheme,
-             animate, cfl_style ) = param
+             animate, cfl_style, eps ) = param
    @unpack ( solver, degree, solution_points, correction_function,
              numerical_flux, bound_limit, limiter, bflux,
              dissipation ) = scheme
@@ -327,7 +330,7 @@ function ParseCommandLine(problem, param, scheme, eq, args;
       "--bflux"
          help = "Boundary Flux"
          default = bflux
-         # TODO - Improve this by overloading ArgParse.parse_item, see
+         # TOTH - Improve this by overloading ArgParse.parse_item, see
          # https://argparsejl.readthedocs.io/en/latest/argparse.html#available-actions-and-nargs-values
       "--dissipation"
          help = "Dissipation type"
@@ -336,8 +339,6 @@ function ParseCommandLine(problem, param, scheme, eq, args;
          arg_type = String
          default = time_scheme
    end
-
-   # TODO - Add animate, bounds limiter, upper and lower bounds
 
    args_dict = parse_args(args, s)
 
@@ -379,7 +380,7 @@ function ParseCommandLine(problem, param, scheme, eq, args;
    param = Parameters(grid_size, cfl, bounds,
                       save_iter_interval, save_time_interval,
                       compute_error_interval, animate, saveto,
-                      time_scheme, cfl_safety_factor, cfl_style)
+                      time_scheme, cfl_safety_factor, cfl_style, eps)
    return problem, scheme, param
 end
 
@@ -425,8 +426,6 @@ end
 # Static array operations
 #------------------------------------------------------------------------------
 
-# TODO : Is Base.OneTo good for performance
-
 @inline function get_node_vars(u, eq, indices...)
    SVector(ntuple(@inline(v -> u[v, indices...]), Val(nvariables(eq))))
 end
@@ -455,8 +454,6 @@ end
    end
    return nothing
 end
-
-# TODO - Rename to multiply_add_set_node_vars! ?
 
 @inline function multiply_add_set_node_vars!(u::AbstractArray,
                                              factor::Real, u_node::SVector{<:Any},
@@ -609,13 +606,13 @@ end
 end
 
 @inline function multiply_add_to_node_vars!(u::AbstractArray,
-                                             factor::Real,
-                                             factor1::Real, u_node1::SVector{<:Any},
-                                             factor2::Real, u_node2::SVector{<:Any},
-                                             factor3::Real, u_node3::SVector{<:Any},
-                                             factor4::Real, u_node4::SVector{<:Any},
-                                             factor5::Real, u_node5::SVector{<:Any},
-                                             equations::AbstractEquations, indices...)
+                                            factor::Real,
+                                            factor1::Real, u_node1::SVector{<:Any},
+                                            factor2::Real, u_node2::SVector{<:Any},
+                                            factor3::Real, u_node3::SVector{<:Any},
+                                            factor4::Real, u_node4::SVector{<:Any},
+                                            factor5::Real, u_node5::SVector{<:Any},
+                                            equations::AbstractEquations, indices...)
    for v in eachvariable(equations)
       u[v, indices...] = u[v, indices...] + factor * ( factor1 * u_node1[v]
                                                       + factor2 * u_node2[v]
@@ -714,6 +711,33 @@ end
    return nothing
 end
 
+function zhang_shu_flux_fix(eq::AbstractEquations,
+                            uprev,    # Solution at previous time level
+                            ulow,     # low order update
+                            Fn,       # Blended flux candidate
+                            fn_inner, # Inner part of flux
+                            fn,       # low order flux
+                            c         # c is such that unew = u - c(Fn-f_inner)
+                            )
+   # This method is to be defined for each equation
+   return Fn
+end
+
+function zhang_shu_flux_fix(eq::AbstractEquations,
+                            Fn, fn,                   # eq, high order flux, low order flux
+                            u_prev_ll, u_prev_rr,     # solution at previous time level
+                            u_low_ll, u_low_rr,       # low order updates
+                            fn_inner_ll, fn_inner_rr, # flux from inner solution points
+                            c_ll, c_rr                # c such that unew = u - c*(Fn-f_inner)
+                           )
+   # This method is to be defined for each equation
+   return Fn
+end
+
+function admissibility_tolerance(eq::AbstractEquations)
+   return 0.0
+end
+
 #-------------------------------------------------------------------------------
 # Set up arrays
 #------------------------------------------------------------------------------
@@ -768,9 +792,8 @@ end
 #-------------------------------------------------------------------------------
 # Limiter functions
 #-------------------------------------------------------------------------------
-
 function setup_limiter_none()
-   limiter = (;name = "none")
+   limiter = (; name = "none")
    return limiter
 end
 
@@ -780,13 +803,16 @@ function setup_limiter_blend(; blend_type, indicating_variables,
                                amax = 1.0, constant_node_factor = 1.0,
                                constant_node_factor2 = 1.0,
                                a = 0.5, c = 1.8, amin = 0.001,
-                               debug_blend = false , pure_fv = false)
+                               debug_blend = false , pure_fv = false,
+                               bc_x = no_upwinding_x, tvbM = 0.0,
+                               numflux = nothing
+                            )
    limiter = (; name = "blend", blend_type, indicating_variables,
                 reconstruction_variables, indicator_model,
                 amax, smooth_alpha, smooth_factor,
                 constant_node_factor, constant_node_factor2,
                 a, c, amin,
-                debug_blend, pure_fv)
+                debug_blend, pure_fv, bc_x, tvbM, numflux)
    return limiter
 end
 
@@ -798,7 +824,8 @@ end
 
 function apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
    @timeit aux.timer "Limiter" begin
-   # TODO - Why are allocations happening here outside of TVB limiter?
+   # TOTHINK - (very small) allocations happening outside limiter funcs?
+   # Are they just because of the assertion in tvbβ or is there a worrisome cause?
    @unpack limiter = scheme
    if limiter.name == "tvb"
       apply_tvb_limiter!(eq, problem, scheme, grid, param, op, ua, u1, aux)
@@ -830,7 +857,8 @@ function minmod(a, b, c, Mdx2)
 end
 
 function minmod(a, b, c, beta, Mdx2)
-   slope = min(beta*abs(a),abs(b),beta*abs(c))
+   # beta = 1.0
+   slope = min(abs(a),beta*abs(b),beta*abs(c))
    if abs(a) < Mdx2
       return a
    end
@@ -845,18 +873,29 @@ function minmod(a, b, c, beta, Mdx2)
    end
 end
 
+function finite_differences(h1, h2, ul, u, ur)
+   back_diff = (u - ul)/h1
+   fwd_diff  = (ur - u)/h2
+   a, b, c = -( h2/(h1*(h1+h2)) ), (h2-h1)/(h1*h2), ( h1/(h2*(h1+h2)) )
+   cent_diff = a*ul + b*u + c*ur
+   # cent_diff = (ur - ul) / (h1 + h2)
+   return back_diff, cent_diff, fwd_diff
+end
+
 function pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme,
                               param, aux, op, u1, ua)
    @timeit aux.timer "Limiter" begin
    @timeit aux.timer "Pre process limiter" begin
-   # TODO - There are allocations in this function, can they be avoided?
+   # TOTHINK - (very small) allocations happening outside limiter funcs?
+   # Are they just because of the assertion in tvbβ or is there a worrisome cause?
    @unpack limiter = scheme
    if limiter.name == "blend"
-      update_ghost_values_u1!(eq, problem, grid, op, u1, t)
+      update_ghost_values_u1!(eq, problem, grid, op, u1, aux, t)
       modal_smoothness_indicator(eq, t, iter, fcount, dt, grid, scheme,
                                  problem, param, aux, op, u1, ua)
+      return nothing
    elseif limiter.name == "tvb"
-      nothing
+      return nothing
    end
    end # timer
    end # timer
@@ -870,7 +909,7 @@ end
 
 @inbounds @inline function conservative2conservative_reconstruction!(ue, ua,
                                                                      eq::AbstractEquations)
-   return nothing
+   return ue
 end
 
 @inbounds @inline function prim2con!(eq::AbstractEquations{<:Any,1}, # For scalar equations
@@ -884,12 +923,12 @@ end
 
 @inbounds @inline function conservative2primitive_reconstruction!(ue, ua,
                                                                   eq::AbstractEquations)
-   con2prim!(eq, ue)
+   SSFR.con2prim(eq, ue)
 end
 
 @inbounds @inline function primitive2conservative_reconstruction!(ue, ua,
                                                                   eq::AbstractEquations)
-   prim2con!(eq, ue)
+   SSFR.prim2con(eq, ue)
 end
 
 @inbounds @inline function conservative2characteristic_reconstruction!(ue, ua,
@@ -1012,7 +1051,7 @@ post_process_soln() = nothing
 update_ghost_values_periodic!() = nothing
 update_ghost_values_u1!() = nothing
 update_ghost_values_fn_blend!() = nothing
-limit_slope!() = nothing
+limit_slope() = nothing
 is_admissible() = nothing
 modal_smoothness_indicator() = nothing
 modal_smoothness_indicator_gassner() = nothing
@@ -1039,7 +1078,7 @@ function solve(equation, problem, scheme, param);
    @unpack grid_size, cfl, compute_error_interval = param
 
    # Make 1D/2D grid
-   grid = make_grid(problem, grid_size)
+   grid = make_cartesian_grid(problem, grid_size)
 
    # Make fr operators
    @unpack degree, solution_points, correction_function = scheme
@@ -1062,6 +1101,8 @@ function solve(equation, problem, scheme, param);
    end
    return out
 end
+
+solve(equation, grid, problem, scheme, param) = solve(equation, problem, scheme, param)
 
 end # @muladd
 

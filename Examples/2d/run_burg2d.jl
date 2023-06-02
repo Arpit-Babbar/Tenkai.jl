@@ -11,7 +11,7 @@ boundary_value = exact_solution # dummy function
 boundary_condition = (periodic, periodic, periodic, periodic)
 final_time = 0.1
 
-degree = 3
+degree = 1
 solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
@@ -19,7 +19,7 @@ bound_limit = "no"
 bflux = evaluate
 numerical_flux = Eq.rusanov
 
-nx, ny = 20, 20
+nx, ny = 640, 640
 bounds = ([-Inf],[Inf])
 cfl = 0.0
 save_iter_interval = 0
@@ -37,7 +37,7 @@ limiter = setup_limiter_blend(
                               indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner",
-                              constant_node_factor = 0.0,
+                              constant_node_factor = 1.0,
                               debug_blend = false,
                               pure_fv = true
                              )

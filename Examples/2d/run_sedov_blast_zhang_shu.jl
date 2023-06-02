@@ -21,18 +21,18 @@ numerical_flux = Eq.rusanov
 
 bound_limit = "yes"
 bflux = evaluate
-final_time = 0.001 #  20 * sqrt(2.0) / 0.5
+final_time = 1.0 #  20 * sqrt(2.0) / 0.5
 
 nx, ny = 50, 50
 cfl = 0.0
 bounds = ([-Inf],[Inf]) # Not used in Euler
 tvbM = 0.0
 save_iter_interval = 0
-save_time_interval = final_time / 20.0
+save_time_interval = 0.0 # final_time / 20.0
 animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
 
-cfl_safety_factor = 0.9
+cfl_safety_factor = 0.98
 
 #------------------------------------------------------------------------------
 grid_size = [nx, ny]

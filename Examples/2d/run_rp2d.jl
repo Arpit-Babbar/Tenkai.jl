@@ -1,5 +1,6 @@
 # For Riemann problems in domain [0.0,1.0]
 using SSFR
+using StaticArrays
 Eq = SSFR.EqEuler2D
 #------------------------------------------------------------------------------
 xmin, xmax = 0.0, 1.0
@@ -8,35 +9,14 @@ ymin, ymax = 0.0, 1.0
 boundary_value = (x,t) -> 0.0 # dummy function
 boundary_condition = (neumann, neumann, neumann, neumann)
 γ = 1.4
+equation = Eq.get_equation(γ)
+riemann_problem_4(x,y) = Eq.riemann_problem(x, y, equation,
+                                                    (1.1,   0.0,   0.0,   1.1),
+                                                    (0.5065,0.8939,0.0,   0.35),
+                                                    (1.1,   0.8939,0.8939,1.1),
+                                                    (0.5065,0.0,   0.8939,0.35))
 
-# initial_value_ref, final_time, ic_name = Eq.dwave_data
-
-function riemann_problem(x,y)
-   if x >= 0.5 && y >= 0.5
-      ρ  = 1.1
-      v1 = 0.0
-      v2 = 0.0
-      p  = 1.1
-   elseif x <= 0.5 && y >= 0.5
-      ρ  = 0.5065
-      v1 = 0.8939
-      v2 = 0.0
-      p  = 0.35
-   elseif x <= 0.5 && y <= 0.5
-      ρ  = 1.1
-      v1 = 0.8939
-      v2 = 0.8939
-      p  = 1.1
-   elseif x >= 0.5 && y <= 0.5
-      ρ  = 0.5065
-      v1 = 0.0
-      v2 = 0.8939
-      p  = 0.35
-   end
-   ρ_v1 = ρ*v1
-   ρ_v2 = ρ*v2
-   return SVector(ρ, ρ*v1, ρ*v2, p/(γ-1.0) + 0.5*(ρ_v1*v1+ρ_v2*v2))
-end
+riemann_problem(x,y) = riemann_problem_4(x,y)
 rieman_problem_(x, y, t)= riemann_problem(x, y)
 initial_value = riemann_problem
 
@@ -50,7 +30,7 @@ bound_limit = "no"
 bflux = evaluate
 final_time = 0.25
 
-nx, ny = 100, 100 # 50, 50
+nx, ny = 10, 10 # 50, 50
 cfl = 0.0
 bounds = ([-Inf],[Inf]) # Not used in Euler
 tvbM = 300.0
@@ -64,12 +44,18 @@ cfl_safety_factor = 0.9
 #------------------------------------------------------------------------------
 grid_size = [nx, ny]
 domain = [xmin, xmax, ymin, ymax]
-equation = Eq.get_equation(γ)
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                      final_time, exact_solution)
-limiter = setup_limiter_tvb(equation; tvbM = tvbM)
+limiter = setup_limiter_blend(
+                              blend_type = mh_blend(equation),
+                              indicating_variables = Eq.rho_p_indicator!,
+                              reconstruction_variables = conservative_reconstruction,
+                              indicator_model = "gassner",
+                              debug_blend = false
+                             )
+# limiter = setup_limiter_tvb(equation; tvbM = tvbM)
 scheme = Scheme(solver, degree, solution_points, correction_function,
-                   numerical_flux, bound_limit, limiter, bflux)
+                numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
                    animate = animate,
@@ -80,4 +66,4 @@ problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
 #------------------------------------------------------------------------------
 sol = SSFR.solve(equation, problem, scheme, param);
 
-return errors, plot_data
+return sol["errors"]
