@@ -866,8 +866,8 @@ function SSFR.limit_slope(eq::Euler1D, s, ufl, u_s_l, ufr, u_s_r, ue, xl, xr)
          end
       end
       s *= theta
-      u_s_l = ue + 2.0*theta*xl*s
-      u_s_r = ue + 2.0*theta*xr*s
+      u_s_l = ue + 2.0*xl*s
+      u_s_r = ue + 2.0*xr*s
    end
 
    ufl = ue + xl*s

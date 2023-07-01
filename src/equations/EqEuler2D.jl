@@ -1297,8 +1297,8 @@ function limit_variable_slope(eq, variable, slope, u_star_ll, u_star_rr, ue, xl,
       ratio_rr = abs(threshold - var_low) / (abs(var_star_rr - var_low) + 1e-13)
       theta = min(ratio_ll, ratio_rr, 1.0)
       slope *= theta
-      u_star_ll = ue + 2.0*theta*xl*slope
-      u_star_rr = ue + 2.0*theta*xr*slope
+      u_star_ll = ue + 2.0*xl*slope
+      u_star_rr = ue + 2.0*xr*slope
    end
    return slope, u_star_ll, u_star_rr
 end
