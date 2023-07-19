@@ -5,28 +5,15 @@ using Plots
 Eq = Tenkai.EqTenMoment1D
 plotlyjs() # Set backend
 
-xmin, xmax = 0.0, 1.0
-boundary_condition = (periodic, periodic)
-
-function dwave(x, equations::Eq.TenMoment1D)
-   rho = 2.0 + sinpi(2.0*x)
-   v1 = 1.0
-   v2 = 0.0
-   P11 = 1.0
-   P12 = 0.0
-   P22 = 1.0
-   return Eq.prim2con(equations, (rho, v1, v2, P11, P12, P22))
-end
+xmin, xmax = -0.5, 0.5
+boundary_condition = (neumann, neumann)
 
 dummy_bv(x,t) = 0.0
 
-eq = Eq.get_equation()
-
-dwave(x) = dwave(x, eq)
-
-exact_dwave(x,t) = dwave(x-t)
-
-initial_value, exact_solution, boundary_value = dwave, exact_dwave, dummy_bv
+initial_value = Eq.two_rare_iv # choices - Eq.sod_iv, Eq.two_shock_iv, Eq.two_rare_iv
+boundary_value = dummy_bv
+exact_solution_rp(x,t) = initial_value(x)
+exact_solution = exact_solution_rp
 
 degree = 4
 solver = "lwfr"
@@ -35,9 +22,9 @@ correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
-final_time = 1.0
+final_time = 0.15 # Choose 0.125 for sod, two_shock and 0.15 for two_rar
 
-nx = ceil(Int64,50)
+nx = ceil(Int64,300)
 cfl = 0.0
 bounds = ([-Inf],[Inf]) # Not used in Euler
 tvbM = 0.0
@@ -48,24 +35,28 @@ compute_error_interval = 1
 
 #------------------------------------------------------------------------------
 grid_size = nx
+eq = Eq.get_equation()
 domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
+# limiter = setup_limiter_none()
 limiter = setup_limiter_blend(
-                              blend_type = fo_blend(eq),
+                              blend_type = mh_blend(eq),
                               # indicating_variables = Eq.rho_p_indicator!,
-                              indicating_variables = Eq.rho_p_indicator!,
+                              indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner"
                              )
-# limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
-                   compute_error_interval, animate = animate)
+                   compute_error_interval, animate = animate,
+                   cfl_safety_factor = 0.9)
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(eq, problem, scheme, param);
 
 println(sol["errors"])
 
 return sol;
+
+sol["plot_data"].p_u1

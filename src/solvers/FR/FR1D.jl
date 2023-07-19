@@ -359,6 +359,42 @@ end
 #-------------------------------------------------------------------------------
 # Limiters
 #-------------------------------------------------------------------------------
+# Correct one variable in bound correction
+
+function correct_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
+   @unpack Vl, Vr = op
+   nx   = grid.size
+   nd   = op.degree + 1
+   eps = 1e-10 # TODO - Get a better one
+   for element in 1:nx
+      var_ll = var_rr = 0.0
+      var_min = 1e20
+      for i in Base.OneTo(nd)
+         u_node = get_node_vars(u1, eq, i, element)
+         var = variable(eq, u_node)
+         var_ll += var * Vl[i]
+         var_rr += var * Vr[i]
+         var_min = min(var_min, var)
+      end
+      var_min = min(var_min, var_ll, var_rr)
+      ua_ = get_node_vars(ua, eq, element)
+      var_avg = variable(eq, ua_)
+      @assert var_avg > 0.0 "Failed at element $element", var_avg
+      eps_ = min(eps, 0.1 * var_avg)
+      ratio = abs(eps_ - var_avg)/(abs(var_min - var_avg) + 1e-13)
+      theta = min(ratio, 1.0) # theta for preserving positivity of density
+      if theta < 1.0
+         for i=1:nd
+            u_node = get_node_vars(u1, eq, i, element)
+            multiply_add_set_node_vars!(u1,
+                                          theta, u_node,
+                                          1-theta, ua_,
+                                          eq, i, element)
+         end
+      end
+   end
+end
+
 # Bounds preserving limiter
 function apply_bound_limiter!(eq::AbstractEquations{1, 1}, grid, scheme, param, op,
                               ua, u1, aux)
@@ -809,7 +845,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
    @timeit aux.timer "Blending limiter" begin
    @unpack xc, dx = grid
    nx = grid.size
-   @unpack nvar = eq
+   nvar = nvariables(eq)
    @unpack Vl, Vr, xg = op
    nd = length(xg)
    @unpack limiter = scheme
@@ -1408,7 +1444,7 @@ end
    num_flux = scheme.numerical_flux
    nd = length(xg)
    resl = blend.resl
-   nvar = eq.nvar
+   nvar = nvariables(eq)
    @unpack xxf, fn = blend
    fn_low = @view blend.fn_low[:,:,cell]
    # Get subcell faces
@@ -1446,7 +1482,7 @@ end
    alp = 0.5*(alpha[i-1]+alpha[i])
    num_flux = scheme.numerical_flux
    @unpack dx = grid
-   nvar = eq.nvar
+   nvar = nvariables(eq)
 
    @unpack xg, wg = op
    nd = length(xg)

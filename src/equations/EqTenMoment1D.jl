@@ -7,9 +7,13 @@ using UnPack
 using Plots
 using Printf
 using JSON3
+using GZip
+using DelimitedFiles
 
 using Tenkai
 using Tenkai.Basis
+using Tenkai.FR1D: correct_variable_bound_limiter!
+using Tenkai.FR: limit_variable_slope
 
 ( # Methods to be extended
 import Tenkai: flux, prim2con, con2prim, limit_slope, zhang_shu_flux_fix,
@@ -48,7 +52,7 @@ function con2prim(eq::TenMoment1D, u)
    return SVector(ρ, v1, v2, P11, P12, P22)
 end
 
-function prim2con(eq::TenMoment1D, prim)
+@inbounds @inline function tenmom_prim2con(prim)
    ρ, v1, v2, P11, P12, P22 = prim
 
    ρv1 = ρ*v1
@@ -59,6 +63,8 @@ function prim2con(eq::TenMoment1D, prim)
 
    return SVector(ρ, ρv1, ρv2, E11, E12, E22)
 end
+
+@inbounds @inline prim2con(eq::TenMoment1D, prim) = tenmom_prim2con
 
 # The flux is given by
 # (ρ v1, P11 + ρ v1^2, P12 + ρ v1*v2, (E + P) ⊗ v)
@@ -166,11 +172,132 @@ end
 #-------------------------------------------------------------------------------
 # Limiters
 #-------------------------------------------------------------------------------
+# Admissibility constraints
+@inline @inbounds density_constraint(eq::TenMoment1D, u) = u[1]
+@inline @inbounds function trace_constraint(eq::TenMoment1D, u)
+   ρ   = u[1]
+   v1  = u[2] / ρ
+   v2  = u[3] / ρ
+   P11 = 2.0 * u[4] - ρ * v1 * v1
+   P22 = 2.0 * u[6] - ρ * v2 * v2
+   return P11 + P22
+end
+
+@inline @inbounds function det_constraint(eq::TenMoment1D, u)
+   ρ   = u[1]
+   v1  = u[2] / ρ
+   v2  = u[3] / ρ
+   P11 = 2.0 * u[4] - ρ * v1 * v1
+   P12 = 2.0 * u[5] - ρ * v1 * v2
+   P22 = 2.0 * u[6] - ρ * v2 * v2
+   return P11*P22 - P12*P12
+end
+
+# Looping over a tuple can be made type stable following this
+# https://github.com/trixi-framework/Trixi.jl/blob/0fd86e4bd856d894de6a7514edcb9758bf6f8e1e/src/callbacks_stage/positivity_zhang_shu.jl#L39
+function iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
+                                          u1, aux, variables::NTuple{N, Any}) where {N}
+   variable = first(variables)
+   remaining_variables = Base.tail(variables)
+
+   correct_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
+   iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
+                                    u1, aux, remaining_variables)
+   return nothing
+end
+
+function iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
+                                          u1, aux, variables::Tuple{})
+   return nothing
+end
+
 function Tenkai.apply_bound_limiter!(eq::TenMoment1D, grid, scheme, param, op, ua,
                                      u1, aux)
    if scheme.bound_limit == "no"
       return nothing
    end
+   variables = (density_constraint, trace_constraint) # , det_constraint)
+   iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua, u1, aux, variables)
+   return nothing
+end
+
+#-------------------------------------------------------------------------------
+# Blending Limiter
+#-------------------------------------------------------------------------------
+
+@inbounds @inline function rho_p_indicator!(un, eq::TenMoment1D)
+   for ix=1:size(un,2) # loop over dofs and faces
+      u_node = get_node_vars(un, eq, ix)
+      p = det_constraint(eq, u_node)
+      un[1,ix] *= p # ρ * p
+   end
+   n_ind_var = 1
+   return n_ind_var
+end
+
+function Tenkai.zhang_shu_flux_fix(eq::TenMoment1D,
+                                 uprev,    # Solution at previous time level
+                                 ulow,     # low order update
+                                 Fn,       # Blended flux candidate
+                                 fn_inner, # Inner part of flux
+                                 fn,       # low order flux
+                                 c         # c is such that unew = u - c(fr-fl)
+                                 )
+   uhigh = uprev - c * (Fn-fn_inner) # First candidate for high order update
+   ρ_low, ρ_high = density_constraint(eq, ulow), density_constraint(eq, uhigh)
+   eps = 0.1*ρ_low
+   ratio = abs(eps-ρ_low)/(abs(ρ_high-ρ_low)+1e-13)
+   theta = min(ratio, 1.0)
+   if theta < 1.0
+      Fn = theta*Fn + (1.0-theta)*fn # Second candidate for flux
+   end
+
+   uhigh = uprev - c * (Fn - fn_inner) # Second candidate for uhigh
+   p_low, p_high = trace_constraint(eq, ulow), trace_constraint(eq, uhigh)
+   eps = 0.1*p_low
+   ratio = abs(eps-p_low)/(abs(p_high-p_low) + 1e-13)
+   theta = min(ratio, 1.0)
+   if theta < 1.0
+      Fn = theta*Fn + (1.0-theta)*fn # Final flux
+   end
+
+   uhigh = uprev - c * (Fn - fn_inner) # Second candidate for uhigh
+   p_low, p_high = det_constraint(eq, ulow), det_constraint(eq, uhigh)
+   eps = 0.1*p_low
+   ratio = abs(eps-p_low)/(abs(p_high-p_low) + 1e-13)
+   theta = min(ratio, 1.0)
+   if theta < 1.0
+      Fn = theta*Fn + (1.0-theta)*fn # Final flux
+   end
+
+   return Fn
+end
+
+function Tenkai.limit_slope(eq::TenMoment1D, slope, ufl, u_star_ll, ufr, u_star_rr,
+                           ue, xl, xr, el_x = nothing, el_y = nothing)
+
+   # The MUSCL-Hancock scheme is guaranteed to be admissibility preserving if
+   # slope is chosen so that
+   # u_star_l = ue + 2.0*slope*xl, u_star_r = ue+2.0*slope*xr are admissible
+   # ue is already admissible and we know we can find sequences of thetas
+   # to make theta*u_star_l+(1-theta)*ue is admissible.
+   # This is equivalent to replacing u_star_l by
+   # u_star_l = ue + 2.0*theta*s*xl.
+   # Thus, we simply have to update the slope by multiplying by theta.
+
+   slope, u_star_ll, u_star_rr = limit_variable_slope(
+      eq, density_constraint, slope, u_star_ll, u_star_rr, ue, xl, xr)
+
+   slope, u_star_ll, u_star_rr = limit_variable_slope(
+      eq, trace_constraint, slope, u_star_ll, u_star_rr, ue, xl, xr)
+
+   slope, u_star_ll, u_star_rr = limit_variable_slope(
+      eq, det_constraint, slope, u_star_ll, u_star_rr, ue, xl, xr)
+
+   ufl = ue + slope*xl
+   ufr = ue + slope*xr
+
+   return ufl, ufr, slope
 end
 
 #-------------------------------------------------------------------------------
@@ -347,6 +474,49 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::TenMoment1D, 
    end # timer
 end
 
+function rp(x, priml, primr, x0)
+   if x < 0.0
+      return tenmom_prim2con(priml)
+   else
+      return tenmom_prim2con(primr)
+   end
+end
+
+sod_iv(x) = rp(x,
+               (1.0,   0.0, 0.0, 2.0, 0.05, 0.6),
+               (0.125, 0.0, 0.0, 0.2, 0.1,  0.2),
+               0.0)
+two_shock_iv(x) = rp(x,
+               (1.0,  1.0,  1.0, 1.0, 0.0, 1.0),
+               (1.0, -1.0, -1.0, 1.0, 0.0, 1.0),
+               0.0)
+
+two_rare_iv(x) = rp(x,
+               (2.0, -0.5, -0.5, 1.5, 0.5, 1.5),
+               (1.0,  1.0,  1.0, 1.0, 0.0, 1.0),
+               0.0)
+exact_solution_data(iv::Function) = nothing
+function exact_solution_data(iv::typeof(sod_iv))
+   exact_filename = joinpath(Tenkai.data_dir, "10mom_sod.gz")
+   file = GZip.open(exact_filename)
+   exact_data = readdlm(file)
+   return exact_data
+end
+
+function exact_solution_data(iv::typeof(two_shock_iv))
+   exact_filename = joinpath(Tenkai.data_dir, "10mom_two_shock.gz")
+   file = GZip.open(exact_filename)
+   exact_data = readdlm(file)
+   return exact_data
+end
+
+function exact_solution_data(iv::typeof(two_rare_iv))
+   exact_filename = joinpath(Tenkai.data_dir, "10mom_two_rare.gz")
+   file = GZip.open(exact_filename)
+   exact_data = readdlm(file)
+   return exact_data
+end
+
 function post_process_soln(eq::TenMoment1D, aux, problem, param)
    @unpack timer, error_file = aux
    @timeit timer "Write solution" begin
@@ -354,6 +524,22 @@ function post_process_soln(eq::TenMoment1D, aux, problem, param)
    @unpack plot_data = aux
    @unpack p_ua, p_u1, anim_ua, anim_u1 = plot_data
    @unpack animate, saveto = param
+   @unpack initial_value = problem
+
+   exact_data = exact_solution_data(initial_value)
+   @show exact_data
+   if exact_data !== nothing
+      for n in eachvariable(eq)
+         @views plot!(p_ua[n+1], exact_data[:,1], exact_data[:,n+1], label="Exact",
+                     color=:black)
+         @views plot!(p_u1[n+1], exact_data[:,1], exact_data[:,n+1], label="Exact",
+                     color=:black, legend=true)
+         ymin = min(minimum(p_ua[n+1][1][:y]),minimum(exact_data[:,n+1]))
+         ymax = max(maximum(p_ua[n+1][1][:y]),maximum(exact_data[:,n+1]))
+         ylims!(p_ua[n+1],(ymin-0.1,ymax+0.1))
+         ylims!(p_u1[n+1],(ymin-0.1,ymax+0.1))
+      end
+   end
    savefig(p_ua, "output/avg.png")
    savefig(p_u1, "output/sol.png")
    savefig(p_ua, "output/avg.html")
@@ -394,7 +580,7 @@ function post_process_soln(eq::TenMoment1D, aux, problem, param)
 end
 
 
-get_equation() = TenMoment1D(["rho", "v1", "v2", "P11", "P12", "P12"], "Ten moment problem")
+get_equation() = TenMoment1D(["rho", "v1", "v2", "P11", "P12", "P22"], "Ten moment problem")
 
 end # @muladd
 

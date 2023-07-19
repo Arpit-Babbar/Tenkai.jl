@@ -96,7 +96,7 @@ function update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache,
    @unpack degree, xg, wg = op
    nd = degree + 1
    dx, xf = grid.dx, grid.xf
-   nvar = eq.nvar
+   nvar = nvariables(eq)
    @unpack boundary_value, boundary_condition = problem
    left, right = boundary_condition
    refresh!(u) = fill!(u,0.0)

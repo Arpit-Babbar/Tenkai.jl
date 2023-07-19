@@ -23,6 +23,7 @@ using Tenkai: get_filename, minmod, @threaded,
 )
 
 using Tenkai.CartesianGrids: CartesianGrid2D, save_mesh_file
+using Tenkai.FR: limit_variable_slope
 
 using Polyester
 using StaticArrays
@@ -1284,23 +1285,6 @@ function Tenkai.blending_flux_factors(eq::Euler2D, ua, dx, dy)
    λy = 1.0 - λx # not used
 
    return λx, λy
-end
-
-function limit_variable_slope(eq, variable, slope, u_star_ll, u_star_rr, ue, xl, xr)
-   # By Jensen's inequality, we can find theta's directly for the primitives
-   var_star_ll, var_star_rr = variable(eq, u_star_ll), variable(eq, u_star_rr)
-   var_low = variable(eq, ue)
-   threshold = 0.1*var_low
-   eps = 1e-10
-   if var_star_ll < eps || var_star_rr < eps
-      ratio_ll = abs(threshold - var_low) / (abs(var_star_ll - var_low) + 1e-13)
-      ratio_rr = abs(threshold - var_low) / (abs(var_star_rr - var_low) + 1e-13)
-      theta = min(ratio_ll, ratio_rr, 1.0)
-      slope *= theta
-      u_star_ll = ue + 2.0*xl*slope
-      u_star_rr = ue + 2.0*xr*slope
-   end
-   return slope, u_star_ll, u_star_rr
 end
 
 function Tenkai.limit_slope(eq::Euler2D, slope, ufl, u_star_ll, ufr, u_star_rr,
