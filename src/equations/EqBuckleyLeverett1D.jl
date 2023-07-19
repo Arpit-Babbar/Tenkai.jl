@@ -1,10 +1,10 @@
 # f(u) = u*u/(u*u+1(1-u)^2)
 module EqBuckleyLeverett1D
 
-using SSFR
+using Tenkai
 
 # flux function will be extended to EqBuckleyLeverett1D
-import SSFR: flux
+import Tenkai: flux
 
 import Roots: find_zero
 
@@ -28,7 +28,7 @@ struct BuckleyLeverret1D <: AbstractEquations{1,1}
 end
 
 # Extending the flux function
-function SSFR.flux(x, u, eq::BuckleyLeverret1D)
+function Tenkai.flux(x, u, eq::BuckleyLeverret1D)
    u_, a = u[1], eq.a_buck
    return SVector(u_*u_/( u_*u_ + a*(1.0-u_)^2 ))
    return nothing

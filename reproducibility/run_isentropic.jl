@@ -1,5 +1,5 @@
-using SSFR
-Eq = SSFR.EqEuler2D
+using Tenkai
+Eq = Tenkai.EqEuler2D
 using StaticArrays
 #------------------------------------------------------------------------------
 xmin, xmax = -10.0, 10.0
@@ -59,7 +59,7 @@ ARGS = ["--degree", "4", "--solver", "lwfr", "--solution_points", "gl", "--corre
  "--save_time_interval", "56.568542494923804", "--save_iter_interval", "0", "--animate", "true"]
 
 problem2, scheme2, param2 = ParseCommandLine(problem, param, scheme, equation, ARGS)
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 println(sol["errors"])
 

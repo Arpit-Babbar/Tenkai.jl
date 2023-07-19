@@ -1,7 +1,7 @@
-using SSFR
+using Tenkai
 using Plots
 plotlyjs()
-Eq = SSFR.EqEuler1D
+Eq = Tenkai.EqEuler1D
 #------------------------------------------------------------------------------
 xmin, xmax = -10.0, 10.0
 
@@ -54,7 +54,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
    animate=animate, saveto="none",
    cfl_safety_factor = 0.98)
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 println(sol["errors"])
 

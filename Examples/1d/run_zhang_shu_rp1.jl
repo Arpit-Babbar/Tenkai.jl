@@ -1,9 +1,9 @@
 # For Riemann problems in domain [0.0,1.0]
 using StaticArrays
-using SSFR
+using Tenkai
 using Plots
 # Submodules
-Eq = SSFR.EqEuler1D
+Eq = Tenkai.EqEuler1D
 plotlyjs() # Set backend
 
 #------------------------------------------------------------------------------
@@ -60,7 +60,7 @@ param = Parameters(
 problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
                                           ARGS)
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 p_ua = plot_data.p_ua
 plot!(p_ua, yscale = :log)
 savefig(p_ua, "test.html")

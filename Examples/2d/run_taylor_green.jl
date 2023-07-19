@@ -1,5 +1,5 @@
-using SSFR
-Eq = SSFR.EqEuler2D
+using Tenkai
+Eq = Tenkai.EqEuler2D
 using StaticArrays
 #------------------------------------------------------------------------------
 xmin, xmax = -8.0, 8.0

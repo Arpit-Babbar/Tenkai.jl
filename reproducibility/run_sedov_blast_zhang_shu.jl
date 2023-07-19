@@ -1,5 +1,5 @@
-using SSFR
-Eq = SSFR.EqEuler2D
+using Tenkai
+Eq = Tenkai.EqEuler2D
 using StaticArrays
 #------------------------------------------------------------------------------
 xmin, xmax = 0.0, 1.1
@@ -75,6 +75,6 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 
 #------------------------------------------------------------------------------
 # @suppress
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 return sol

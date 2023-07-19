@@ -1,4 +1,4 @@
-using SSFR
+using Tenkai
 using Trixi: trixi_include
 using Plots
 # gr()

@@ -1,8 +1,8 @@
 module LWFR
 
 
-( # FR Methods unified as 1D and 2D in SSFR
-using SSFR: set_initial_condition!,
+( # FR Methods unified as 1D and 2D in Tenkai
+using Tenkai: set_initial_condition!,
             compute_cell_average!,
             compute_face_residual!,
             write_soln!,
@@ -13,7 +13,7 @@ using SSFR: set_initial_condition!,
 #------------------------------------------------------------------------------
 # Extending methods needed in FR.jl which are defined here
 #------------------------------------------------------------------------------
-import ..SSFR: solve_lwfr
+import ..Tenkai: solve_lwfr
 
 # Dimension independent methods in FR
 (

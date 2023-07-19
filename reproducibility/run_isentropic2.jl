@@ -1,6 +1,6 @@
-using SSFR
-FR = SSFR.FR2D
-Eq = SSFR.EqEuler2D
+using Tenkai
+FR = Tenkai.FR2D
+Eq = Tenkai.EqEuler2D
 using StaticArrays
 #------------------------------------------------------------------------------
 xmin, xmax = -10.0, 10.0
@@ -87,7 +87,7 @@ boundary_condition = (periodic, periodic, periodic, periodic)
    param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                         save_time_interval, compute_error_interval,
                         animate = animate)
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 println(sol["errors"])
 

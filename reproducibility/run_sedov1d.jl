@@ -1,6 +1,6 @@
-using SSFR
+using Tenkai
 
-Eq = SSFR.EqEuler1D
+Eq = Tenkai.EqEuler1D
 #------------------------------------------------------------------------------
 xmin, xmax, nx, dx, initial_value, exact_solution = Eq.sedov_data
 
@@ -49,7 +49,7 @@ scheme = Scheme(solver, degree, solution_points, correction_function,
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
    save_time_interval, compute_error_interval; saveto="nothing")
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 println(sol["errors"])
 

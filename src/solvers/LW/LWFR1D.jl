@@ -1,7 +1,7 @@
 module LWFR1D
 
 ( # methods extended in this module
-import ..SSFR: setup_arrays_lwfr,
+import ..Tenkai: setup_arrays_lwfr,
                compute_cell_residual_1!, compute_cell_residual_2!,
                compute_cell_residual_3!, compute_cell_residual_4!,
                update_ghost_values_lwfr!,
@@ -10,7 +10,7 @@ import ..SSFR: setup_arrays_lwfr,
 )
 
 (
-using ..SSFR: periodic, dirichlet, neumann, reflect, extrapolate, evaluate,
+using ..Tenkai: periodic, dirichlet, neumann, reflect, extrapolate, evaluate,
               update_ghost_values_periodic!,
               update_ghost_values_fn_blend!,
               get_node_vars, set_node_vars!,

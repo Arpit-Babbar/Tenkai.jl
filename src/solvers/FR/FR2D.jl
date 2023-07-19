@@ -17,9 +17,9 @@ import Trixi
 
 using ..FR: refresh!
 
-using ..SSFR: fr_dir, lwfr_dir, rkfr_dir, eq_dir
+using ..Tenkai: fr_dir, lwfr_dir, rkfr_dir, eq_dir
 
-using SSFR.FR: admissibility_tolerance
+using Tenkai.FR: admissibility_tolerance
 
 using ..Basis
 
@@ -39,8 +39,8 @@ using ..FR: periodic, dirichlet, neumann, reflect,
 
 using ..Equations: AbstractEquations, nvariables, eachvariable
 
-( # Methods to be extended from SSFR
-import ..SSFR: update_ghost_values_periodic!,
+( # Methods to be extended from Tenkai
+import ..Tenkai: update_ghost_values_periodic!,
                update_ghost_values_u1!,
                update_ghost_values_fn_blend!,
                modal_smoothness_indicator,
@@ -78,7 +78,7 @@ using OffsetArrays
 
 using JSON3
 
-using SSFR: flux, con2prim, con2prim!
+using Tenkai: flux, con2prim, con2prim!
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,

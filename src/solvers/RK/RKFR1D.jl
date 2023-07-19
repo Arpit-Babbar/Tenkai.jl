@@ -1,7 +1,7 @@
 module RKFR1D
 
 (
-import ..SSFR: setup_arrays_rkfr,
+import ..Tenkai: setup_arrays_rkfr,
                compute_cell_residual_rkfr!,
                update_ghost_values_rkfr!,
                update_ghost_values_fn_blend!,
@@ -18,7 +18,7 @@ using ..FR: @threaded
 using ..Equations: AbstractEquations, nvariables, eachvariable
 
 (
-using ..SSFR: update_ghost_values_periodic! # KLUDGE - Should this be taken from FR?
+using ..Tenkai: update_ghost_values_periodic! # KLUDGE - Should this be taken from FR?
 )
 
 (

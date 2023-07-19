@@ -4,10 +4,10 @@ using MuladdMacro
 using StaticArrays
 using Roots: find_zero
 
-using SSFR
+using Tenkai
 
 # methods to be extended in this module
-import SSFR: flux
+import Tenkai: flux
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -22,12 +22,12 @@ struct Burg2D{Speed <: Function} <: AbstractEquations{2,1}
    numfluxes::Dict{String, Function}
 end
 
-@inbounds @inline function SSFR.flux(x, y, u, eq::Burg2D)
+@inbounds @inline function Tenkai.flux(x, y, u, eq::Burg2D)
    f1 = f2 = 0.5 * u[1]^2
    return SVector(f1), SVector(f2)
 end
 
-@inbounds @inline function SSFR.flux(x, y, u, eq::Burg2D, orientation::Integer)
+@inbounds @inline function Tenkai.flux(x, y, u, eq::Burg2D, orientation::Integer)
    f = 0.5 * u[1]^2
    return SVector(f)
 end

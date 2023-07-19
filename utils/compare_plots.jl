@@ -1,6 +1,6 @@
 using Plots
 using Setfield
-using SSFR: Utils
+using Tenkai: Utils
 
 ARGS=["--grid_size", "60"]
 include("../Examples/1d/run_blast.jl")
@@ -35,12 +35,12 @@ scheme = setproperties(scheme, (degree = degree, limiter = limiter_mh,
                                 numerical_flux = Eq.roe))
 
 using .Utils: join_plots, join_plots_scalar
-sol1 = SSFR.solve(equation, problem, scheme, param);
+sol1 = Tenkai.solve(equation, problem, scheme, param);
 p1 = sol1["plot_data"].p_ua
 
 scheme = setproperties(scheme, (degree = degree, limiter = limiter_tvb,
                                 numerical_flux = Eq.roe))
-sol2 = SSFR.solve(equation, problem, scheme, param);
+sol2 = Tenkai.solve(equation, problem, scheme, param);
 p2 = sol2["plot_data"].p_ua
 
 leg1  = "MH"

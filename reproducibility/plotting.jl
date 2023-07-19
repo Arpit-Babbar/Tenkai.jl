@@ -1,4 +1,4 @@
-using SSFR.EqEuler1D: exact_solution_data
+using Tenkai.EqEuler1D: exact_solution_data
 import PyPlot as plt
 using Plots
 using DelimitedFiles

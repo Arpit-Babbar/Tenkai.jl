@@ -3,10 +3,10 @@ module EqBurg1D
 using StaticArrays
 using MuladdMacro
 
-using SSFR
+using Tenkai
 
 # flux function will be extended to Burg1D
-import SSFR: flux
+import Tenkai: flux
 
 import Roots.find_zero
 
@@ -26,7 +26,7 @@ struct Burg1D{F2 <: Function} <: AbstractEquations{1,1}
 end
 
 # Extending the flux function
-function SSFR.flux(x, u, eq::Burg1D)
+function Tenkai.flux(x, u, eq::Burg1D)
    return SVector(0.5*u[1]^2)
    return nothing
 end

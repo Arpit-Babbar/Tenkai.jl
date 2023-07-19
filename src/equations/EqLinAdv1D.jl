@@ -3,10 +3,10 @@ module EqLinAdv1D
 using StaticArrays
 using MuladdMacro
 
-using SSFR
+using Tenkai
 
 # flux function will be extended to LinAdv1D
-import SSFR: flux
+import Tenkai: flux
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -183,7 +183,7 @@ initial_values_la = Dict{String, Tuple{Function,Function}}()
 #------------------------------------------------------------------------------
 
 # Extending the flux function
-@inbounds @inline function SSFR.flux(x, u, eq::LinAdv1D)
+@inbounds @inline function Tenkai.flux(x, u, eq::LinAdv1D)
    f = eq.velocity(x) * u[1]
    return SVector(f)
    return nothing

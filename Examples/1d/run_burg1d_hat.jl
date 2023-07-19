@@ -1,7 +1,7 @@
 import Roots.find_zero
-using SSFR
+using Tenkai
 # Submodules
-Eq = SSFR.EqBurg1D
+Eq = Tenkai.EqBurg1D
 
 #------------------------------------------------------------------------------
 xmin, xmax = -2.0, 2.0
@@ -52,7 +52,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
                                           ARGS)
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 println(sol["errors"])
 

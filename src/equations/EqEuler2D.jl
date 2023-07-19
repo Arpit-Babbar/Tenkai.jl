@@ -1,8 +1,8 @@
 module EqEuler2D
 
 ( # Methods to be extended in this module
-  # Extended methods are also marked with SSFR. Example - SSFR.flux
-import SSFR: flux, prim2con, prim2con!, con2prim, con2prim!,
+  # Extended methods are also marked with Tenkai. Example - Tenkai.flux
+import Tenkai: flux, prim2con, prim2con!, con2prim, con2prim!,
              eigmatrix,
              apply_tvb_limiter!, apply_bound_limiter!, initialize_plot,
              blending_flux_factors, zhang_shu_flux_fix,
@@ -11,7 +11,7 @@ import SSFR: flux, prim2con, prim2con!, con2prim, con2prim!,
 )
 
 ( # Methods explicitly imported for readability
-using SSFR: get_filename, minmod, @threaded,
+using Tenkai: get_filename, minmod, @threaded,
             periodic, dirichlet, neumann, reflect,
             update_ghost_values_fn_blend!,
             get_node_vars,
@@ -22,7 +22,7 @@ using SSFR: get_filename, minmod, @threaded,
             comp_wise_mutiply_node_vars!, AbstractEquations
 )
 
-using SSFR.CartesianGrids: CartesianGrid2D, save_mesh_file
+using Tenkai.CartesianGrids: CartesianGrid2D, save_mesh_file
 
 using Polyester
 using StaticArrays
@@ -35,9 +35,9 @@ using MuladdMacro
 using Printf
 using EllipsisNotation
 using HDF5: h5open, attributes
-using SSFR
+using Tenkai
 
-using SSFR.FR2D: correct_variable!
+using Tenkai.FR2D: correct_variable!
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -58,7 +58,7 @@ end
 #------------------------------------------------------------------------------
 
 # Extending the flux function
-@inline @inbounds function SSFR.flux(x, y, U, eq::Euler2D, orientation::Integer)
+@inline @inbounds function Tenkai.flux(x, y, U, eq::Euler2D, orientation::Integer)
    @unpack γ_minus_1 = eq
    ρ, ρ_u1, ρ_u2, ρ_e = U
    u1 = ρ_u1 / ρ
@@ -80,7 +80,7 @@ end
 end
 
 # Extending the flux function
-@inline @inbounds function SSFR.flux(x, y, U, eq::Euler2D)
+@inline @inbounds function Tenkai.flux(x, y, U, eq::Euler2D)
    @unpack γ_minus_1 = eq
    ρ, ρ_u1, ρ_u2, ρ_e = U
    u1 = ρ_u1 / ρ
@@ -103,7 +103,7 @@ end
 end
 
 # function converting primitive variables to PDE variables
-function SSFR.prim2con(eq::Euler2D, prim) # primitive, gas constant
+function Tenkai.prim2con(eq::Euler2D, prim) # primitive, gas constant
    @unpack γ_minus_1 = eq
    ρ, v1, v2, p = prim
    ρ_v1 = ρ * v1
@@ -112,7 +112,7 @@ function SSFR.prim2con(eq::Euler2D, prim) # primitive, gas constant
    return SVector(ρ, ρ_v1, ρ_v2, ρ_e)
 end
 
-function SSFR.prim2con!(eq::Euler2D, ua)
+function Tenkai.prim2con!(eq::Euler2D, ua)
    @unpack γ, γ_minus_1 = eq
    ρ, v1, v2, p = ua
    ua[2] = ρ_v1 = ρ * v1
@@ -122,7 +122,7 @@ function SSFR.prim2con!(eq::Euler2D, ua)
 end
 
 # function converting pde variables to primitive variables
-function SSFR.con2prim(eq::Euler2D, U)
+function Tenkai.con2prim(eq::Euler2D, U)
    @unpack γ_minus_1 = eq
    ρ, ρ_u1, ρ_u2, ρ_e = U
    u1 = ρ_u1/ρ
@@ -132,7 +132,7 @@ function SSFR.con2prim(eq::Euler2D, U)
    return primitives
 end
 
-function SSFR.con2prim!(eq::Euler2D, ua, ua_)
+function Tenkai.con2prim!(eq::Euler2D, ua, ua_)
    @unpack γ_minus_1 = eq
    ρ, ρ_u1, ρ_u2, ρ_e = ua
    u1, u2 = ρ_u1/ρ, ρ_u2/ρ
@@ -141,7 +141,7 @@ function SSFR.con2prim!(eq::Euler2D, ua, ua_)
    return nothing
 end
 
-function SSFR.con2prim!(eq::Euler2D, ua)
+function Tenkai.con2prim!(eq::Euler2D, ua)
    @unpack γ_minus_1 = eq
    ρ, ρ_u1, ρ_u2, ρ_e = ua
    u1, u2 = ρ_u1/ρ, ρ_u2/ρ
@@ -162,7 +162,7 @@ end
    return p
 end
 
-function SSFR.is_admissible(eq::Euler2D, u::AbstractVector)
+function Tenkai.is_admissible(eq::Euler2D, u::AbstractVector)
    ρ, vel_x, vel_y, p = con2prim(eq, u)
    if ρ > 1e-12 && p > 1e-12
       return true
@@ -175,7 +175,7 @@ end
 #-------------------------------------------------------------------------------
 # Scheme information
 #-------------------------------------------------------------------------------
-function SSFR.compute_time_step(eq::Euler2D, grid, aux, op, cfl, u1, ua)
+function Tenkai.compute_time_step(eq::Euler2D, grid, aux, op, cfl, u1, ua)
    @timeit aux.timer "Time Step computation" begin
    @unpack dx, dy = grid
    nx, ny = grid.size
@@ -903,7 +903,7 @@ end
 # Limiters
 #------------------------------------------------------------------------------
 # Zhang-Shu limiting procedure for one variable
-function SSFR.apply_bound_limiter!(eq::Euler2D, grid, scheme, param, op, ua,
+function Tenkai.apply_bound_limiter!(eq::Euler2D, grid, scheme, param, op, ua,
                                    u1, aux)
    if scheme.bound_limit == "no"
       return nothing
@@ -1010,7 +1010,7 @@ function minmod_β(a, b, c, Mdx2)
    end
 end
 
-function SSFR.apply_tvb_limiterβ!(eq::Euler2D, problem, scheme, grid, param,
+function Tenkai.apply_tvb_limiterβ!(eq::Euler2D, problem, scheme, grid, param,
                                   op, ua, u1, aux)
    @timeit aux.timer "TVB Limiter" begin
    nx, ny = grid.size
@@ -1107,7 +1107,7 @@ function SSFR.apply_tvb_limiterβ!(eq::Euler2D, problem, scheme, grid, param,
    end # timer
 end
 
-function SSFR.apply_tvb_limiter!(eq::Euler2D, problem, scheme, grid, param, op,
+function Tenkai.apply_tvb_limiter!(eq::Euler2D, problem, scheme, grid, param, op,
                                  ua, u1, aux)
    @timeit aux.timer "TVB Limiter" begin
    nx, ny = grid.size
@@ -1267,7 +1267,7 @@ end
    return n_ind_var
 end
 
-function SSFR.blending_flux_factors(eq::Euler2D, ua, dx, dy)
+function Tenkai.blending_flux_factors(eq::Euler2D, ua, dx, dy)
    # This method is done differently for different equations
 
    # TODO - temporary hack. FIX!
@@ -1303,7 +1303,7 @@ function limit_variable_slope(eq, variable, slope, u_star_ll, u_star_rr, ue, xl,
    return slope, u_star_ll, u_star_rr
 end
 
-function SSFR.limit_slope(eq::Euler2D, slope, ufl, u_star_ll, ufr, u_star_rr,
+function Tenkai.limit_slope(eq::Euler2D, slope, ufl, u_star_ll, ufr, u_star_rr,
                            ue, xl, xr, el_x = nothing, el_y = nothing)
 
    # The MUSCL-Hancock scheme is guaranteed to be admissibility preserving if
@@ -1327,7 +1327,7 @@ function SSFR.limit_slope(eq::Euler2D, slope, ufl, u_star_ll, ufr, u_star_rr,
    return ufl, ufr, slope
 end
 
-function SSFR.zhang_shu_flux_fix(eq::Euler2D,
+function Tenkai.zhang_shu_flux_fix(eq::Euler2D,
                                  uprev,    # Solution at previous time level
                                  ulow,     # low order update
                                  Fn,       # Blended flux candidate
@@ -1359,7 +1359,7 @@ end
 #------------------------------------------------------------------------------
 # Ghost values functions
 #------------------------------------------------------------------------------
-function SSFR.update_ghost_values_rkfr!(problem, scheme, eq::Euler2D, grid,
+function Tenkai.update_ghost_values_rkfr!(problem, scheme, eq::Euler2D, grid,
                                         aux, op, cache, t)
    @timeit aux.timer "Update ghost values" begin
    @unpack Fb, ub = cache
@@ -1529,7 +1529,7 @@ function SSFR.update_ghost_values_rkfr!(problem, scheme, eq::Euler2D, grid,
    end # timer
 end
 
-function SSFR.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
+function Tenkai.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
                                         grid, aux, op, cache, t, dt)
    @timeit aux.timer "Update ghost values" begin
    @unpack Fb, Ub, ua = cache
@@ -1859,7 +1859,7 @@ function hllc_upwinding_super_x(u1, eq, op, xf, y, jy, el_x, el_y, Fn)
       u = @view u1[:,:,jy,el_x,el_y]
       # ur = get_node_vars(Ub, eq, jy, 1, el_x, el_y)
       @views ur = SVector{nvariables(eq)}(dot(u[n,:], Vl) for n in eachvariable(eq))
-      if !(SSFR.is_admissible(eq, ur))
+      if !(Tenkai.is_admissible(eq, ur))
          ur = get_node_vars(u1, eq, 1, jy, el_x, el_y)
       end
       fl, fr = flux(xf, y, ul, eq, 1), flux(xf, y, ur, eq, 1)
@@ -1884,7 +1884,7 @@ function hllc_upwinding_normal_x(u1, eq, op, xf, y, jy, el_x, el_y, Fn)
       # u = @view u1[:,:,jy,el_x,el_y]
       # ur = get_node_vars(Ub, eq, jy, 1, el_x, el_y)
       # @views ur = SVector{nvariables(eq)}(dot(u[n,:], Vl) for n in eachvariable(eq))
-      # if !(SSFR.is_admissible(eq, ur))
+      # if !(Tenkai.is_admissible(eq, ur))
       #    ur = get_node_vars(u1, eq, 1, jy, el_x, el_y)
       # end
       fl, fr = flux(xf, y, ul, eq, 1), flux(xf, y, ur, eq, 1)
@@ -1909,7 +1909,7 @@ function hllc_upwinding_weak_x(u1, eq, op, xf, y, jy, el_x, el_y, Fn)
       u = @view u1[:,:,jy,el_x,el_y]
       # ur = get_node_vars(Ub, eq, jy, 1, el_x, el_y)
       @views ur = SVector{nvariables(eq)}(dot(u[n,:], Vl) for n in eachvariable(eq))
-      if !(SSFR.is_admissible(eq, ur))
+      if !(Tenkai.is_admissible(eq, ur))
          ur = get_node_vars(u1, eq, 1, jy, el_x, el_y)
       end
       fl, fr = flux(xf, y, ul, eq, 1), flux(xf, y, ur, eq, 1)
@@ -1925,7 +1925,7 @@ end
 #-------------------------------------------------------------------------------
 # Write solution to a vtk file
 #-------------------------------------------------------------------------------
-function SSFR.initialize_plot(eq::Euler2D, op, grid, problem, scheme, timer, u1, ua)
+function Tenkai.initialize_plot(eq::Euler2D, op, grid, problem, scheme, timer, u1, ua)
    return nothing
 end
 
@@ -1982,7 +1982,7 @@ function write_poly(eq::Euler2D, grid, op, u1, fcount)
    out = vtk_save(vtk_sol)
 end
 
-function SSFR.write_soln!(base_name, fcount, iter, time, dt, eq::Euler2D,
+function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::Euler2D,
                           grid, problem, param, op,
                           z, u1, aux, ndigits=3)
    @timeit aux.timer "Write solution" begin

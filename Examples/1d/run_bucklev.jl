@@ -1,8 +1,8 @@
 import Roots.find_zero
-using SSFR
+using Tenkai
 # Submodules
 using Plots
-Eq = SSFR.EqBuckleyLeverett1D
+Eq = Tenkai.EqBuckleyLeverett1D
 plotlyjs() # Set backend
 
 #------------------------------------------------------------------------------
@@ -48,4 +48,4 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 #------------------------------------------------------------------------------
 problem, scheme, param, = ParseCommandLine(problem, param, scheme, eq, ARGS)
 #------------------------------------------------------------------------------
-SSFR.solve(eq, problem, scheme, param)
+Tenkai.solve(eq, problem, scheme, param)

@@ -1,6 +1,6 @@
 using StaticArrays
-using SSFR
-Eq = SSFR.EqLinAdv2D
+using Tenkai
+Eq = Tenkai.EqLinAdv2D
 #------------------------------------------------------------------------------
 case = 3 # options: 1,2,3,4
 
@@ -71,7 +71,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 #------------------------------------------------------------------------------
 problem, scheme, param = ParseCommandLine(problem, param, scheme, eq, ARGS)
 #------------------------------------------------------------------------------
-sol = SSFR.solve(eq, problem, scheme, param);
+sol = Tenkai.solve(eq, problem, scheme, param);
 
 println(sol["errors"])
 

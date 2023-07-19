@@ -1,6 +1,6 @@
-using SSFR
+using Tenkai
 # Run with dev branch with title 'Works best for M2000'
-Eq = SSFR.EqEuler2D
+Eq = Tenkai.EqEuler2D
 using StaticArrays
 #------------------------------------------------------------------------------
 xmin, xmax =  0.0, 1.0
@@ -88,6 +88,6 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    cfl_safety_factor = cfl_safety_factor,
                    saveto = "none")
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param)
+sol = Tenkai.solve(equation, problem, scheme, param)
 
 return sol

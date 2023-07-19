@@ -12,13 +12,13 @@ using Polyester
 using LoopVectorization
 using JSON3
 
-using SSFR
-using SSFR.Basis
+using Tenkai
+using Tenkai.Basis
 
-import SSFR.FR: admissibility_tolerance
+import Tenkai.FR: admissibility_tolerance
 
 ( # Methods to be extended
-import SSFR: flux, prim2con, prim2con!, con2prim, con2prim!,
+import Tenkai: flux, prim2con, prim2con!, con2prim, con2prim!,
              eigmatrix,
              limit_slope, zhang_shu_flux_fix,
              apply_tvb_limiter!, apply_bound_limiter!, initialize_plot,
@@ -26,7 +26,7 @@ import SSFR: flux, prim2con, prim2con!, con2prim, con2prim!,
 )
 
 (
-   using SSFR: PlotData, data_dir, get_filename, neumann, minmod,
+   using Tenkai: PlotData, data_dir, get_filename, neumann, minmod,
                get_node_vars,
                set_node_vars!,
                nvariables, eachvariable,
@@ -146,7 +146,7 @@ end
    return p
 end
 
-function SSFR.eigmatrix(eq::Euler1D, u)
+function Tenkai.eigmatrix(eq::Euler1D, u)
    @unpack γ = eq
    g1 = γ - 1.0
    g2 = 0.5*g1
@@ -198,7 +198,7 @@ end
 #-------------------------------------------------------------------------------
 # Scheme information
 #-------------------------------------------------------------------------------
-function SSFR.compute_time_step(eq::Euler1D, grid, aux, op, cfl, u1, ua)
+function Tenkai.compute_time_step(eq::Euler1D, grid, aux, op, cfl, u1, ua)
    nx = grid.size
    dx = grid.dx
    den = 0.0
@@ -623,7 +623,7 @@ end
 #-------------------------------------------------------------------------------
 # Limiters
 #-------------------------------------------------------------------------------
-function SSFR.apply_bound_limiter!(eq::Euler1D, grid, scheme, param, op, ua,
+function Tenkai.apply_bound_limiter!(eq::Euler1D, grid, scheme, param, op, ua,
                                    u1, aux)
    if scheme.bound_limit == "no"
       return nothing
@@ -688,7 +688,7 @@ function SSFR.apply_bound_limiter!(eq::Euler1D, grid, scheme, param, op, ua,
    end # timer
 end
 
-function SSFR.apply_tvb_limiter!(eq::Euler1D, problem, scheme, grid, param, op, ua,
+function Tenkai.apply_tvb_limiter!(eq::Euler1D, problem, scheme, grid, param, op, ua,
                                  u1, aux)
    @timeit aux.timer "TVB limiter" begin
    nx = grid.size
@@ -822,7 +822,7 @@ end
    return n_ind_var
 end
 
-function SSFR.is_admissible(eq::Euler1D, u::AbstractVector)
+function Tenkai.is_admissible(eq::Euler1D, u::AbstractVector)
    prim = con2prim(eq, u)
    if prim[1] > 1e-10 && prim[3] > 1e-10
       return true
@@ -831,14 +831,14 @@ function SSFR.is_admissible(eq::Euler1D, u::AbstractVector)
    end
 end
 
-function SSFR.conservative2characteristic_reconstruction!(mode, ua, eq::Euler1D)
+function Tenkai.conservative2characteristic_reconstruction!(mode, ua, eq::Euler1D)
    # R, L = eigmatrix(eq, ua)
    # temp = L * mode
    # mode .= temp
    @assert false "not implemented"
 end
 
-function SSFR.characteristic2conservative_reconstruction!(mode, ua, eq::Euler1D)
+function Tenkai.characteristic2conservative_reconstruction!(mode, ua, eq::Euler1D)
    # R, L = eigmatrix(eq, ua)
    # temp = R * mode
    # mode .= temp
@@ -847,7 +847,7 @@ end
 
 admissibility_tolerance(eq::Euler1D) = 1e-10
 
-function SSFR.limit_slope(eq::Euler1D, s, ufl, u_s_l, ufr, u_s_r, ue, xl, xr)
+function Tenkai.limit_slope(eq::Euler1D, s, ufl, u_s_l, ufr, u_s_r, ue, xl, xr)
    @unpack γ = eq
    eps = admissibility_tolerance(eq)
 
@@ -876,7 +876,7 @@ function SSFR.limit_slope(eq::Euler1D, s, ufl, u_s_l, ufr, u_s_r, ue, xl, xr)
    return ufl, ufr
 end
 
-function SSFR.zhang_shu_flux_fix(eq::Euler1D,
+function Tenkai.zhang_shu_flux_fix(eq::Euler1D,
                                  uprev,    # Solution at previous time level
                                  ulow,     # low order update
                                  Fn,       # Blended flux candidate
@@ -908,7 +908,7 @@ end
 # Plotting functions
 #-------------------------------------------------------------------------------
 
-function SSFR.initialize_plot(eq::Euler1D, op, grid, problem, scheme, timer, u1,
+function Tenkai.initialize_plot(eq::Euler1D, op, grid, problem, scheme, timer, u1,
                               ua)
    @timeit timer "Write solution" begin
    @timeit timer "Initialize write solution" begin
@@ -981,7 +981,7 @@ function SSFR.initialize_plot(eq::Euler1D, op, grid, problem, scheme, timer, u1,
    end # timer
 end
 
-function SSFR.write_soln!(base_name, fcount, iter, time, dt, eq::Euler1D, grid,
+function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::Euler1D, grid,
                           problem, param, op, ua, u1, aux, ndigits=3)
    @timeit aux.timer "Write solution" begin
    @unpack plot_data = aux
@@ -1123,7 +1123,7 @@ function exact_solution_data(test_case)
    return exact_data
 end
 
-function SSFR.post_process_soln(eq::Euler1D, aux, problem, param)
+function Tenkai.post_process_soln(eq::Euler1D, aux, problem, param)
    @unpack timer, error_file = aux
    @timeit timer "Write solution" begin
    println("Post processing solution")

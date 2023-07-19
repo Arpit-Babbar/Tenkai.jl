@@ -1,7 +1,7 @@
 module RKFR2D
 
 (
-import ..SSFR: setup_arrays_rkfr,
+import ..Tenkai: setup_arrays_rkfr,
                compute_cell_residual_rkfr!,
                update_ghost_values_rkfr!,
                flux
@@ -9,7 +9,7 @@ import ..SSFR: setup_arrays_rkfr,
 
 
 (
-using ..SSFR: periodic, dirichlet, neumann, reflect,
+using ..Tenkai: periodic, dirichlet, neumann, reflect,
               evaluate, extrapolate,
               update_ghost_values_periodic!,
               update_ghost_values_fn_blend!,

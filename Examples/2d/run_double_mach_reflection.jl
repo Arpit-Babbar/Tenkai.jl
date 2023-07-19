@@ -1,5 +1,5 @@
-using SSFR
-Eq = SSFR.EqEuler2D
+using Tenkai
+Eq = Tenkai.EqEuler2D
 #------------------------------------------------------------------------------
 xmin, xmax = 0.0, 4.0
 ymin, ymax = 0.0, 1.0
@@ -61,6 +61,6 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
                                           ARGS)
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 return sol;

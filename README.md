@@ -1,9 +1,9 @@
 # Tenkai.jl
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://Arpit-Babbar.github.io/SSFR/stable/)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://Arpit-Babbar.github.io/SSFR/dev/)
-[![Build Status](https://github.com/Arpit-Babbar/SSFR/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Arpit-Babbar/SSFR/actions/workflows/CI.yml?query=branch%3Amain)
-[![Coverage](https://codecov.io/gh/Arpit-Babbar/SSFR/branch/main/graph/badge.svg)](https://codecov.io/gh/Arpit-Babbar/SSFR)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://Arpit-Babbar.github.io/Tenkai/stable/)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://Arpit-Babbar.github.io/Tenkai/dev/)
+[![Build Status](https://github.com/Arpit-Babbar/Tenkai/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Arpit-Babbar/Tenkai/actions/workflows/CI.yml?query=branch%3Amain)
+[![Coverage](https://codecov.io/gh/Arpit-Babbar/Tenkai/branch/main/graph/badge.svg)](https://codecov.io/gh/Arpit-Babbar/Tenkai)
 
 # 1d/2d FR solver
 
@@ -30,7 +30,7 @@ julia> import Pkg; Pkg.instantiate()
 For the first time, to precompile parts of code to local drive, it is also recommended that you run
 
 ```julia
-julia> using SSFR
+julia> using Tenkai
 ```
 
 At this point, in principle you can exit the REPL and always run your code directly through the shell as

@@ -3,14 +3,14 @@ module EqLinAdv2D
 using StaticArrays
 using MuladdMacro
 
-using SSFR
+using Tenkai
 using TimerOutputs
-using SSFR.FR2D: correct_variable!
+using Tenkai.FR2D: correct_variable!
 using UnPack
 
 # methods to be extended in this module
-import SSFR: flux
-import SSFR.FR: admissibility_tolerance
+import Tenkai: flux
+import Tenkai.FR: admissibility_tolerance
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -40,14 +40,14 @@ function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::LinAdv2D, dir)
    return SVector(Fn)
 end
 
-function SSFR.flux(x,y,u, eq::LinAdv2D)
+function Tenkai.flux(x,y,u, eq::LinAdv2D)
    v1, v2 = eq.velocity(x, y)
    # return SVector(v1*u, v2*u)
    f1, f2 = v1*u[1], v2*u[1]
    return SVector(f1), SVector(f2)
 end
 
-function SSFR.flux(x,y,u, eq::LinAdv2D, orientation::Integer)
+function Tenkai.flux(x,y,u, eq::LinAdv2D, orientation::Integer)
    v1, v2 = eq.velocity(x, y)
    if orientation == 1
       f1 = v1*u[1]
@@ -130,7 +130,7 @@ function composite2d(x, y)
    return SVector(smooth_hump2d(x, y)+cone2d(x, y)+slotted_disc2d(x, y))
 end
 
-function SSFR.apply_bound_limiter!(eq::LinAdv2D, grid, scheme, param, op, ua,
+function Tenkai.apply_bound_limiter!(eq::LinAdv2D, grid, scheme, param, op, ua,
                                    u1, aux)
    if scheme.bound_limit == "no"
       return nothing
@@ -149,7 +149,7 @@ function SSFR.apply_bound_limiter!(eq::LinAdv2D, grid, scheme, param, op, ua,
    end # timer
 end
 
-function SSFR.limit_slope(eq::LinAdv2D, s, ufl, u_s_l, ufr, u_s_r, ue, xl, xr)
+function Tenkai.limit_slope(eq::LinAdv2D, s, ufl, u_s_l, ufr, u_s_r, ue, xl, xr)
    eps = 1e-10
 
    variables = ((eq, u) -> first(u), (eq,u) -> 1.0 - first(u))
@@ -177,7 +177,7 @@ function SSFR.limit_slope(eq::LinAdv2D, s, ufl, u_s_l, ufr, u_s_r, ue, xl, xr)
    return ufl, ufr
 end
 
-function SSFR.zhang_shu_flux_fix(eq::LinAdv2D,
+function Tenkai.zhang_shu_flux_fix(eq::LinAdv2D,
                             Fn, fn,                   # high order flux, low order flux
                             u_prev_ll, u_prev_rr,     # solution at previous time level
                             u_low_ll, u_low_rr,       # low order updates
@@ -204,7 +204,7 @@ function SSFR.zhang_shu_flux_fix(eq::LinAdv2D,
    return Fn
 end
 
-function SSFR.is_admissible(eq::LinAdv2D, u::AbstractVector)
+function Tenkai.is_admissible(eq::LinAdv2D, u::AbstractVector)
    # Check if the invariant domain in preserved. This has to be
    # extended in Equation module
    return u[1] >= 0.0 && u[1] <= 1.0

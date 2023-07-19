@@ -4,7 +4,7 @@ using ..Basis
 using ..CartesianGrids
 using ..Equations: AbstractEquations, nvariables, eachvariable
 
-import SSFR
+import Tenkai
 
 using ArgParse
 using OffsetArrays # OffsetArray, OffsetMatrix, OffsetVector
@@ -776,8 +776,8 @@ function create_auxiliaries(eq, op, grid, problem, scheme, param, cache)
    timer = TimerOutput()
    plot_data = initialize_plot(eq, op, grid, problem, scheme, timer, u1, ua);
    # Setup blending limiter
-   blend = SSFR.Blend(eq, op, grid, problem, scheme, param, plot_data)
-   hierarchical = SSFR.Hierarchical(eq, op, grid, problem, scheme, param,
+   blend = Tenkai.Blend(eq, op, grid, problem, scheme, param, plot_data)
+   hierarchical = Tenkai.Hierarchical(eq, op, grid, problem, scheme, param,
                               plot_data)
    aux_cache = create_aux_cache(eq, op)
    error_file = open("error.txt", "w")
@@ -923,12 +923,12 @@ end
 
 @inbounds @inline function conservative2primitive_reconstruction!(ue, ua,
                                                                   eq::AbstractEquations)
-   SSFR.con2prim(eq, ue)
+   Tenkai.con2prim(eq, ue)
 end
 
 @inbounds @inline function primitive2conservative_reconstruction!(ue, ua,
                                                                   eq::AbstractEquations)
-   SSFR.prim2con(eq, ue)
+   Tenkai.prim2con(eq, ue)
 end
 
 @inbounds @inline function conservative2characteristic_reconstruction!(ue, ua,

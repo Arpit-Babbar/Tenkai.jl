@@ -1,7 +1,7 @@
 using Plots
 plotlyjs()
 using DelimitedFiles
-using SSFR.EqLinAdv1D: mult1d
+using Tenkai.EqLinAdv1D: mult1d
 using GZip
 
 p = plot(size = (900,500));
@@ -12,7 +12,7 @@ amax1 = readdlm("output_$(testcase)_amax1/sol.txt")
 # mlp_soln = readdlm("output_$(testcase)_mlp/sol.txt")
 amax05 = readdlm("output/sol.txt")
 
-exact_file = GZip.open(SSFR.data_dir*"/$(testcase).dat.gz")
+exact_file = GZip.open(Tenkai.data_dir*"/$(testcase).dat.gz")
 exact_data = readdlm(exact_file)
 # @views plot!(p, mlp_soln[:,1], mult1d.(mlp_soln[:,1]), label = "Exact", color = "black");
 plot!(p, exact_data[:,1], exact_data[:,2], label="Exact", color=:black)

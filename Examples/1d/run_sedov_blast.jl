@@ -1,5 +1,5 @@
-using SSFR
-Eq = SSFR.EqEuler1D
+using Tenkai
+Eq = Tenkai.EqEuler1D
 
 #------------------------------------------------------------------------------
 xmin, xmax, nx, dx, initial_value, exact_solution = Eq.sedov_data
@@ -64,7 +64,7 @@ param = Parameters(
 problem, scheme, param, = ParseCommandLine(problem, param, scheme, equation,
                                            ARGS)
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 println(sol["errors"])
 

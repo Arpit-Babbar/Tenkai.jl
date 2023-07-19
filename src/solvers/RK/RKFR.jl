@@ -1,7 +1,7 @@
 module RKFR
 
-( # FR Methods unified as 1D and 2D in SSFR
-using SSFR: set_initial_condition!,
+( # FR Methods unified as 1D and 2D in Tenkai
+using Tenkai: set_initial_condition!,
             compute_cell_average!,
             compute_face_residual!,
             set_blend_dt!,
@@ -26,7 +26,7 @@ using LinearAlgebra: axpy!, axpby!
 #------------------------------------------------------------------------------
 # Extending methods needed in FR.jl which are defined here
 #------------------------------------------------------------------------------
-import ..SSFR: solve_rkfr
+import ..Tenkai: solve_rkfr
 
 #------------------------------------------------------------------------------
 # Dimension independent methods in FR used here

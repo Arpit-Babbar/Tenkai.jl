@@ -1,7 +1,7 @@
-using SSFR
-Eq = SSFR.EqLinAdv2D
+using Tenkai
+Eq = Tenkai.EqLinAdv2D
 using StaticArrays
-using SSFR.StructuredMeshes: save_mesh_file
+using Tenkai.StructuredMeshes: save_mesh_file
 import Trixi
 using Trixi2Vtk
 #------------------------------------------------------------------------------
@@ -44,7 +44,7 @@ degree              = 6
 solver              = "rkfr"
 solution_points     = "gll"
 correction_function = "g2"
-numerical_flux      = SSFR.flux_lax_friedrichs
+numerical_flux      = Tenkai.flux_lax_friedrichs
 bound_limit         = "no"
 bflux               = extrapolate
 final_time          = 0.1 # 20 * sqrt(2.0) / 0.5
@@ -86,7 +86,7 @@ grid = UnstructuredMesh2D(mesh_file)
 #                                           grid, ARGS)
 #------------------------------------------------------------------------------
 rm("output", force = true, recursive = true)
-sol = SSFR.solve(equation, grid, problem, scheme, param);
+sol = Tenkai.solve(equation, grid, problem, scheme, param);
 Trixi.save_mesh_file(grid, "output")
 trixi2vtk("output/sol*.h5", output_directory="output")
 println(sol["errors"])

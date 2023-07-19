@@ -1,6 +1,6 @@
 using StaticArrays
-using SSFR
-Eq = SSFR.EqLinAdv2D
+using Tenkai
+Eq = Tenkai.EqLinAdv2D
 
 #------------------------------------------------------------------------------
 (xmin, xmax, ymin, ymax, velocity, initial_value,
@@ -50,6 +50,6 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
                                           ARGS)
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 println(sol["errors"])
 return sol

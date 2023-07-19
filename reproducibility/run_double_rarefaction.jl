@@ -1,5 +1,5 @@
-using SSFR
-Eq = SSFR.EqEuler1D
+using Tenkai
+Eq = Tenkai.EqEuler1D
 #------------------------------------------------------------------------------
 xmin, xmax = -1.0, 1.0
 
@@ -51,7 +51,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
    save_time_interval, compute_error_interval;
    animate=animate, saveto="none")
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 println(sol["errors"])
 

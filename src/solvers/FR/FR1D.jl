@@ -2,8 +2,8 @@ module FR1D
 
 using StaticArrays
 
-using ..SSFR: fr_dir, lwfr_dir, rkfr_dir, eq_dir, src_dir
-using ..SSFR: update_ghost_values_periodic!, flux, con2prim
+using ..Tenkai: fr_dir, lwfr_dir, rkfr_dir, eq_dir, src_dir
+using ..Tenkai: update_ghost_values_periodic!, flux, con2prim
 (
 using ..FR: Scheme, Problem, Parameters, @threaded, PlotData,
             get_filename, minmod, prim2con!, con2prim!, save_solution,
@@ -12,8 +12,8 @@ using ..FR: Scheme, Problem, Parameters, @threaded, PlotData,
 using ..Equations: AbstractEquations, nvariables, eachvariable
 using ..Basis: Vandermonde_lag, weights_and_points, nodal2modal, nodal2modal_krivodonova, Vandermonde_leg_krivodonova
 
-( # Methods to be extended from SSFR
-import ..SSFR: update_ghost_values_periodic!,
+( # Methods to be extended from Tenkai
+import ..Tenkai: update_ghost_values_periodic!,
                modal_smoothness_indicator,
                modal_smoothness_indicator_gassner,
                update_ghost_values_u1!,

@@ -1,6 +1,6 @@
 using StaticArrays
-using SSFR
-Eq = SSFR.EqLinAdv1D
+using Tenkai
+Eq = Tenkai.EqLinAdv1D
 # Submodules
 using Plots
 plotlyjs() # Set backend
@@ -46,6 +46,6 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 problem, scheme, param = ParseCommandLine(problem, param, scheme, eq,
                                              ARGS)
 #------------------------------------------------------------------------------
-errors, plot_data = SSFR.solve(eq, problem, scheme, param)
+errors, plot_data = Tenkai.solve(eq, problem, scheme, param)
 
 return errors, plot_data

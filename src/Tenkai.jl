@@ -1,4 +1,4 @@
-module SSFR
+module Tenkai
 
 src_dir = @__DIR__ # Directory of file
 data_dir = "$src_dir/../data/"
