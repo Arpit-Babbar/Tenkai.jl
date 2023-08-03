@@ -578,7 +578,6 @@ end
 
 function hllc(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler1D, dir)
    # Compute speeds using ual, uar
-   nvar = eq.nvar
    sl, sr = hll_speeds_toro(ual, uar, eq)
    # Supersonic cases
    if sl > 0.0

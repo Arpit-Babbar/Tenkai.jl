@@ -10,7 +10,7 @@ boundary_condition = (neumann, neumann)
 
 dummy_bv(x,t) = 0.0
 
-initial_value = Eq.two_rare_iv # choices - Eq.sod_iv, Eq.two_shock_iv, Eq.two_rare_iv
+initial_value = Eq.two_rare_vacuum_iv # choices - Eq.sod_iv, Eq.two_shock_iv, Eq.two_rare_iv, Eq.two_rare_vacuum_iv
 boundary_value = dummy_bv
 exact_solution_rp(x,t) = initial_value(x)
 exact_solution = exact_solution_rp
@@ -19,10 +19,10 @@ degree = 4
 solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
-numerical_flux = Eq.rusanov
+numerical_flux = Eq.hll
 bound_limit = "yes"
 bflux = evaluate
-final_time = 0.15 # Choose 0.125 for sod, two_shock and 0.15 for two_rar
+final_time = 0.05 # Choose 0.125 for sod, two_shock; 0.15 for two_rare_iv; 0.05 for two_rare_vacuum_iv
 
 nx = ceil(Int64,300)
 cfl = 0.0
@@ -31,7 +31,7 @@ tvbM = 0.0
 save_iter_interval = 0
 save_time_interval = 0.0 * final_time
 animate = true # Factor on save_iter_interval or save_time_interval
-compute_error_interval = 1
+compute_error_interval = 0
 
 #------------------------------------------------------------------------------
 grid_size = nx
@@ -45,13 +45,14 @@ limiter = setup_limiter_blend(
                               # indicating_variables = Eq.rho_p_indicator!,
                               indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
-                              indicator_model = "gassner"
+                              indicator_model = "gassner",
+                              # pure_fv = true
                              )
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
                    compute_error_interval, animate = animate,
-                   cfl_safety_factor = 0.9)
+                   cfl_safety_factor = 0.6)
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(eq, problem, scheme, param);
 
@@ -59,4 +60,4 @@ println(sol["errors"])
 
 return sol;
 
-sol["plot_data"].p_u1
+sol["plot_data"].p_ua

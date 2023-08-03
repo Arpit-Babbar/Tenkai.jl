@@ -105,12 +105,18 @@ end
    rr, v1r, v2r, P11r, P12r, P22r = con2prim(eq, ur)
 
    T11l = P11l / rl
-   min_l = v1l - sqrt(3.0*T11l)
-   max_l = v1l + sqrt(3.0*T11l)
+   cl1 = sqrt(3.0*T11l)
+   cl2 = P12l / sqrt(rl * P22l)
+   cl = max(cl1, cl2)
+   min_l = v1l - cl
+   max_l = v1l + cl
 
    T11r = P11r / rr
-   min_r = v1r - sqrt(3.0*T11r)
-   max_r = v1r + sqrt(3.0*T11r)
+   cr1 = sqrt(3.0*T11r)
+   cr2 = P12r / sqrt(rr * P22r)
+   cr = max(cr1, cr2)
+   min_r = v1r - cr
+   max_r = v1r + cr
 
    sl = min(min_l, min_r)
    sr = max(max_l, max_r)
@@ -216,7 +222,7 @@ function Tenkai.apply_bound_limiter!(eq::TenMoment1D, grid, scheme, param, op, u
    if scheme.bound_limit == "no"
       return nothing
    end
-   variables = (density_constraint, trace_constraint) # , det_constraint)
+   variables = (density_constraint, trace_constraint, det_constraint)
    iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua, u1, aux, variables)
    return nothing
 end
@@ -495,6 +501,12 @@ two_rare_iv(x) = rp(x,
                (2.0, -0.5, -0.5, 1.5, 0.5, 1.5),
                (1.0,  1.0,  1.0, 1.0, 0.0, 1.0),
                0.0)
+
+two_rare_vacuum_iv(x) = rp(x,
+               (1.0,   -5.0, 0.0, 2.0, 0.0, 2.0),
+               (1.0,  5.0, 0.0, 2.0, 0.0, 2.0),
+               0.0)
+
 exact_solution_data(iv::Function) = nothing
 function exact_solution_data(iv::typeof(sod_iv))
    exact_filename = joinpath(Tenkai.data_dir, "10mom_sod.gz")
