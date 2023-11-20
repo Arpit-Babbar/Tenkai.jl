@@ -51,14 +51,16 @@ end
 #-------------------------------------------------------------------------------
 function perform_mdrk_step!(eq, t, iter, fcount, dt, grid, problem, scheme,
                             param, aux, op, uprev, ua, res, Fb, Ub, cache, unew,
-                            cell_residual!)
+                            cell_residual!, boundary_scaling_factor)
    @timeit aux.timer "MDRK Stages" begin
    pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme,
                         param, aux, op, uprev, ua)
    @timeit aux.timer "Cell Residual" cell_residual!(eq, grid, op, scheme, aux,
                                                     t, dt, uprev, res, Fb, Ub,
                                                     cache)
-   update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache, t, dt)
+
+   update_ghost_values_mdrk!(problem, scheme, eq, grid, aux, op, cache, t,
+                             dt, boundary_scaling_factor)
    compute_face_residual!(eq, grid, op, scheme, param, aux, t, dt, uprev,
                           Fb, Ub, ua, res)
    unew .= uprev
@@ -117,12 +119,12 @@ function solve_mdrk(eq, problem, scheme, param, grid, op, aux, cache)
       # First stage
       perform_mdrk_step!(eq, t, iter, fcount, dt, grid, problem, scheme,
                          param, aux, op, u1, ua, res, Fb, Ub, cache, us,
-                         compute_cell_residual_mdrk_1!)
+                         compute_cell_residual_mdrk_1!, 0.5)
 
       # Second stage
       perform_mdrk_step!(eq, t, iter, fcount, dt, grid, problem, scheme,
                          param, aux, op, u1, ua, res, Fb, Ub, cache, u1,
-                         compute_cell_residual_mdrk_2!)
+                         compute_cell_residual_mdrk_2!, 1.0)
 
       t += dt; iter += 1
       @printf("iter,dt,t = %5d %12.4e %12.4e\n", iter, dt, t)
