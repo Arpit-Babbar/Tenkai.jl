@@ -9,6 +9,7 @@ grid_dir = "$src_dir/grids"
 utils_dir = "$src_dir/../utils"
 solvers_dir = "$src_dir/solvers"
 fr_dir = "$solvers_dir/FR"
+mdrk_dir = "$solvers_dir/MDRK"
 rkfr_dir = "$solvers_dir/RK"
 lwfr_dir = "$solvers_dir/LW"
 
@@ -106,6 +107,7 @@ import .FR: update_ghost_values_periodic!,
             setup_arrays_rkfr,
             solve_lwfr,
             solve_rkfr,
+            solve_mdrk,
             compute_error,
             initialize_plot,
             write_soln!,
@@ -265,6 +267,7 @@ import .RKFR2D: setup_arrays_rkfr,
 # )
 
 include("$lwfr_dir/LWFR.jl")
+include("$mdrk_dir/MDRK.jl")
 
 ( # Skeleton methods to be defined and extended in LWFR1D, LWFR2D
 import .LWFR: setup_arrays_lwfr,
@@ -276,6 +279,7 @@ import .LWFR: setup_arrays_lwfr,
 )
 
 include("$lwfr_dir/LWFR1D.jl")
+include("$mdrk_dir/MDRK1D.jl")
 
 ( # methods extended to LWFR1D
 import .LWFR1D: setup_arrays_lwfr,

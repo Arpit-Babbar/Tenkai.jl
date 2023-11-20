@@ -33,7 +33,7 @@ using FastGaussQuadrature
 
 @enum BCType periodic dirichlet neumann reflect
 @enum BFluxType extrapolate evaluate
-@enum SolverType rkfr lwfr # TEMPORARY HACK, AVOID REPETETION
+@enum SolverType rkfr lwfr mdrk # TODO - Is this only needed for D2 / D1?
 
 #-------------------------------------------------------------------------------
 # Create a struct of problem description
@@ -122,6 +122,8 @@ function solver2enum(solver)
       solver_enum = lwfr
    elseif solver == "rkfr"
       solver_enum = rkfr
+   elseif solver == "mdrk"
+      solver_enum = mdrk
    end
 end
 
@@ -747,6 +749,8 @@ function setup_arrays(grid, scheme, equation)
       return setup_arrays_lwfr(grid, scheme, equation)
    elseif solver == "rkfr"
       return setup_arrays_rkfr(grid, scheme, equation)
+   elseif solver == "mdrk"
+      return setup_arrays_mdrk(grid, scheme, equation)
    else
       @assert false "Incorrect solver"
    end
@@ -1075,8 +1079,10 @@ modal_smoothness_indicator_gassner() = nothing
 Blend() = nothing
 setup_arrays_lwfr() = nothing
 setup_arrays_rkfr() = nothing
+setup_arrays_mdrk() = nothing
 solve_lwfr() = nothing
 solve_rkfr() = nothing
+solve_mdrk() = nothing
 
 # These methods are primarily for LWFR.jl, but are also needed here for
 # get_bflux_function()
@@ -1111,6 +1117,9 @@ function solve(equation, problem, scheme, param);
                        cache)
    elseif solver == "rkfr"
       out = solve_rkfr(equation, problem, scheme, param, grid, op, aux,
+                       cache)
+   elseif solver == "mdrk"
+      out = solve_mdrk(equation, problem, scheme, param, grid, op, aux,
                        cache)
    else
       println("Solver not implemented")
