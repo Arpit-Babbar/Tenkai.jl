@@ -13,6 +13,8 @@ using Tenkai.LWFR: update_ghost_values_lwfr!, update_solution_lwfr!
 
 using Tenkai
 
+include("$(Tenkai.mdrk_dir)/MDRK1D.jl")
+
 #------------------------------------------------------------------------------
 # Extending methods needed in FR.jl which are defined here
 #------------------------------------------------------------------------------
@@ -37,16 +39,6 @@ using MuladdMacro
 @muladd begin
 
 #-------------------------------------------------------------------------------
-# Compute cell residual for all real cells
-#-------------------------------------------------------------------------------
-function compute_cell_residual_mdrk_1!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb,
-                                      Ub, cache)
-   @timeit aux.timer "Cell Residual" begin
-   return nothing
-   end # timer
-end
-
-#-------------------------------------------------------------------------------
 # Perform a full stage of MDRK
 #-------------------------------------------------------------------------------
 function perform_mdrk_step!(eq, t, iter, fcount, dt, grid, problem, scheme,
@@ -59,7 +51,7 @@ function perform_mdrk_step!(eq, t, iter, fcount, dt, grid, problem, scheme,
                                                     t, dt, uprev, res, Fb, Ub,
                                                     cache)
 
-   update_ghost_values_mdrk!(problem, scheme, eq, grid, aux, op, cache, t,
+   update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache, t,
                              dt, boundary_scaling_factor)
    compute_face_residual!(eq, grid, op, scheme, param, aux, t, dt, uprev,
                           Fb, Ub, ua, res)

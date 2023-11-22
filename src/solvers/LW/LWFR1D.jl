@@ -83,7 +83,7 @@ end
 # Fill ghost values
 #-------------------------------------------------------------------------------
 function update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache,
-                                   t, dt)
+                                   t, dt, scaling_factor = 1)
    @timeit aux.timer "Update ghost values" begin
    @unpack Fb, Ub = cache
    update_ghost_values_periodic!(eq, problem, Fb, Ub)
@@ -105,15 +105,17 @@ function update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache,
 
    # For Dirichlet bc, use upwind flux at faces by assigning both physical
    # and ghost cells through the bc.
+   dt_scaled = scaling_factor * dt
+   wg_scaled = scaling_factor * wg # It is a static array so doesn't cause allocations
    if left == dirichlet
       x = xf[1]
       for l=1:nd
-         tq = t + xg[l]*dt
+         tq = t + xg[l]*dt_scaled
          ubvalue = boundary_value(x,tq)
          fbvalue = flux(x, ubvalue, eq)
          for n=1:nvar
-            ub[n] += ubvalue[n] * wg[l]
-            fb[n] += fbvalue[n] * wg[l]
+            ub[n] += ubvalue[n] * wg_scaled[l]
+            fb[n] += fbvalue[n] * wg_scaled[l]
          end
       end
       for n=1:nvar
@@ -142,12 +144,12 @@ function update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache,
    if right == dirichlet
       x  = xf[nx+1]
       for l=1:nd
-         tq = t + xg[l]*dt
+         tq = t + xg[l]*dt_scaled
          ubvalue = boundary_value(x,tq)
          fbvalue = flux(x, ub, eq)
          for n=1:nvar
-            ub[n] += ubvalue[n] * wg[l]
-            fb[n] += fbvalue[n] * wg[l]
+            ub[n] += ubvalue[n] * wg_scaled[l]
+            fb[n] += fbvalue[n] * wg_scaled[l]
          end
       end
       for n=1:nvar
