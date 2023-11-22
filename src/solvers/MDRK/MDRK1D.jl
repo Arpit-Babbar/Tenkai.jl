@@ -162,13 +162,9 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op,
       # Interpolate to faces
       for i in Base.OneTo(nd)
          U_node = get_node_vars(U, eq, i)
-         U2_node = get_node_vars(U2_loc, eq, i)
 
          multiply_add_to_node_vars!(Ub, Vl[i], U_node, eq, 1, cell)
          multiply_add_to_node_vars!(Ub, Vr[i], U_node, eq, 2, cell)
-
-         multiply_add_to_node_vars!(Ub2, Vl[i], U2_node, eq, 1, cell)
-         multiply_add_to_node_vars!(Ub2, Vr[i], U2_node, eq, 2, cell)
       end
       F2[:,:,cell] .= F2_loc
       U2[:,:,cell] .= U2_loc

@@ -267,7 +267,6 @@ import .RKFR2D: setup_arrays_rkfr,
 # )
 
 include("$lwfr_dir/LWFR.jl")
-include("$mdrk_dir/MDRK.jl")
 
 ( # Skeleton methods to be defined and extended in LWFR1D, LWFR2D
 import .LWFR: setup_arrays_lwfr,
@@ -310,6 +309,8 @@ import .LWFR2D: setup_arrays_lwfr,
 # )
 
 ## Example equation files
+
+include("$mdrk_dir/MDRK.jl")
 
 # 1D
 include("$eq_dir/EqLinAdv1D.jl")
