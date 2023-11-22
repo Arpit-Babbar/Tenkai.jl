@@ -23,7 +23,7 @@ final_time = 20.0
 
 nx, ny = 64, 64
 cfl = 0.0
-bounds = ([-Inf],[Inf]) # Not used in Euler
+bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
 save_iter_interval = 0
 save_time_interval = 0.0
@@ -40,14 +40,12 @@ problem = Problem(domain,
                   initial_value,
                   boundary_value, boundary_condition,
                   final_time, exact_solution)
-blend = setup_limiter_blend(
-                              blend_type = mh_blend(equation),
-                              indicating_variables = Eq.rho_p_indicator!,
-                              reconstruction_variables = conservative_reconstruction,
-                              indicator_model = "gassner",
-                              debug_blend = false,
-                              pure_fv = false
-                            )
+blend = setup_limiter_blend(blend_type = mh_blend(equation),
+                            indicating_variables = Eq.rho_p_indicator!,
+                            reconstruction_variables = conservative_reconstruction,
+                            indicator_model = "gassner",
+                            debug_blend = false,
+                            pure_fv = false)
 limiter = blend
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)

@@ -9,7 +9,7 @@ xmin, xmax = -1.0, 1.0
 
 boundary_condition = (periodic, periodic)
 final_time = 0.8
-velocity, initial_value, exact_solution =  Eq.smooth_sin1d_data
+velocity, initial_value, exact_solution = Eq.smooth_sin1d_data
 boundary_value = exact_solution
 
 degree = 4

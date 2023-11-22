@@ -5,32 +5,34 @@ Eq = Tenkai.EqLinAdv2D
 case = 3 # options: 1,2,3,4
 
 if case == 1 || case == 2 # full domain
-   xmin, xmax = -1.0, 1.0
-   ymin, ymax = -1.0, 1.0
-   final_time = 0.1
-   initial_value__(x, y) = SVector(1.0 + exp(-50.0*((x-0.5)^2 + y^2)))
-   if case == 1
-      boundary_condition_ = (periodic, periodic, periodic, periodic)
-   else
-      boundary_condition_ = (dirichlet, dirichlet, dirichlet, dirichlet)
-   end
+    xmin, xmax = -1.0, 1.0
+    ymin, ymax = -1.0, 1.0
+    final_time = 0.1
+    initial_value__(x, y) = SVector(1.0 + exp(-50.0 * ((x - 0.5)^2 + y^2)))
+    if case == 1
+        boundary_condition_ = (periodic, periodic, periodic, periodic)
+    else
+        boundary_condition_ = (dirichlet, dirichlet, dirichlet, dirichlet)
+    end
 elseif case == 3
-   xmin, xmax = 0.0, 1.0
-   ymin, ymax = 0.0, 1.0
-   final_time = 0.5 * pi
-   initial_value__(x, y) = SVector(1.0 + exp(-50.0*((x-0.5)^2 + y^2)))
-   boundary_condition_ = (neumann, dirichlet, dirichlet, neumann)
+    xmin, xmax = 0.0, 1.0
+    ymin, ymax = 0.0, 1.0
+    final_time = 0.5 * pi
+    initial_value__(x, y) = SVector(1.0 + exp(-50.0 * ((x - 0.5)^2 + y^2)))
+    boundary_condition_ = (neumann, dirichlet, dirichlet, neumann)
 else
-   xmin, xmax = 0.0, 1.0
-   ymin, ymax = 0.0, 1.0
-   final_time = 2.0 * pi
-   initial_value__(x, y) = SVector(sinpi(2 * x) * sinpi(2 * y))
-   boundary_condition_ = (neumann, dirichlet, dirichlet, neumann)
+    xmin, xmax = 0.0, 1.0
+    ymin, ymax = 0.0, 1.0
+    final_time = 2.0 * pi
+    initial_value__(x, y) = SVector(sinpi(2 * x) * sinpi(2 * y))
+    boundary_condition_ = (neumann, dirichlet, dirichlet, neumann)
 end
 
 velocity__(x, y) = SVector(-y, x)
-exact_solution_(x,y,t) = initial_value__(x*cos(t) + y*sin(t), -x*sin(t) + y*cos(t))
-boundary_value_(x,y,t) = exact_solution_(x, y, t)
+function exact_solution_(x, y, t)
+    initial_value__(x * cos(t) + y * sin(t), -x * sin(t) + y * cos(t))
+end
+boundary_value_(x, y, t) = exact_solution_(x, y, t)
 #------------------------------------------------------------------------------
 degree = 4
 solver = "lwfr"
@@ -41,7 +43,7 @@ bflux = extrapolate
 numerical_flux = Eq.rusanov
 
 nx, ny = 20, 20
-bounds = ([-Inf],[Inf])
+bounds = ([-Inf], [Inf])
 cfl = 0.0
 tvbM = 0.0
 save_iter_interval = 0
@@ -66,8 +68,8 @@ limiter = setup_limiter_tvb(eq; tvbM = tvbM)
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
-                      save_time_interval, compute_error_interval,
-                      animate = animate)
+                   save_time_interval, compute_error_interval,
+                   animate = animate)
 #------------------------------------------------------------------------------
 problem, scheme, param = ParseCommandLine(problem, param, scheme, eq, ARGS)
 #------------------------------------------------------------------------------

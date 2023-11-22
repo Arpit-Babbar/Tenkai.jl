@@ -14,23 +14,21 @@ v1_() = 1.0
 v2_() = 1.0
 
 function dwave(x, y)
-   γ = 1.4 # RETHINK!
-   ρ = 1.0 + 0.98*sinpi(2.0*(x+y))
-   v1 = v1_()
-   v2 = v2_()
-   p   = 1.0
-   ρ_v1, ρ_v2 = ρ*v1, ρ*v2
-   ρ_e  = p/(γ-1.0) + 0.5 * (ρ_v1 * v1 + ρ_v2 * v2)
-   return SVector(ρ, ρ*v1, ρ*v2, ρ_e)
+    γ = 1.4 # RETHINK!
+    ρ = 1.0 + 0.98 * sinpi(2.0 * (x + y))
+    v1 = v1_()
+    v2 = v2_()
+    p = 1.0
+    ρ_v1, ρ_v2 = ρ * v1, ρ * v2
+    ρ_e = p / (γ - 1.0) + 0.5 * (ρ_v1 * v1 + ρ_v2 * v2)
+    return SVector(ρ, ρ * v1, ρ * v2, ρ_e)
 end
 
-function dwave_exact(x,y,t)
-   return dwave(x-v1_()*t,y-v2_()*t)
+function dwave_exact(x, y, t)
+    return dwave(x - v1_() * t, y - v2_() * t)
 end
 initial_value = dwave
 exact_solution = dwave_exact
-
-
 
 # initial_value = Eq.constant_state
 # exact_solution = Eq.constant_state_exact
@@ -47,7 +45,7 @@ final_time = 0.1
 
 nx, ny = 80, 80
 cfl = 0.0
-bounds = ([-Inf],[Inf]) # Not used in Euler
+bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
 save_iter_interval = 0
 save_time_interval = 0.0
@@ -62,15 +60,13 @@ domain = [xmin, xmax, ymin, ymax]
 equation = Eq.get_equation(γ)
 problem = Problem(domain, initial_value, boundary_value,
                   boundary_condition, final_time, exact_solution)
-limiter = setup_limiter_blend(
-                              blend_type = mh_blend(equation),
+limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               indicating_variables = Eq.rho_p_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner",
                               debug_blend = false,
                               pure_fv = true,
-                              tvbM = Inf
-                             )
+                              tvbM = Inf)
 # limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)

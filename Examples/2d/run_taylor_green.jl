@@ -24,7 +24,7 @@ final_time = 0.1 #  20 * sqrt(2.0) / 0.5
 
 nx, ny = 64, 64
 cfl = 0.0
-bounds = ([-Inf],[Inf]) # Not used in Euler
+bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
 save_iter_interval = 0
 save_time_interval = final_time / 10.0

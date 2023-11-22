@@ -10,7 +10,7 @@ boundary_condition = (dirichlet, neumann, bottom, dirichlet)
 
 boundary_value = Eq.double_mach_reflection_bv
 
-initial_value  = Eq.double_mach_reflection_iv
+initial_value = Eq.double_mach_reflection_iv
 
 exact_solution = boundary_value
 
@@ -24,9 +24,9 @@ bflux = evaluate
 final_time = 0.2
 
 ny = 5
-nx = 4*ny
+nx = 4 * ny
 cfl = 0.0
-bounds = ([-Inf],[Inf]) # Not used in Euler
+bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 10.0
 save_iter_interval = 0
 save_time_interval = 0.0 # final_time / 40.0
@@ -41,15 +41,13 @@ domain = [xmin, xmax, ymin, ymax]
 equation = Eq.get_equation(γ)
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
-limiter = setup_limiter_blend(
-                              blend_type = mh_blend(equation),
+limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               indicating_variables = Eq.rho_p_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner",
                               constant_node_factor = 1.0,
                               debug_blend = false,
-                              pure_fv = false
-                             )
+                              pure_fv = false)
 # limiter = setup_limiter_tvb(equation; tvbM = tvbM)
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux, 2)

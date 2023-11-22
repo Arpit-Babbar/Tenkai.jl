@@ -26,7 +26,7 @@ bflux = evaluate
 
 nx = 100
 cfl = 0.0
-bounds = ([-Inf],[Inf]) # Not used in Euler
+bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 10.0
 save_iter_interval = 0
 save_time_interval = 0.0
@@ -55,13 +55,11 @@ limiter = setup_limiter_hierarchical(alpha = 1.0,
                                      reconstruction = characteristic_reconstruction)
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
-param = Parameters(
-                     grid_size, cfl, bounds, save_iter_interval,
-                     save_time_interval, compute_error_interval;
-                     animate = animate,
-                     cfl_safety_factor = cfl_safety_factor,
-                     time_scheme = "SSPRK54"
-                  )
+param = Parameters(grid_size, cfl, bounds, save_iter_interval,
+                   save_time_interval, compute_error_interval;
+                   animate = animate,
+                   cfl_safety_factor = cfl_safety_factor,
+                   time_scheme = "SSPRK54")
 #------------------------------------------------------------------------------
 problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
                                           ARGS)

@@ -10,7 +10,7 @@ xmin, xmax = 0.1, 1.0
 
 boundary_condition = (dirichlet, neumann)
 final_time = 1.0
-velocity, initial_value, exact_solution =  Eq.or_data
+velocity, initial_value, exact_solution = Eq.or_data
 boundary_value = exact_solution
 
 degree = 2

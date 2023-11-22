@@ -23,11 +23,11 @@ bound_limit = "yes"
 
 nx = 50
 if degree == 3
-   cfl = 0.079
+    cfl = 0.079
 else
-   cfl = 0.0
+    cfl = 0.0
 end
-bounds = ([0.0],[1.0])
+bounds = ([0.0], [1.0])
 tvbM = 0.0
 save_iter_interval = 0
 save_time_interval = 0.0
