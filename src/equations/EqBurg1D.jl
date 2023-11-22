@@ -15,6 +15,7 @@ import Roots.find_zero
 # we need to opt-in explicitly.
 # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 @muladd begin
+#! format: noindent
 
 # struct Burg1D{F1,F2 <: Function} <: AbstractScalarEq1D
 struct Burg1D{F2 <: Function} <: AbstractEquations{1,1}

@@ -30,6 +30,7 @@ using MuladdMacro
 # we need to opt-in explicitly.
 # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 @muladd begin
+#! format: noindent
 
 # The conservative variables are
 # ρ, ρv1, ρv2, E11, E12, E22

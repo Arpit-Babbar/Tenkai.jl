@@ -22,6 +22,7 @@ using LinearAlgebra: axpy!, axpby!
 # we need to opt-in explicitly.
 # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 @muladd begin
+#! format: noindent
 
 #------------------------------------------------------------------------------
 # Extending methods needed in FR.jl which are defined here

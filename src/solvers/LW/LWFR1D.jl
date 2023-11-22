@@ -33,6 +33,7 @@ using ..Equations: AbstractEquations, nvariables, eachvariable
 # we need to opt-in explicitly.
 # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 @muladd begin
+#! format: noindent
 
 #-------------------------------------------------------------------------------
 # Allocate solution arrays needed by LWFR in 1d

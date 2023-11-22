@@ -18,6 +18,7 @@ import Tenkai.LWFR2D: extrap_bflux!
 
 using ..Equations: AbstractEquations, nvariables, eachvariable
 @muladd begin
+#! format: noindent
 
 function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
    gArray(nvar, nx, ny) = OffsetArray(zeros(nvar, nx + 2, ny + 2),

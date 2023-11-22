@@ -11,6 +11,7 @@ module Equations2D
    # we need to opt-in explicitly.
    # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
    @muladd begin
+#! format: noindent
 
    # Define dummy functions for modules to extend
    flux(x, u, eq, orientation) = @assert false "method not defined for equation"

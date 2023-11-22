@@ -45,6 +45,7 @@ using Tenkai.FR2D: correct_variable!
 # we need to opt-in explicitly.
 # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 @muladd begin
+#! format: noindent
 
 struct Euler2D{HLLSpeeds <: Function} <: AbstractEquations{2,4}
    γ::Float64

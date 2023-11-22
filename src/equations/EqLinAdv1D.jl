@@ -13,6 +13,7 @@ import Tenkai: flux
 # we need to opt-in explicitly.
 # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 @muladd begin
+#! format: noindent
 
 struct LinAdv1D{F2,F3 <: Function} <: AbstractEquations{1,1}
    speed::F2

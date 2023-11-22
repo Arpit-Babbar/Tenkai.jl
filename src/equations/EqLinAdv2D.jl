@@ -17,6 +17,7 @@ import Tenkai.FR: admissibility_tolerance
 # we need to opt-in explicitly.
 # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 @muladd begin
+#! format: noindent
 
 struct LinAdv2D{Speed, Velocity <: Function} <: AbstractEquations{2,1}
    speed::Speed
