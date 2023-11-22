@@ -10,7 +10,7 @@ xmin, xmax = -1.0, 1.0
 
 boundary_condition = (periodic, periodic)
 final_time = 8.0
-velocity, initial_value, exact_solution =  Eq.mult1d_data
+velocity, initial_value, exact_solution = Eq.mult1d_data
 boundary_value = exact_solution
 
 degree = 4
@@ -37,13 +37,11 @@ domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value,
                   boundary_condition, final_time, exact_solution)
 equation = Eq.get_equation(velocity)
-limiter = setup_limiter_blend(
-                              blend_type = mh_blend(equation),
+limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               indicating_variables = conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner",
-                              debug_blend = false
-                             )
+                              debug_blend = false)
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,

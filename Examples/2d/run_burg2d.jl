@@ -20,7 +20,7 @@ bflux = evaluate
 numerical_flux = Eq.rusanov
 
 nx, ny = 640, 640
-bounds = ([-Inf],[Inf])
+bounds = ([-Inf], [Inf])
 cfl = 0.0
 save_iter_interval = 0
 save_time_interval = 0.0 # final_time / 10.0
@@ -32,15 +32,13 @@ domain = [xmin, xmax, ymin, ymax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
 equation = Eq.get_equation()
-limiter = setup_limiter_blend(
-                              blend_type = mh_blend(equation),
+limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner",
                               constant_node_factor = 1.0,
                               debug_blend = false,
-                              pure_fv = true
-                             )
+                              pure_fv = true)
 # limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
@@ -56,4 +54,3 @@ sol = Tenkai.solve(equation, problem, scheme, param);
 print(sol["errors"])
 
 return sol;
-

@@ -23,10 +23,10 @@ final_time = 20.0
 
 nx, ny = 64, 64
 cfl = 0.0
-bounds = ([-Inf],[Inf]) # Not used in Euler
+bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
 save_iter_interval = 0
-save_time_interval =0.0 #  final_time / 100.0
+save_time_interval = 0.0 #  final_time / 100.0
 animate_time_factor = 1 # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
 
@@ -38,15 +38,13 @@ domain = [xmin, xmax, ymin, ymax]
 equation = Eq.get_equation(γ)
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
-limiter = setup_limiter_blend(
-                              blend_type = mh_blend(equation),
+limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               indicating_variables = Eq.rho_p_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner",
-			      amax = 1.0,
+                              amax = 1.0,
                               debug_blend = false,
-                              pure_fv = false
-                             )
+                              pure_fv = false)
 # limiter = setup_limiter_tvb(equation; tvbM = tvbM)
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)

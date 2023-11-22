@@ -26,7 +26,7 @@ bflux = evaluate
 
 nx = 400
 cfl = 0.0
-bounds = ([-Inf],[Inf]) # Not used in Euler
+bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 300.0
 save_iter_interval = 0
 save_time_interval = 0.0
@@ -46,16 +46,14 @@ problem = Problem(domain, initial_value, boundary_value,
 equation = Eq.get_equation(γ)
 MH = mh_blend(equation)
 FO = fo_blend(equation)
-blend = setup_limiter_blend(
-                              blend_type = MH,
-                              # indicating_variables = Eq.rho_p_indicator!,
-                              indicating_variables = Eq.rho_p_indicator!,
-                              reconstruction_variables = conservative_reconstruction,
-                              indicator_model = indicator_model,
-                              debug_blend = debug_blend,
-                              pure_fv = pure_fv,
-                              numflux = Eq.rusanov
-                             )
+blend = setup_limiter_blend(blend_type = MH,
+                            # indicating_variables = Eq.rho_p_indicator!,
+                            indicating_variables = Eq.rho_p_indicator!,
+                            reconstruction_variables = conservative_reconstruction,
+                            indicator_model = indicator_model,
+                            debug_blend = debug_blend,
+                            pure_fv = pure_fv,
+                            numflux = Eq.rusanov)
 tvb = setup_limiter_tvb(equation; tvbM = tvbM)
 limiter = blend # To enable using trixi_include
 scheme = Scheme(solver, degree, solution_points, correction_function,

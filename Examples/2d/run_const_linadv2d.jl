@@ -4,7 +4,7 @@ Eq = Tenkai.EqLinAdv2D
 
 #------------------------------------------------------------------------------
 (xmin, xmax, ymin, ymax, velocity, initial_value,
- exact_solution) = Eq.smooth_sin_vel1_data
+exact_solution) = Eq.smooth_sin_vel1_data
 boundary_value = exact_solution # dummy function
 boundary_condition = (periodic, periodic, periodic, periodic)
 final_time = 1.0
@@ -18,7 +18,7 @@ bound_limit = "no"
 bflux = extrapolate
 
 nx, ny = 120, 120
-bounds = ([-Inf],[Inf])
+bounds = ([-Inf], [Inf])
 cfl = 0.0
 tvbM = 0.0
 save_iter_interval = 0
@@ -30,15 +30,13 @@ domain = [xmin, xmax, ymin, ymax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
 equation = Eq.get_equation(velocity)
-limiter = setup_limiter_blend(
-                              blend_type = mh_blend(equation),
+limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               indicating_variables = conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner",
                               debug_blend = false,
                               pure_fv = true,
-                              tvbM = Inf
-                             )
+                              tvbM = Inf)
 # limiter = setup_limiter_tvbβ(equation; tvbM = tvbM, beta = 1.0)
 # limiter = setup_limiter_tvb(equation; tvbM = tvbM, beta = 1.0)
 # limiter = setup_limiter_none()

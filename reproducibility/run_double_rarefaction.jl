@@ -35,21 +35,19 @@ problem = Problem(domain, initial_value, boundary_value, boundary_condition,
 equation = Eq.get_equation(γ)
 MH = mh_blend(equation)
 FO = fo_blend(equation)
-blend = setup_limiter_blend(
-   blend_type=MH,
-   # indicating_variables = Eq.rho_p_indicator!,
-   indicating_variables=Eq.rho_p_indicator!,
-   reconstruction_variables=conservative_reconstruction,
-   indicator_model="gassner",
-   numflux=Eq.rusanov
-)
-tvb = setup_limiter_tvb(equation; tvbM=tvbM)
+blend = setup_limiter_blend(blend_type = MH,
+                            # indicating_variables = Eq.rho_p_indicator!,
+                            indicating_variables = Eq.rho_p_indicator!,
+                            reconstruction_variables = conservative_reconstruction,
+                            indicator_model = "gassner",
+                            numflux = Eq.rusanov)
+tvb = setup_limiter_tvb(equation; tvbM = tvbM)
 limiter = blend # To enable using trixi_include
 scheme = Scheme(solver, degree, solution_points, correction_function,
-   numerical_flux, bound_limit, limiter, bflux)
+                numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
-   save_time_interval, compute_error_interval;
-   animate=animate, saveto="none")
+                   save_time_interval, compute_error_interval;
+                   animate = animate, saveto = "none")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 

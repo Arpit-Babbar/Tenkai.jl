@@ -2,7 +2,7 @@ using Tenkai
 Eq = Tenkai.EqBurg1D
 
 #------------------------------------------------------------------------------
-xmin, xmax = 0.0, 2.0*pi
+xmin, xmax = 0.0, 2.0 * pi
 initial_value = Eq.initial_value_burger_sin
 boundary_value = Eq.zero_boundary_value # dummy function
 boundary_condition = (periodic, periodic)
@@ -20,7 +20,7 @@ bound_limit = "no"
 
 nx = 100
 cfl = 0.0
-bounds = ([-0.2],[0.2])
+bounds = ([-0.2], [0.2])
 tvbM = 0.0
 save_iter_interval = 0
 save_time_interval = 0.0 # final_time/10.0
