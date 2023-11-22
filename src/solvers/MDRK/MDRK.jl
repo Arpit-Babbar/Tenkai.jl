@@ -51,7 +51,7 @@ function perform_mdrk_step!(eq, t, iter, fcount, dt, grid, problem, scheme,
                                                     t, dt, uprev, res, Fb, Ub,
                                                     cache)
 
-   update_ghost_values_mdrk!(problem, scheme, eq, grid, aux, op, cache, t,
+   update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache, t,
                              dt, boundary_scaling_factor)
    compute_face_residual!(eq, grid, op, scheme, param, aux, t, dt, uprev,
                           Fb, Ub, ua, res)
