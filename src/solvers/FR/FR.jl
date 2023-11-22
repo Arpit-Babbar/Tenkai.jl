@@ -171,6 +171,13 @@ trivial_function(x) = nothing
 function get_bflux_function(solver, degree, bflux)
    if solver == "rkfr"
       return trivial_function
+   elseif solver == "mdrk"
+      if bflux == extrapolate
+         return extrap_bflux!
+      else
+         eval_bflux! = Tenkai.MDRK.eval_bflux_mdrk!
+         return eval_bflux!
+      end
    else
       if bflux == extrapolate
          return extrap_bflux!

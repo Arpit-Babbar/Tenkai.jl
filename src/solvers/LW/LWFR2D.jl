@@ -111,7 +111,7 @@ function setup_arrays_lwfr(grid, scheme, eq::AbstractEquations{2})
 end
 
 function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2,1},
-                                   grid, aux, op, cache, t, dt)
+                                   grid, aux, op, cache, t, dt, scaling_factor = 1)
    @timeit aux.timer "Update ghost values" begin
    @unpack Fb, Ub = cache
    update_ghost_values_periodic!(eq, problem, Fb, Ub)
@@ -131,6 +131,9 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2,1},
 
    refresh!(u) = fill!(u, 0.0)
 
+   dt_scaled = scaling_factor * dt
+   wg_scaled = scaling_factor * wg
+
    # For Dirichlet bc, use upwind flux at faces by assigning both physical
    # and ghost cells through the bc.
    if left == dirichlet
@@ -142,12 +145,12 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2,1},
             # KLUDGE - Don't allocate so much!
             ub, fb  = pre_allocated[Threads.threadid()]
             for l=1:nd
-               tq = t + xg[l]*dt
+               tq = t + xg[l]*dt_scaled
                ubvalue = boundary_value(x, y, tq)
                fbvalue = flux(x, y, ubvalue, eq, 1)
                for n=1:nvar
-                  ub[n] += ubvalue[n] * wg[l]
-                  fb[n] += fbvalue[n] * wg[l]
+                  ub[n] += ubvalue[n] * wg_scaled[l]
+                  fb[n] += fbvalue[n] * wg_scaled[l]
                end
             end
             for n=1:nvar
@@ -185,12 +188,12 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2,1},
             # KLUDGE - Improve
             ub, fb  = pre_allocated[Threads.threadid()]
             for l=1:nd
-               tq = t + xg[l]*dt
+               tq = t + xg[l]*dt_scaled
                ubvalue = boundary_value(x, y, tq)
                fbvalue = flux(x, y, ubvalue, eq, 1)
-                for n=1:nvar
-                  fb[n] += fbvalue[n] * wg[l]
-                  ub[n] += ubvalue[n] * wg[l]
+               for n=1:nvar
+                  ub[n] += ubvalue[n] * wg_scaled[l]
+                  fb[n] += fbvalue[n] * wg_scaled[l]
                end
             end
             for n=1:nvar
@@ -227,12 +230,12 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2,1},
             x  = xf[i] + xg[k] * dx[i]
             ub, fb = pre_allocated[Threads.threadid()]
             for l=1:nd
-               tq = t + xg[l]*dt
+               tq = t + xg[l]*dt_scaled
                ubvalue = boundary_value(x, y, tq)
                fbvalue = flux(x, y, ubvalue, eq, 2)
                 for n=1:nvar
-                  ub[n] += ubvalue[n] * wg[l]
-                  fb[n] += fbvalue[n] * wg[l]
+                  ub[n] += ubvalue[n] * wg_scaled[l]
+                  fb[n] += fbvalue[n] * wg_scaled[l]
                end
             end
             for n=1:nvar
@@ -271,12 +274,12 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2,1},
             x  = xf[i] + xg[k] * dx[i]
             ub, fb = pre_allocated[Threads.threadid()]
             for l=1:nd
-               tq = t + xg[l]*dt
+               tq = t + xg[l]*dt_scaled
                ubvalue = boundary_value(x, y, tq)
                fbvalue = flux(x, y, ubvalue, eq, 2)
                 for n=1:nvar
-                  ub[n] += ubvalue[n] * wg[l]
-                  fb[n] += fbvalue[n] * wg[l]
+                  ub[n] += ubvalue[n] * wg_scaled[l]
+                  fb[n] += fbvalue[n] * wg_scaled[l]
                end
             end
             for n=1:nvar

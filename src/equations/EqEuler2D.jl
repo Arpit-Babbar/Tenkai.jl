@@ -1514,7 +1514,8 @@ function Tenkai.update_ghost_values_rkfr!(problem, scheme, eq::Euler2D, grid,
 end
 
 function Tenkai.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
-                                        grid, aux, op, cache, t, dt)
+                                          grid, aux, op, cache, t, dt,
+                                          scaling_factor = 1.0)
    @timeit aux.timer "Update ghost values" begin
    @unpack Fb, Ub, ua = cache
    update_ghost_values_periodic!(eq, problem, Fb, Ub)
@@ -1545,6 +1546,9 @@ function Tenkai.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
    # https://github.com/JuliaLang/julia/issues/15276
    # https://docs.julialang.org/en/v1/manual/performance-tips/#man-performance-captured-1
 
+   dt_scaled = scaling_factor * dt
+   wg_scaled = scaling_factor * wg
+
    # For Dirichlet bc, use upwind flux at faces by assigning both physical
    # and ghost cells through the bc.
    if left == dirichlet
@@ -1555,11 +1559,11 @@ function Tenkai.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
             ub, fb = pre_allocated[Threads.threadid()]
             refresh!.(( ub, fb ))
             for l in Base.OneTo(nd)
-               tq = t + xg[l]*dt
+               tq = t + xg[l]*dt_scaled
                ub_value = problem.boundary_value(x1, y1, tq)
                fb_value = flux(x1, y1, ub_value, eq, 1)
-               multiply_add_to_node_vars!(ub, wg[l], ub_value, eq, 1)
-               multiply_add_to_node_vars!(fb, wg[l], fb_value, eq, 1)
+               multiply_add_to_node_vars!(ub, wg_scaled[l], ub_value, eq, 1)
+               multiply_add_to_node_vars!(fb, wg_scaled[l], fb_value, eq, 1)
             end
             ub_node = get_node_vars(ub, eq, 1)
             fb_node = get_node_vars(fb, eq, 1)
@@ -1612,11 +1616,11 @@ function Tenkai.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
             ub, fb = pre_allocated[Threads.threadid()]
             refresh!.(( ub, fb ))
             for l in Base.OneTo(nd)
-               tq = t + xg[l]*dt
+               tq = t + xg[l]*dt_scaled
                ubvalue = boundary_value(x2, y2, tq)
                fbvalue = flux(x2, y2, ubvalue, eq, 1)
-               multiply_add_to_node_vars!(ub, wg[l], ubvalue, eq, 1)
-               multiply_add_to_node_vars!(fb, wg[l], fbvalue, eq, 1)
+               multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
+               multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
             end
             ub_node = get_node_vars(ub, eq, 1)
             fb_node = get_node_vars(fb, eq, 1)
@@ -1657,11 +1661,11 @@ function Tenkai.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
             ub, fb = pre_allocated[Threads.threadid()]
             refresh!.(( ub, fb ))
             for l in Base.OneTo(nd)
-               tq = t + xg[l]*dt
+               tq = t + xg[l]*dt_scaled
                ubvalue = boundary_value(x3, y3, tq)
                fbvalue = flux(x3, y3, ubvalue, eq, 2)
-               multiply_add_to_node_vars!(ub, wg[l], ubvalue, eq, 1)
-               multiply_add_to_node_vars!(fb, wg[l], fbvalue, eq, 1)
+               multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
+               multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
             end
             ub_node = get_node_vars(ub, eq, 1)
             fb_node = get_node_vars(fb, eq, 1)
@@ -1705,11 +1709,11 @@ function Tenkai.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
             ub, fb = pre_allocated[Threads.threadid()]
             refresh!.(( ub, fb ))
             for l in Base.OneTo(nd)
-               tq = t + xg[l]*dt
+               tq = t + xg[l]*dt_scaled
                ubvalue = boundary_value(x4, y4, tq)
                fbvalue = flux(x4, y4, ubvalue, eq, 2)
-               multiply_add_to_node_vars!(ub, wg[l], ubvalue, eq, 1)
-               multiply_add_to_node_vars!(fb, wg[l], fbvalue, eq, 1)
+               multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
+               multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
             end
             ub_node = get_node_vars(ub, eq, 1)
             fb_node = get_node_vars(fb, eq, 1)
