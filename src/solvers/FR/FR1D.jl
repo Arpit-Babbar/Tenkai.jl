@@ -166,6 +166,9 @@ function get_cfl(eq::AbstractEquations{1}, scheme, param)
    elseif solver == "rkfr"
       cfl_radau = os_vector([1.0, 0.333, 0.209, 0.145, 0.110])
       cfl_g2    = os_vector([1.0, 1.0, 0.45, 0.2875, 0.212])
+   elseif solver == "mdrk"
+      cfl_radau = os_vector([1.0, 0.333, 0.170, 0.107, 0.069])
+      cfl_g2    = os_vector([1.0, 1.000, 0.333, 0.224, 0.103])
    end
    # Reduce this cfl by a small amount
    if correction_function == "radau"
