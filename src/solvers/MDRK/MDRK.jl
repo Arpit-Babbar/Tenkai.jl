@@ -13,6 +13,8 @@ using Tenkai.LWFR: update_ghost_values_lwfr!, update_solution_lwfr!
 
 using Tenkai
 
+include("$(Tenkai.mdrk_dir)/MDRK1D.jl")
+
 #------------------------------------------------------------------------------
 # Extending methods needed in FR.jl which are defined here
 #------------------------------------------------------------------------------
@@ -35,16 +37,6 @@ using MuladdMacro
 # we need to opt-in explicitly.
 # See https://ranocha.de/blog/Optimizing_EC_Trixi for further details.
 @muladd begin
-
-#-------------------------------------------------------------------------------
-# Compute cell residual for all real cells
-#-------------------------------------------------------------------------------
-function compute_cell_residual_mdrk_1!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb,
-                                      Ub, cache)
-   @timeit aux.timer "Cell Residual" begin
-   return nothing
-   end # timer
-end
 
 #-------------------------------------------------------------------------------
 # Perform a full stage of MDRK

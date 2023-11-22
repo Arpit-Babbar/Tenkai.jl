@@ -279,7 +279,6 @@ import .LWFR: setup_arrays_lwfr,
 )
 
 include("$lwfr_dir/LWFR1D.jl")
-include("$mdrk_dir/MDRK1D.jl")
 
 ( # methods extended to LWFR1D
 import .LWFR1D: setup_arrays_lwfr,
