@@ -454,7 +454,8 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, grid, dx, dy,
-                             grid.xf[el_x], grid.yf[el_y], op, u1, u, nothing, res)
+                             grid.xf[el_x], grid.yf[el_y], op, u1, u, nothing, res,
+                             0.5)
         @views cell_data = (u1_, el_x, el_y)
         @views compute_bflux!(eq, grid, cell_data, eval_data_big, xg, Vl, Vr,
                               F, G, F2_loc, G2_loc, Fb[:, :, :, el_x, el_y],

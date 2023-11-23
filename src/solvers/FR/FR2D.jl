@@ -428,7 +428,7 @@ end
 
 function compute_face_residual!(eq::AbstractEquations{2}, grid, op, scheme,
                                 param, aux, t, dt, u1,
-                                Fb, Ub, ua, res)
+                                Fb, Ub, ua, res, scaling_factor = 1.0)
     @timeit aux.timer "Face residual" begin
     #! format: noindent
     @unpack bl, br, xg, wg, degree = op
@@ -457,7 +457,7 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, scheme,
             Fn, blend_factors = blend_face_residual_x!(el_x, el_y, jy, x, y, u1, ua,
                                                        eq, dt, grid, op,
                                                        scheme, param, Fn, aux,
-                                                       res)
+                                                       res, scaling_factor)
 
             # These quantities won't be used so we can store numerical flux here
             set_node_vars!(Fb, Fn, eq, jy, 2, el_x - 1, el_y)
@@ -504,7 +504,7 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, scheme,
             Fn, blend_factors = blend_face_residual_y!(el_x, el_y, ix, x, y,
                                                        u1, ua, eq, dt, grid, op,
                                                        scheme, param, Fn, aux,
-                                                       res)
+                                                       res, scaling_factor)
             # These quantities won't be used so we can store numerical flux here
             set_node_vars!(Fb, Fn, eq, ix, 4, el_x, el_y - 1)
             set_node_vars!(Fb, Fn, eq, ix, 3, el_x, el_y)
@@ -1543,7 +1543,8 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid, op, u1
 end
 
 function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, scheme,
-                                 aux, dt, grid, dx, dy, xf, yf, op, u1, u_, f, res)
+                                 aux, dt, grid, dx, dy, xf, yf, op, u1, u_, f, res,
+                                 scaling_factor = 1.0)
     @timeit_debug aux.timer "Blending limiter" begin
     #! format: noindent
     @unpack blend = aux
@@ -1577,7 +1578,7 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, scheme,
             X = SVector(xx, yy)
             ul, ur = get_node_vars(u, eq, ii - 1, jj), get_node_vars(u, eq, ii, jj)
             fl, fr = flux(xx, yy, ul, eq, 1), flux(xx, yy, ur, eq, 1)
-            fn = num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
+            fn = scaling_factor * num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
             multiply_add_to_node_vars!(r, # r[ii-1,jj]+=alpha*dt/(dx*wg[ii-1])*fn
                                        alpha * dt / (dx * wg[ii - 1]),
                                        fn, eq, ii - 1, jj)
@@ -1601,7 +1602,7 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, scheme,
             X = SVector(xx, yy)
             ul, ur = get_node_vars(u, eq, ii, jj - 1), get_node_vars(u, eq, ii, jj)
             fl, fr = flux(xx, yy, ul, eq, 2), flux(xx, yy, ur, eq, 2)
-            fn = num_flux(X, ul, ur, fl, fr, ul, ur, eq, 2)
+            fn = scaling_factor * num_flux(X, ul, ur, fl, fr, ul, ur, eq, 2)
             multiply_add_to_node_vars!(r, # r[ii,jj-1]+=alpha*dt/(dy*wg[jj-1])*fn
                                        alpha * dt / (dy * wg[jj - 1]),
                                        fn,
@@ -1623,7 +1624,7 @@ end
 
 function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2}, scheme,
                                     aux, dt, grid, dx, dy, xf, yf, op, u1, ::Any, f,
-                                    res)
+                                    res, scaling_factor = 1.0)
     @timeit_debug aux.timer "Blending limiter" begin
     #! format: noindent
     @unpack blend = aux
@@ -1639,6 +1640,7 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2}, scheme
     ue, = blend.cache.ue[id][1] # solution values in cell + 2 from neighbours
     unph, = blend.cache.unph[id][1] # face values evolved to to time level n+1/2
     dt = blend.cache.dt[1] # For support with DiffEq
+    scaled_dt = scaling_factor * dt
     @unpack fn_low = blend.cache
     alpha = blend.cache.alpha[el_x, el_y]
 
@@ -1754,69 +1756,69 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2}, scheme
 
         multiply_add_set_node_vars!(unph, # u_{i-1/2+,j}=u_{i-1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
                                     ufl,  # u_{i-1/2,j}
-                                    -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                    -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                     fr,
-                                    -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                    -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                     -fl,
                                     eq,
                                     1, # Left face
                                     ii, jj)
         multiply_add_set_node_vars!(unph, # u_{i+1/2-,j}=u_{i+1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
                                     ufr,  # u_{i+1/2,j}
-                                    -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                    -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                     fr,
-                                    -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                    -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                     -fl,
                                     eq,
                                     2, # Right face
                                     ii, jj)
         multiply_add_set_node_vars!(unph, # u_{i,j-1/2+}=u_{i,j-1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
                                     ufd,  # u_{i,j-1/2}
-                                    -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                    -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                     gu,
-                                    -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                    -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                     -gd,
                                     eq,
                                     3, # Bottom face
                                     ii, jj)
         multiply_add_set_node_vars!(unph, # u_{i,j+1/2-}=u_{i,j+1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
                                     ufu,  # u_{i,j+1/2}
-                                    -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                    -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                     gu,
-                                    -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                    -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                     -gd,
                                     eq,
                                     4, # Top face
                                     ii, jj)
 
         multiply_add_to_node_vars!(unph, # u_{i-1/2+,j}=u_{i,j-1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
-                                   -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                   -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                    gu,
-                                   -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                   -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                    -gd,
                                    eq,
                                    1, # Left face
                                    ii, jj)
         multiply_add_to_node_vars!(unph, # u_{i+1/2+,j}=u_{i+1/2,j}-0.5*dt*(gu-gd)/(yfu-yfd)
-                                   -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                   -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                    gu,
-                                   -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                   -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                    -gd,
                                    eq,
                                    2, # Right face
                                    ii, jj)
         multiply_add_to_node_vars!(unph, # u_{i-1/2+,j}=u_{i-1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
-                                   -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                   -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                    fr,
-                                   -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                   -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                    -fl,
                                    eq,
                                    3, # Bottom face
                                    ii, jj)
         multiply_add_to_node_vars!(unph, # u_{i-1/2+,j}=u_{i-1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
-                                   -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                   -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                    fr,
-                                   -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                   -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                    -fl,
                                    eq,
                                    4, # Top face
@@ -1834,7 +1836,7 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2}, scheme
             ul = get_node_vars(unph, eq, 2, ii - 1, jj)
             ur = get_node_vars(unph, eq, 1, ii, jj)
             fl, fr = flux(xx, yy, ul, eq, 1), flux(xx, yy, ur, eq, 1)
-            fn = num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
+            fn = scaling_factor * num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
             multiply_add_to_node_vars!(r, # r[ii-1,jj] += dt/(dx*wg[ii-1])*fn
                                        alpha * dt / (dx * wg[ii - 1]),
                                        fn,
@@ -1861,7 +1863,7 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2}, scheme
             ud = get_node_vars(unph, eq, 4, ii, jj - 1)
             uu = get_node_vars(unph, eq, 3, ii, jj)
             gd, gu = flux(xx, yy, ud, eq, 2), flux(xx, yy, uu, eq, 2)
-            gn = num_flux(X, ud, uu, gd, gu, ud, uu, eq, 2)
+            gn = scaling_factor * num_flux(X, ud, uu, gd, gu, ud, uu, eq, 2)
             multiply_add_to_node_vars!(r, # r[ii,jj-1]+=alpha*dt/(dy*wg[jj-1])*gn
                                        alpha * dt / (dy * wg[jj - 1]),
                                        gn,
@@ -1964,7 +1966,8 @@ end
 function blend_face_residual_fo_x!(el_x, el_y, jy, xf, y, u1, ua,
                                    eq::AbstractEquations{2}, dt, grid, op,
                                    scheme, param,
-                                   Fn, aux, res)
+                                   Fn, aux, res,
+                                   scaling_factor = 1.0)
     @timeit_debug aux.timer "Blending limiter" begin # Check the overhead,
     #! format: noindent
     #                                  # it's supposed to be 0.25 microseconds
@@ -1987,7 +1990,7 @@ function blend_face_residual_fo_x!(el_x, el_y, jy, xf, y, u1, ua,
     fl, fr = flux(xf, y, ul, eq, 1), flux(xf, y, ur, eq, 1)
 
     X = SVector(xf, y)
-    fn = num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
+    fn = scaling_factor * num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
 
     Fn = get_blended_flux_x(el_x, el_y, jy, eq, dt, grid,
                             blend, scheme, xf, y, u1, ua, fn, Fn, op)
@@ -2016,7 +2019,8 @@ end
 
 function blend_face_residual_muscl_x!(el_x, el_y, jy, xf, y, u1, ua,
                                       eq::AbstractEquations{2, <:Any}, dt, grid,
-                                      op, scheme, param, Fn, aux, res)
+                                      op, scheme, param, Fn, aux, res,
+                                      scaling_factor = 1.0)
     @timeit_debug aux.timer "Blending limiter" begin
     #! format: noindent
     @unpack blend = aux
@@ -2033,6 +2037,7 @@ function blend_face_residual_muscl_x!(el_x, el_y, jy, xf, y, u1, ua,
     unph = @view unph_[:, 1:2, 1, 1] # Load nvar x 2 array to save storage
 
     dt = blend.cache.dt[1] # For support with DiffEq
+    dt_scaled = scaling_factor * dt
 
     @unpack xg, wg = op
     nd = length(xg)
@@ -2198,17 +2203,17 @@ function blend_face_residual_muscl_x!(el_x, el_y, jy, xf, y, u1, ua,
         # Use finite difference method to evolve face values to time level n+1/2
         multiply_add_set_node_vars!(unph, # unph = uf - 0.5*dt*(fr-fl)/(xfr-xfl)
                                     uf,
-                                    -0.5 * dt / (xfr - xfl),
+                                    -0.5 * dt_scaled / (xfr - xfl),
                                     fr,
-                                    0.5 * dt / (xfr - xfl),
+                                    0.5 * dt_scaled / (xfr - xfl),
                                     fl,
                                     eq,
                                     i)
 
         multiply_add_to_node_vars!(unph, # unph += -0.5*dt*(gu-gd)/(yfu-yfd)
-                                   -0.5 * dt / (yfu - yfd),
+                                   -0.5 * dt_scaled / (yfu - yfd),
                                    gu,
-                                   0.5 * dt / (yfu - yfd),
+                                   0.5 * dt_scaled / (yfu - yfd),
                                    gd,
                                    eq,
                                    i)
@@ -2217,7 +2222,7 @@ function blend_face_residual_muscl_x!(el_x, el_y, jy, xf, y, u1, ua,
     ur = get_node_vars(unph, eq, 2)
     fl, fr = flux(xf, y, ul, eq, 1), flux(xf, y, ur, eq, 1)
     X = SVector(xf, y)
-    fn = num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
+    fn = scaling_factor * num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
 
     # Repetetition block
     Fn = get_blended_flux_x(el_x, el_y, jy, eq, dt, grid,
@@ -2302,7 +2307,8 @@ end
 # KLUDGE/TOTHINK - Do a unified face residual for x,y. The direction should be a parameter.
 function blend_face_residual_fo_y!(el_x, el_y, ix, x, yf, u1, ua,
                                    eq::AbstractEquations{2}, dt, grid, op,
-                                   scheme, param, Fn, aux, res)
+                                   scheme, param, Fn, aux, res,
+                                   scaling_factor = 1.0)
     @timeit_debug aux.timer "Blending limiter" begin # Check the overhead,
     #! format: noindent
     #                                  # it's supposed to be 0.25 microseconds
@@ -2319,7 +2325,7 @@ function blend_face_residual_fo_y!(el_x, el_y, ix, x, yf, u1, ua,
     ur = get_node_vars(u1, eq, ix, 1, el_x, el_y)
     fr = flux(x, yf, ur, eq, 2)
     X = SVector(x, yf)
-    fn = num_flux(X, ul, ur, fl, fr, ul, ur, eq, 2)
+    fn = scaling_factor * num_flux(X, ul, ur, fl, fr, ul, ur, eq, 2)
 
     Fn = get_blended_flux_y(el_x, el_y, ix, eq, dt, grid, blend,
                             scheme, x, yf, u1, ua, fn, Fn, op)
@@ -2345,7 +2351,8 @@ end
 
 function blend_face_residual_muscl_y!(el_x, el_y, ix, x, yf, u1, ua,
                                       eq::AbstractEquations{2, <:Any}, dt, grid, op,
-                                      scheme, param, Fn, aux, res)
+                                      scheme, param, Fn, aux, res,
+                                      scaling_factor = 1.0)
     @timeit_debug aux.timer "Blending limiter" begin
     #! format: noindent
     @unpack blend = aux
@@ -2358,6 +2365,7 @@ function blend_face_residual_muscl_y!(el_x, el_y, ix, x, yf, u1, ua,
     id = Threads.threadid()
 
     dt = blend.cache.dt[1] # For support with DiffEq
+    dt_scaled = scaling_factor * dt
 
     unph_, = blend.cache.unph[id][1]
     unph = @view unph_[:, 1:2, 1, 1] # Load nvar x 2 array
@@ -2522,17 +2530,17 @@ function blend_face_residual_muscl_y!(el_x, el_y, ix, x, yf, u1, ua,
         # use finite difference method to evolve face values to time n+1/2
         multiply_add_set_node_vars!(unph, # unph = uf - 0.5*dt*(gu-gd)/(yfu-yfd)
                                     uf,
-                                    -0.5 * dt / (yfu - yfd),
+                                    -0.5 * dt_scaled / (yfu - yfd),
                                     gu,
-                                    -0.5 * dt / (yfu - yfd),
+                                    -0.5 * dt_scaled / (yfu - yfd),
                                     -gd,
                                     eq,
                                     i)
 
         multiply_add_to_node_vars!(unph, # unph = uf - 0.5*dt*(gu-gd)/(yfu-yfd)
-                                   -0.5 * dt / (xfr - xfl),
+                                   -0.5 * dt_scaled / (xfr - xfl),
                                    fr,
-                                   0.5 * dt / (xfr - xfl),
+                                   0.5 * dt_scaled / (xfr - xfl),
                                    fl,
                                    eq,
                                    i)
@@ -2542,7 +2550,7 @@ function blend_face_residual_muscl_y!(el_x, el_y, ix, x, yf, u1, ua,
     uu = get_node_vars(unph, eq, 2)
     gd, gu = flux(x, yf, ud, eq, 2), flux(x, yf, uu, eq, 2)
     X = SVector(x, yf)
-    fn = num_flux(X, ud, uu, gd, gu, ud, uu, eq, 2)
+    fn = scaling_factor * num_flux(X, ud, uu, gd, gu, ud, uu, eq, 2)
 
     Fn = get_blended_flux_y(el_x, el_y, ix, eq, dt, grid, blend,
                             scheme, x, yf, u1, ua, fn, Fn, op)
@@ -2579,12 +2587,14 @@ mh_blend(::AbstractEquations{2, <:Any}) = (;
                                            name = "muscl")
 
 function trivial_cell_residual(i, j, eq::AbstractEquations{2}, scheme, aux,
-                               dt, grid, dx, dy, xf, yf, op, u1, u, f, r)
+                               dt, grid, dx, dy, xf, yf, op, u1, u, f, r,
+                               scaling_factor = 1.0)
     return nothing
 end
 
 function trivial_face_residual(i, j, k, x, yf, u1, ua, eq::AbstractEquations{2},
-                               dt, grid, op, scheme, param, Fn, aux, res)
+                               dt, grid, op, scheme, param, Fn, aux, res,
+                               scaling_factor = 1.0)
     return Fn, (1.0, 1.0)
 end
 
