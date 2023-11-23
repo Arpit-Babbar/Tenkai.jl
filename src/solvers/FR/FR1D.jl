@@ -1586,7 +1586,8 @@ end
 @inbounds @inline function blend_cell_residual_muscl!(cell,
                                                       eq::AbstractEquations{1},
                                                       scheme, aux, lamx, dt,
-                                                      dx, xf, op, u1, u, ua, f, r)
+                                                      dx, xf, op, u1, u, ua, f, r,
+                                                      scaling_factor = 1.0)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead, it's supposed
     #! format: noindent
     # to be 0.25 microseconds
@@ -1600,6 +1601,7 @@ end
     num_flux = blend.numflux
     nvar = nvariables(eq)
     @unpack xxf, xe, ufl, ufr = blend # re-use values
+    dt_scaled = scaling_factor * blend.dt[1]
     # Get subcell faces
     xxf[0] = xf
     for ii in 1:nd
@@ -1693,10 +1695,10 @@ end
         fr = flux(xxf[ii], ufr, eq)          # f(u_j^{n,+})
         # Use finite difference to evolve face values to time level n+1/2
         for n in 1:nvar
-            unph[n, 1, ii] = ufl[n] + (0.5 * blend.dt[1]
+            unph[n, 1, ii] = ufl[n] + (0.5 * dt_scaled
                               * (fl[n] - fr[n]) / (xxf[ii] - xxf[ii - 1])) # u_j^{n+1/2,-}
             unph[n, 2, ii] = ufr[n] +
-                             0.5 * blend.dt[1] *
+                             0.5 * dt_scaled *
                              ((fl[n] - fr[n])
                               /
                               (xxf[ii] - xxf[ii - 1])) # u_j^{n+1/2,+}
@@ -1716,7 +1718,7 @@ end
         fl = flux(xx, ul, eq)
         fr = flux(xx, ur, eq)
         # numerical flux between subcell j-1 and j
-        fn = num_flux(xx, ul, ur, fl, fr, ul, ur, eq, 1)
+        fn = scaling_factor * num_flux(xx, ul, ur, fl, fr, ul, ur, eq, 1)
         for n in 1:nvar
             resl[n, ii - 1] += fn[n] / wg[ii - 1]
             resl[n, ii] -= fn[n] / wg[ii]
@@ -1750,7 +1752,7 @@ end
                                               eq::AbstractEquations{1},
                                               dt, grid, op, scheme,
                                               param, Fn, aux, lamx,
-                                              res)
+                                              res, scaling_factor = 1.0)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead
     #! format: noindent
     @unpack blend = aux
@@ -1764,6 +1766,7 @@ end
     # num_flux = scheme.numerical_flux
     nvar = nvariables(eq)
     alp = 0.5 * (alpha[i - 1] + alpha[i])
+    scaled_dt = scaling_factor * blend.dt[1]
 
     dx = grid.dx
     # Reuse arrays to save memory
@@ -1836,7 +1839,7 @@ end
     fr = flux(xfr, ufr, eq)
     for n in 1:nvar
         # perform update to get u^{n+1/2,-} with finite difference method
-        unph[n, 1] = ufr[n] + 0.5 * blend.dt[1] * (fl[n] - fr[n]) / (xfr - xfl)
+        unph[n, 1] = ufr[n] + 0.5 * scaled_dt * (fl[n] - fr[n]) / (xfr - xfl)
     end
 
     # We now compute the right face value u^{n+1/2,+}
@@ -1883,7 +1886,7 @@ end
     fr_ = flux(xr, ufr_, eq)
     for n in 1:nvar
         # perform update to get u^{n+1/2,+} with finite difference method
-        unph[n, 2] = ufl_[n] + 0.5 * blend.dt[1] * (fl_[n] - fr_[n]) / (xfr - xfl)
+        unph[n, 2] = ufl_[n] + 0.5 * scaled_dt * (fl_[n] - fr_[n]) / (xfr - xfl)
     end
 
     # left, right fluxes at i^th face at time level n+1/2
@@ -1892,7 +1895,7 @@ end
     @views fl = flux(xf, unph_l, eq)
     @views fr = flux(xf, unph_r, eq)
 
-    fn = num_flux(xf, unph_l, unph_r, fl, fr, unph_l, unph_r, eq, 1)
+    fn = scaling_factor * num_flux(xf, unph_l, unph_r, fl, fr, unph_l, unph_r, eq, 1)
 
     # If positivity fails, set
     # it's supposed to be 0.25 microseconds
