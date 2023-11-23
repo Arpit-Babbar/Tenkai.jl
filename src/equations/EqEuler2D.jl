@@ -176,41 +176,42 @@ end
 #-------------------------------------------------------------------------------
 function Tenkai.compute_time_step(eq::Euler2D, grid, aux, op, cfl, u1, ua)
     @timeit aux.timer "Time Step computation" begin
-        @unpack dx, dy = grid
-        nx, ny = grid.size
-        @unpack γ = eq
-        @unpack wg = op
-        den = 0.0
-        corners = ((0, 0), (nx + 1, 0), (0, ny + 1), (nx + 1, ny + 1))
-        for element in CartesianIndices((0:(nx + 1), 0:(ny + 1)))
-            el_x, el_y = element[1], element[2]
-            if (el_x, el_y) ∈ corners # KLUDGE - Temporary hack
-                continue
-            end
-            u_node = get_node_vars(ua, eq, el_x, el_y)
-            rho, v1, v2, p = con2prim(eq, u_node)
-            c = sqrt(γ * p / rho)
-            sx, sy = abs(v1) + c, abs(v2) + c
-            den = max(den, abs(sx) / dx[el_x] + abs(sy) / dy[el_y] + 1e-12)
-            # Code for using polynomial values in place of cell average values
-            # TOTHINK - Decide whether to keep them or not
-            # for j in 1:nd, i in 1:nd
-            #    u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
-            #    rho, v1, v2, p = con2prim(eq, u_node)
-            #    c = sqrt(γ*p/rho)
-            #    sx, sy = abs(v1) + c, abs(v2) + c
-            #    den = max(den, abs(sx)/dx[el_x] + abs(sy)/dy[el_y] + 1e-12)
-            #    # speed_x, speed_y = abs(sx)/dx[el_x], abs(sy)/dy[el_y]
-            #    # λy = speed_y/(speed_x + speed_y + 1e-13)
-            #    # λx = 1.0 - λy
-            #    # w = min(wg[1], wg[nd])
-            #    # den_blend = max(den_blend, abs(sx)/(dx[el_x]*λx*w) + 1e-12)
-            #    # den_blend = max(den_blend, abs(sy)/(λy*dy[el_y]*w) + 1e-12)
-            # end
+    #! format: noindent
+    @unpack dx, dy = grid
+    nx, ny = grid.size
+    @unpack γ = eq
+    @unpack wg = op
+    den = 0.0
+    corners = ((0, 0), (nx + 1, 0), (0, ny + 1), (nx + 1, ny + 1))
+    for element in CartesianIndices((0:(nx + 1), 0:(ny + 1)))
+        el_x, el_y = element[1], element[2]
+        if (el_x, el_y) ∈ corners # KLUDGE - Temporary hack
+            continue
         end
+        u_node = get_node_vars(ua, eq, el_x, el_y)
+        rho, v1, v2, p = con2prim(eq, u_node)
+        c = sqrt(γ * p / rho)
+        sx, sy = abs(v1) + c, abs(v2) + c
+        den = max(den, abs(sx) / dx[el_x] + abs(sy) / dy[el_y] + 1e-12)
+        # Code for using polynomial values in place of cell average values
+        # TOTHINK - Decide whether to keep them or not
+        # for j in 1:nd, i in 1:nd
+        #    u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
+        #    rho, v1, v2, p = con2prim(eq, u_node)
+        #    c = sqrt(γ*p/rho)
+        #    sx, sy = abs(v1) + c, abs(v2) + c
+        #    den = max(den, abs(sx)/dx[el_x] + abs(sy)/dy[el_y] + 1e-12)
+        #    # speed_x, speed_y = abs(sx)/dx[el_x], abs(sy)/dy[el_y]
+        #    # λy = speed_y/(speed_x + speed_y + 1e-13)
+        #    # λx = 1.0 - λy
+        #    # w = min(wg[1], wg[nd])
+        #    # den_blend = max(den_blend, abs(sx)/(dx[el_x]*λx*w) + 1e-12)
+        #    # den_blend = max(den_blend, abs(sy)/(λy*dy[el_y]*w) + 1e-12)
+        # end
+    end
 
-        dt = cfl / den
-        return dt
+    dt = cfl / den
+    return dt
     end # timer
 end
 
@@ -910,14 +911,15 @@ function Tenkai.apply_bound_limiter!(eq::Euler2D, grid, scheme, param, op, ua,
     end
     @unpack eps = param
     @timeit aux.timer "Bound limiter" begin
-        # variables = (get_density, get_pressure)
-        # for variable in variables
-        #    correct_variable!(eq, variable, op, aux, grid, u1, ua)
-        # end # KLUDGE Fix the type instability and do it with a loop
-        # https://github.com/trixi-framework/Trixi.jl/blob/0fd86e4bd856d894de6a7514edcb9758bf6f8e1e/src/callbacks_stage/positivity_zhang_shu.jl#L39   correct_variable!(eq, get_density,  op, aux, grid, u1, ua)
-        correct_variable!(eq, get_density, op, aux, grid, u1, ua, eps)
-        correct_variable!(eq, get_pressure, op, aux, grid, u1, ua, eps)
-        return nothing
+    #! format: noindent
+    # variables = (get_density, get_pressure)
+    # for variable in variables
+    #    correct_variable!(eq, variable, op, aux, grid, u1, ua)
+    # end # KLUDGE Fix the type instability and do it with a loop
+    # https://github.com/trixi-framework/Trixi.jl/blob/0fd86e4bd856d894de6a7514edcb9758bf6f8e1e/src/callbacks_stage/positivity_zhang_shu.jl#L39   correct_variable!(eq, get_density,  op, aux, grid, u1, ua)
+    correct_variable!(eq, get_density, op, aux, grid, u1, ua, eps)
+    correct_variable!(eq, get_pressure, op, aux, grid, u1, ua, eps)
+    return nothing
     end # timer
 end
 
@@ -1061,222 +1063,224 @@ end
 function Tenkai.apply_tvb_limiterβ!(eq::Euler2D, problem, scheme, grid, param,
                                     op, ua, u1, aux)
     @timeit aux.timer "TVB Limiter" begin
-        nx, ny = grid.size
-        @unpack xg, wg, Vl, Vr = op
-        @unpack dx, dy = grid
-        @unpack tvbM, cache, beta = scheme.limiter
-        @unpack nvar = eq
-        nd = length(wg)
+    #! format: noindent
+    nx, ny = grid.size
+    @unpack xg, wg, Vl, Vr = op
+    @unpack dx, dy = grid
+    @unpack tvbM, cache, beta = scheme.limiter
+    @unpack nvar = eq
+    nd = length(wg)
 
-        refresh!(u) = fill!(u, zero(eltype(u)))
-        # Pre-allocate for each thread
+    refresh!(u) = fill!(u, zero(eltype(u)))
+    # Pre-allocate for each thread
 
-        # Loop over cells
-        @threaded for ij in CartesianIndices((1:nx, 1:ny))
-            id = Threads.threadid()
-            el_x, el_y = ij[1], ij[2]
-            # face averages
-            (ul, ur, ud, uu,
-            dux, dur, duy, duu,
-            dual, duar, duad, duau,
-            char_dux, char_dur, char_duy, char_duu,
-            char_dual, char_duar, char_duad, char_duau,
-            duxm, durm, duym, duum) = cache[id]
-            u1_ = @view u1[:, :, :, el_x, el_y]
-            ua_, ual, uar, uad, uau = (get_node_vars(ua, eq, el_x, el_y),
-                                       get_node_vars(ua, eq, el_x - 1, el_y),
-                                       get_node_vars(ua, eq, el_x + 1, el_y),
-                                       get_node_vars(ua, eq, el_x, el_y - 1),
-                                       get_node_vars(ua, eq, el_x, el_y + 1))
-            Lx, Ly, Rx, Ry = eigmatrix(eq, ua_)
-            refresh!.((ul, ur, ud, uu))
+    # Loop over cells
+    @threaded for ij in CartesianIndices((1:nx, 1:ny))
+        id = Threads.threadid()
+        el_x, el_y = ij[1], ij[2]
+        # face averages
+        (ul, ur, ud, uu,
+        dux, dur, duy, duu,
+        dual, duar, duad, duau,
+        char_dux, char_dur, char_duy, char_duu,
+        char_dual, char_duar, char_duad, char_duau,
+        duxm, durm, duym, duum) = cache[id]
+        u1_ = @view u1[:, :, :, el_x, el_y]
+        ua_, ual, uar, uad, uau = (get_node_vars(ua, eq, el_x, el_y),
+                                   get_node_vars(ua, eq, el_x - 1, el_y),
+                                   get_node_vars(ua, eq, el_x + 1, el_y),
+                                   get_node_vars(ua, eq, el_x, el_y - 1),
+                                   get_node_vars(ua, eq, el_x, el_y + 1))
+        Lx, Ly, Rx, Ry = eigmatrix(eq, ua_)
+        refresh!.((ul, ur, ud, uu))
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            u_ = get_node_vars(u1_, eq, i, j)
+            multiply_add_to_node_vars!(ul, Vl[i] * wg[j], u_, eq, 1)
+            multiply_add_to_node_vars!(ur, Vr[i] * wg[j], u_, eq, 1)
+            multiply_add_to_node_vars!(ud, Vl[j] * wg[i], u_, eq, 1)
+            multiply_add_to_node_vars!(uu, Vr[j] * wg[i], u_, eq, 1)
+        end
+        # KLUDGE - Give better names to these quantities
+        # slopes b/w centres and faces
+        ul_, ur_ = get_node_vars(ul, eq, 1), get_node_vars(ur, eq, 1)
+        ud_, uu_ = get_node_vars(ud, eq, 1), get_node_vars(uu, eq, 1)
+        ual_, uar_ = get_node_vars(ual, eq, 1), get_node_vars(uar, eq, 1)
+        uad_, uau_ = get_node_vars(uad, eq, 1), get_node_vars(uau, eq, 1)
+
+        multiply_add_set_node_vars!(dux, 1.0, ur_, -1.0, ul_, eq, 1)
+        multiply_add_set_node_vars!(duy, 1.0, uu_, -1.0, ud_, eq, 1)
+
+        multiply_add_set_node_vars!(dual, 1.0, ua_, -1.0, ual_, eq, 1)
+        multiply_add_set_node_vars!(duar, 1.0, uar_, -1.0, ua_, eq, 1)
+        multiply_add_set_node_vars!(duad, 1.0, ua_, -1.0, uad_, eq, 1)
+        multiply_add_set_node_vars!(duau, 1.0, uau_, -1.0, ua_, eq, 1)
+
+        dux_ = get_node_vars(dux, eq, 1)
+        dual_, duar_ = get_node_vars(dual, eq, 1), get_node_vars(duar, eq, 1)
+        duy_ = get_node_vars(duy, eq, 1)
+        duad_, duau_ = get_node_vars(duad, eq, 1), get_node_vars(duau, eq, 1)
+
+        # Convert to characteristic variables
+        mul!(char_dux, Lx, dux_)
+        mul!(char_dual, Lx, dual_)
+        mul!(char_duar, Lx, duar_)
+        mul!(char_duy, Ly, duy_)
+        mul!(char_duad, Ly, duad_)
+        mul!(char_duau, Ly, duau_)
+        Mdx2, Mdy2 = tvbM * dx[el_x]^2, tvbM * dy[el_y]^2
+        for n in Base.OneTo(nvar)
+            duxm[n] = minmod_β(char_dux[n], beta * char_dual[n],
+                               beta * char_duar[n], Mdx2)
+            duym[n] = minmod_β(char_duy[n], beta * char_duad[n],
+                               beta * char_duau[n], Mdy2)
+        end
+
+        jump_x = jump_y = 0.0
+        duxm_ = get_node_vars(duxm, eq, 1)
+        duym_ = get_node_vars(duym, eq, 1)
+        for n in 1:nvar
+            jump_x += abs(char_dux[n] - duxm_[n])
+            jump_y += abs(char_duy[n] - duym_[n])
+        end
+        jump_x /= nvar
+        jump_y /= nvar
+        if jump_x + jump_y > 1e-10
+            mul!(dux, Rx, duxm_)
+            mul!(duy, Ry, duym_)
+            dux_, duy_ = get_node_vars(dux, eq, 1), get_node_vars(duy, eq, 1)
             for j in Base.OneTo(nd), i in Base.OneTo(nd)
-                u_ = get_node_vars(u1_, eq, i, j)
-                multiply_add_to_node_vars!(ul, Vl[i] * wg[j], u_, eq, 1)
-                multiply_add_to_node_vars!(ur, Vr[i] * wg[j], u_, eq, 1)
-                multiply_add_to_node_vars!(ud, Vl[j] * wg[i], u_, eq, 1)
-                multiply_add_to_node_vars!(uu, Vr[j] * wg[i], u_, eq, 1)
-            end
-            # KLUDGE - Give better names to these quantities
-            # slopes b/w centres and faces
-            ul_, ur_ = get_node_vars(ul, eq, 1), get_node_vars(ur, eq, 1)
-            ud_, uu_ = get_node_vars(ud, eq, 1), get_node_vars(uu, eq, 1)
-            ual_, uar_ = get_node_vars(ual, eq, 1), get_node_vars(uar, eq, 1)
-            uad_, uau_ = get_node_vars(uad, eq, 1), get_node_vars(uau, eq, 1)
-
-            multiply_add_set_node_vars!(dux, 1.0, ur_, -1.0, ul_, eq, 1)
-            multiply_add_set_node_vars!(duy, 1.0, uu_, -1.0, ud_, eq, 1)
-
-            multiply_add_set_node_vars!(dual, 1.0, ua_, -1.0, ual_, eq, 1)
-            multiply_add_set_node_vars!(duar, 1.0, uar_, -1.0, ua_, eq, 1)
-            multiply_add_set_node_vars!(duad, 1.0, ua_, -1.0, uad_, eq, 1)
-            multiply_add_set_node_vars!(duau, 1.0, uau_, -1.0, ua_, eq, 1)
-
-            dux_ = get_node_vars(dux, eq, 1)
-            dual_, duar_ = get_node_vars(dual, eq, 1), get_node_vars(duar, eq, 1)
-            duy_ = get_node_vars(duy, eq, 1)
-            duad_, duau_ = get_node_vars(duad, eq, 1), get_node_vars(duau, eq, 1)
-
-            # Convert to characteristic variables
-            mul!(char_dux, Lx, dux_)
-            mul!(char_dual, Lx, dual_)
-            mul!(char_duar, Lx, duar_)
-            mul!(char_duy, Ly, duy_)
-            mul!(char_duad, Ly, duad_)
-            mul!(char_duau, Ly, duau_)
-            Mdx2, Mdy2 = tvbM * dx[el_x]^2, tvbM * dy[el_y]^2
-            for n in Base.OneTo(nvar)
-                duxm[n] = minmod_β(char_dux[n], beta * char_dual[n],
-                                   beta * char_duar[n], Mdx2)
-                duym[n] = minmod_β(char_duy[n], beta * char_duad[n],
-                                   beta * char_duau[n], Mdy2)
-            end
-
-            jump_x = jump_y = 0.0
-            duxm_ = get_node_vars(duxm, eq, 1)
-            duym_ = get_node_vars(duym, eq, 1)
-            for n in 1:nvar
-                jump_x += abs(char_dux[n] - duxm_[n])
-                jump_y += abs(char_duy[n] - duym_[n])
-            end
-            jump_x /= nvar
-            jump_y /= nvar
-            if jump_x + jump_y > 1e-10
-                mul!(dux, Rx, duxm_)
-                mul!(duy, Ry, duym_)
-                dux_, duy_ = get_node_vars(dux, eq, 1), get_node_vars(duy, eq, 1)
-                for j in Base.OneTo(nd), i in Base.OneTo(nd)
-                    multiply_add_set_node_vars!(u1_,
-                                                1.0, ua_,
-                                                xg[i] - 0.5,
-                                                dux_,
-                                                xg[j] - 0.5,
-                                                duy_,
-                                                eq, i, j)
-                end
+                multiply_add_set_node_vars!(u1_,
+                                            1.0, ua_,
+                                            xg[i] - 0.5,
+                                            dux_,
+                                            xg[j] - 0.5,
+                                            duy_,
+                                            eq, i, j)
             end
         end
-        return nothing
+    end
+    return nothing
     end # timer
 end
 
 function Tenkai.apply_tvb_limiter!(eq::Euler2D, problem, scheme, grid, param, op,
                                    ua, u1, aux)
     @timeit aux.timer "TVB Limiter" begin
-        nx, ny = grid.size
-        @unpack xg, wg, Vl, Vr = op
-        @unpack dx, dy = grid
-        @unpack tvbM, cache, beta = scheme.limiter
-        @unpack nvar = eq
-        nd = length(wg)
+    #! format: noindent
+    nx, ny = grid.size
+    @unpack xg, wg, Vl, Vr = op
+    @unpack dx, dy = grid
+    @unpack tvbM, cache, beta = scheme.limiter
+    @unpack nvar = eq
+    nd = length(wg)
 
-        refresh!(u) = fill!(u, zero(eltype(u)))
-        # Pre-allocate for each thread
+    refresh!(u) = fill!(u, zero(eltype(u)))
+    # Pre-allocate for each thread
 
-        # Loop over cells
-        @threaded for ij in CartesianIndices((1:nx, 1:ny))
-            id = Threads.threadid()
-            el_x, el_y = ij[1], ij[2]
-            # face averages
-            (ul, ur, ud, uu,
-            dul, dur, dud, duu,
-            dual, duar, duad, duau,
-            char_dul, char_dur, char_dud, char_duu,
-            char_dual, char_duar, char_duad, char_duau,
-            dulm, durm, dudm, duum,
-            duxm, duym, dux, duy) = cache[id]
-            u1_ = @view u1[:, :, :, el_x, el_y]
-            ua_, ual, uar, uad, uau = (get_node_vars(ua, eq, el_x, el_y),
-                                       get_node_vars(ua, eq, el_x - 1, el_y),
-                                       get_node_vars(ua, eq, el_x + 1, el_y),
-                                       get_node_vars(ua, eq, el_x, el_y - 1),
-                                       get_node_vars(ua, eq, el_x, el_y + 1))
-            Lx, Ly, Rx, Ry = eigmatrix(eq, ua_)
-            refresh!.((ul, ur, ud, uu))
+    # Loop over cells
+    @threaded for ij in CartesianIndices((1:nx, 1:ny))
+        id = Threads.threadid()
+        el_x, el_y = ij[1], ij[2]
+        # face averages
+        (ul, ur, ud, uu,
+        dul, dur, dud, duu,
+        dual, duar, duad, duau,
+        char_dul, char_dur, char_dud, char_duu,
+        char_dual, char_duar, char_duad, char_duau,
+        dulm, durm, dudm, duum,
+        duxm, duym, dux, duy) = cache[id]
+        u1_ = @view u1[:, :, :, el_x, el_y]
+        ua_, ual, uar, uad, uau = (get_node_vars(ua, eq, el_x, el_y),
+                                   get_node_vars(ua, eq, el_x - 1, el_y),
+                                   get_node_vars(ua, eq, el_x + 1, el_y),
+                                   get_node_vars(ua, eq, el_x, el_y - 1),
+                                   get_node_vars(ua, eq, el_x, el_y + 1))
+        Lx, Ly, Rx, Ry = eigmatrix(eq, ua_)
+        refresh!.((ul, ur, ud, uu))
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            u_ = get_node_vars(u1_, eq, i, j)
+            multiply_add_to_node_vars!(ul, Vl[i] * wg[j], u_, eq, 1)
+            multiply_add_to_node_vars!(ur, Vr[i] * wg[j], u_, eq, 1)
+            multiply_add_to_node_vars!(ud, Vl[j] * wg[i], u_, eq, 1)
+            multiply_add_to_node_vars!(uu, Vr[j] * wg[i], u_, eq, 1)
+        end
+        # KLUDGE - Give better names to these quantities
+        # slopes b/w centres and faces
+        ul_, ur_ = get_node_vars(ul, eq, 1), get_node_vars(ur, eq, 1)
+        ud_, uu_ = get_node_vars(ud, eq, 1), get_node_vars(uu, eq, 1)
+        ual_, uar_ = get_node_vars(ual, eq, 1), get_node_vars(uar, eq, 1)
+        uad_, uau_ = get_node_vars(uad, eq, 1), get_node_vars(uau, eq, 1)
+
+        multiply_add_set_node_vars!(dul, 1.0, ua_, -1.0, ul_, eq, 1)
+        multiply_add_set_node_vars!(dur, 1.0, ur_, -1.0, ua_, eq, 1)
+        multiply_add_set_node_vars!(dud, 1.0, ua_, -1.0, ud_, eq, 1)
+        multiply_add_set_node_vars!(duu, 1.0, uu_, -1.0, ua_, eq, 1)
+
+        multiply_add_set_node_vars!(dual, 1.0, ua_, -1.0, ual_, eq, 1)
+        multiply_add_set_node_vars!(duar, 1.0, uar_, -1.0, ua_, eq, 1)
+        multiply_add_set_node_vars!(duad, 1.0, ua_, -1.0, uad_, eq, 1)
+        multiply_add_set_node_vars!(duau, 1.0, uau_, -1.0, ua_, eq, 1)
+
+        dul_, dur_ = get_node_vars(dul, eq, 1), get_node_vars(dur, eq, 1)
+        dual_, duar_ = get_node_vars(dual, eq, 1), get_node_vars(duar, eq, 1)
+        dud_, duu_ = get_node_vars(dud, eq, 1), get_node_vars(duu, eq, 1)
+        duad_, duau_ = get_node_vars(duad, eq, 1), get_node_vars(duau, eq, 1)
+
+        # Convert to characteristic variables
+        mul!(char_dul, Lx, dul_)
+        mul!(char_dur, Lx, dur_)
+        mul!(char_dual, Lx, dual_)
+        mul!(char_duar, Lx, duar_)
+        mul!(char_dud, Ly, dud_)
+        mul!(char_duu, Ly, duu_)
+        mul!(char_duad, Ly, duad_)
+        mul!(char_duau, Ly, duau_)
+        Mdx2, Mdy2 = tvbM * dx[el_x]^2, tvbM * dy[el_y]^2
+        for n in Base.OneTo(nvar)
+            dulm[n] = minmod(char_dul[n], char_dual[n], char_duar[n], Mdx2)
+            durm[n] = minmod(char_dur[n], char_dual[n], char_duar[n], Mdx2)
+            dudm[n] = minmod(char_dud[n], char_duad[n], char_duau[n], Mdy2)
+            duum[n] = minmod(char_duu[n], char_duad[n], char_duau[n], Mdy2)
+        end
+
+        jump_x = jump_y = 0.0
+        dulm_, durm_ = get_node_vars(dulm, eq, 1), get_node_vars(durm, eq, 1)
+        dudm_, duum_ = get_node_vars(dudm, eq, 1), get_node_vars(duum, eq, 1)
+        for n in 1:nvar
+            jump_x += 0.5 *
+                      (abs(char_dul[n] - dulm_[n]) + abs(char_dur[n] - durm_[n]))
+            jump_y += 0.5 *
+                      (abs(char_dud[n] - dudm_[n]) + abs(char_duu[n] - duum_[n]))
+        end
+        jump_x /= nvar
+        jump_y /= nvar
+        if jump_x + jump_y > 1e-10
+            dulm_, durm_, dudm_, duum_ = (get_node_vars(dulm, eq, 1),
+                                          get_node_vars(durm, eq, 1),
+                                          get_node_vars(dudm, eq, 1),
+                                          get_node_vars(duum, eq, 1))
+            multiply_add_set_node_vars!(duxm,
+                                        0.5, dulm_, 0.5, durm_,
+                                        eq, 1)
+            multiply_add_set_node_vars!(duym,
+                                        0.5, dudm_, 0.5, duum_,
+                                        eq, 1)
+            duxm_, duym_ = get_node_vars(duxm, eq, 1), get_node_vars(duym, eq, 1)
+            mul!(dux, Rx, duxm_)
+            mul!(duy, Ry, duym_)
+            dux_, duy_ = get_node_vars(dux, eq, 1), get_node_vars(duy, eq, 1)
             for j in Base.OneTo(nd), i in Base.OneTo(nd)
-                u_ = get_node_vars(u1_, eq, i, j)
-                multiply_add_to_node_vars!(ul, Vl[i] * wg[j], u_, eq, 1)
-                multiply_add_to_node_vars!(ur, Vr[i] * wg[j], u_, eq, 1)
-                multiply_add_to_node_vars!(ud, Vl[j] * wg[i], u_, eq, 1)
-                multiply_add_to_node_vars!(uu, Vr[j] * wg[i], u_, eq, 1)
-            end
-            # KLUDGE - Give better names to these quantities
-            # slopes b/w centres and faces
-            ul_, ur_ = get_node_vars(ul, eq, 1), get_node_vars(ur, eq, 1)
-            ud_, uu_ = get_node_vars(ud, eq, 1), get_node_vars(uu, eq, 1)
-            ual_, uar_ = get_node_vars(ual, eq, 1), get_node_vars(uar, eq, 1)
-            uad_, uau_ = get_node_vars(uad, eq, 1), get_node_vars(uau, eq, 1)
-
-            multiply_add_set_node_vars!(dul, 1.0, ua_, -1.0, ul_, eq, 1)
-            multiply_add_set_node_vars!(dur, 1.0, ur_, -1.0, ua_, eq, 1)
-            multiply_add_set_node_vars!(dud, 1.0, ua_, -1.0, ud_, eq, 1)
-            multiply_add_set_node_vars!(duu, 1.0, uu_, -1.0, ua_, eq, 1)
-
-            multiply_add_set_node_vars!(dual, 1.0, ua_, -1.0, ual_, eq, 1)
-            multiply_add_set_node_vars!(duar, 1.0, uar_, -1.0, ua_, eq, 1)
-            multiply_add_set_node_vars!(duad, 1.0, ua_, -1.0, uad_, eq, 1)
-            multiply_add_set_node_vars!(duau, 1.0, uau_, -1.0, ua_, eq, 1)
-
-            dul_, dur_ = get_node_vars(dul, eq, 1), get_node_vars(dur, eq, 1)
-            dual_, duar_ = get_node_vars(dual, eq, 1), get_node_vars(duar, eq, 1)
-            dud_, duu_ = get_node_vars(dud, eq, 1), get_node_vars(duu, eq, 1)
-            duad_, duau_ = get_node_vars(duad, eq, 1), get_node_vars(duau, eq, 1)
-
-            # Convert to characteristic variables
-            mul!(char_dul, Lx, dul_)
-            mul!(char_dur, Lx, dur_)
-            mul!(char_dual, Lx, dual_)
-            mul!(char_duar, Lx, duar_)
-            mul!(char_dud, Ly, dud_)
-            mul!(char_duu, Ly, duu_)
-            mul!(char_duad, Ly, duad_)
-            mul!(char_duau, Ly, duau_)
-            Mdx2, Mdy2 = tvbM * dx[el_x]^2, tvbM * dy[el_y]^2
-            for n in Base.OneTo(nvar)
-                dulm[n] = minmod(char_dul[n], char_dual[n], char_duar[n], Mdx2)
-                durm[n] = minmod(char_dur[n], char_dual[n], char_duar[n], Mdx2)
-                dudm[n] = minmod(char_dud[n], char_duad[n], char_duau[n], Mdy2)
-                duum[n] = minmod(char_duu[n], char_duad[n], char_duau[n], Mdy2)
-            end
-
-            jump_x = jump_y = 0.0
-            dulm_, durm_ = get_node_vars(dulm, eq, 1), get_node_vars(durm, eq, 1)
-            dudm_, duum_ = get_node_vars(dudm, eq, 1), get_node_vars(duum, eq, 1)
-            for n in 1:nvar
-                jump_x += 0.5 *
-                          (abs(char_dul[n] - dulm_[n]) + abs(char_dur[n] - durm_[n]))
-                jump_y += 0.5 *
-                          (abs(char_dud[n] - dudm_[n]) + abs(char_duu[n] - duum_[n]))
-            end
-            jump_x /= nvar
-            jump_y /= nvar
-            if jump_x + jump_y > 1e-10
-                dulm_, durm_, dudm_, duum_ = (get_node_vars(dulm, eq, 1),
-                                              get_node_vars(durm, eq, 1),
-                                              get_node_vars(dudm, eq, 1),
-                                              get_node_vars(duum, eq, 1))
-                multiply_add_set_node_vars!(duxm,
-                                            0.5, dulm_, 0.5, durm_,
-                                            eq, 1)
-                multiply_add_set_node_vars!(duym,
-                                            0.5, dudm_, 0.5, duum_,
-                                            eq, 1)
-                duxm_, duym_ = get_node_vars(duxm, eq, 1), get_node_vars(duym, eq, 1)
-                mul!(dux, Rx, duxm_)
-                mul!(duy, Ry, duym_)
-                dux_, duy_ = get_node_vars(dux, eq, 1), get_node_vars(duy, eq, 1)
-                for j in Base.OneTo(nd), i in Base.OneTo(nd)
-                    multiply_add_set_node_vars!(u1_,
-                                                1.0, ua_,
-                                                2.0 * (xg[i] - 0.5),
-                                                dux_,
-                                                2.0 * (xg[j] - 0.5),
-                                                duy_,
-                                                eq, i, j)
-                end
+                multiply_add_set_node_vars!(u1_,
+                                            1.0, ua_,
+                                            2.0 * (xg[i] - 0.5),
+                                            dux_,
+                                            2.0 * (xg[j] - 0.5),
+                                            duy_,
+                                            eq, i, j)
             end
         end
-        return nothing
+    end
+    return nothing
     end # timer
 end
 
@@ -1402,170 +1406,171 @@ end
 function Tenkai.update_ghost_values_rkfr!(problem, scheme, eq::Euler2D, grid,
                                           aux, op, cache, t)
     @timeit aux.timer "Update ghost values" begin
-        @unpack Fb, ub = cache
-        update_ghost_values_periodic!(eq, problem, Fb, ub)
+    #! format: noindent
+    @unpack Fb, ub = cache
+    update_ghost_values_periodic!(eq, problem, Fb, ub)
 
-        @unpack periodic_x, periodic_y = problem
-        if periodic_x && periodic_y
-            return nothing
-        end
-
-        nx, ny = grid.size
-        @unpack degree, xg = op
-        nd = degree + 1
-        nvar = nvariables(eq)
-        @unpack dx, dy, xf, yf = grid
-        @unpack boundary_value, boundary_condition = problem
-        left, right, bottom, top = boundary_condition
-
-        if left == dirichlet
-            x1 = xf[1]
-            @threaded for j in 1:ny
-                for k in Base.OneTo(nd)
-                    y1 = yf[j] + xg[k] * dy[j]
-                    ub_value = boundary_value(x1, y1, t)
-                    set_node_vars!(ub, ub_value, eq, k, 2, 0, j)
-                    fb_value = flux(x1, y1, ub_value, eq, 1)
-                    set_node_vars!(Fb, fb_value, eq, k, 2, 0, j)
-
-                    # Purely upwind at boundary
-                    set_node_vars!(ub, ub_value, eq, k, 1, 1, j)
-                    set_node_vars!(Fb, fb_value, eq, k, 1, 1, j)
-                end
-            end
-        elseif left in (neumann, reflect)
-            @threaded for j in 1:ny
-                for k in Base.OneTo(nd)
-                    ub_node = get_node_vars(ub, eq, k, 1, 1, j)
-                    fb_node = get_node_vars(Fb, eq, k, 1, 1, j)
-                    set_node_vars!(ub, ub_node, eq, k, 2, 0, j)
-                    set_node_vars!(Fb, fb_node, eq, k, 2, 0, j)
-                    if left == reflect
-                        ub[2, k, 2, 0, j] *= -1.0 # vel_x
-                        Fb[1, k, 2, 0, j] *= -1.0 # ρ * vel_x
-                        Fb[3, k, 2, 0, j] *= -1.0 # ρ * vel_x * vel_y
-                        Fb[4, k, 2, 0, j] *= -1.0 # (ρ_e + p) * vel_x
-                    end
-                end
-            end
-        else
-            println("Incorrect bc specified at left.")
-            @assert false
-        end
-
-        if right == dirichlet
-            x2 = xf[nx + 1]
-            @threaded for j in 1:ny
-                for k in Base.OneTo(nd)
-                    y2 = yf[j] + xg[k] * dy[j]
-                    ub_value = boundary_value(x2, y2, t)
-                    set_node_vars!(ub, ub_value, eq, k, 1, nx + 1, j)
-                    fb_value = flux(x2, y2, ub_value, eq, 1)
-                    set_node_vars!(Fb, fb_value, eq, k, 1, nx + 1, j)
-
-                    # Purely upwind
-                    # set_node_vars!(ub, ub_value, eq, k, 2, nx, j)
-                    # set_node_vars!(Fb, fb, eq, k, 2, nx, j)
-                end
-            end
-        elseif right in (neumann, reflect)
-            @threaded for j in 1:ny
-                for k in 1:nd
-                    ub_node = get_node_vars(ub, eq, k, 2, nx, j)
-                    fb_node = get_node_vars(Fb, eq, k, 2, nx, j)
-                    set_node_vars!(ub, ub_node, eq, k, 1, nx + 1, j)
-                    set_node_vars!(Fb, fb_node, eq, k, 1, nx + 1, j)
-
-                    if right == reflect
-                        ub[2, k, 1, nx + 1, j] *= -1.0 # ρ*u1
-                        Fb[1, k, 1, nx + 1, j] *= -1.0 # ρ*u1
-                        Fb[3, k, 1, nx + 1, j] *= -1.0 # ρ*u1*u2
-                        Fb[4, k, 1, nx + 1, j] *= -1.0 # (ρ_e + p) * u1
-                    end
-                end
-            end
-        else
-            println("Incorrect bc specified at right.")
-            @assert false
-        end
-
-        if bottom == dirichlet
-            y3 = yf[1]
-            @threaded for i in 1:nx
-                for k in Base.OneTo(nd)
-                    x3 = xf[i] + xg[k] * dx[i]
-                    ub_value = boundary_value(x3, y3, t)
-                    fb_value = flux(x3, y3, ub_value, eq, 2)
-                    set_node_vars!(ub, ub_value, eq, k, 4, i, 0)
-                    set_node_vars!(Fb, fb_value, eq, k, 4, i, 0)
-
-                    # Purely upwind
-
-                    # set_node_vars!(Ub, ub, eq, k, 3, i, 1)
-                    # set_node_vars!(Fb, fb, eq, k, 3, i, 1)
-                end
-            end
-        elseif bottom in (neumann, reflect)
-            @threaded for i in 1:nx
-                for k in Base.OneTo(nd)
-                    ub_node = get_node_vars(ub, eq, k, 3, i, 1)
-                    fb_node = get_node_vars(Fb, eq, k, 3, i, 1)
-                    set_node_vars!(ub, ub_node, eq, k, 4, i, 0)
-                    set_node_vars!(Fb, fb_node, eq, k, 4, i, 0)
-                    if bottom == reflect
-                        ub[3, k, 4, i, 0] *= -1.0 # ρ*vel_y
-                        Fb[1, k, 4, i, 0] *= -1.0 # ρ*vel_y
-                        Fb[2, k, 4, i, 0] *= -1.0 # ρ*vel_x*vel_y
-                        Fb[4, k, 4, i, 0] *= -1.0 # (ρ_e + p) * vel_y
-                    end
-                end
-            end
-        else
-            @assert typeof(bottom)<:Tuple{Any, Any, Any} "$(typeof(bottom))"
-            bc! = bottom[1]
-            bc!(grid, eq, op, Fb, ub, aux)
-        end
-
-        if top == dirichlet
-            y4 = yf[ny + 1]
-            @threaded for i in 1:nx
-                for k in Base.OneTo(nd)
-                    x4 = xf[i] + xg[k] * dx[i]
-                    ub_value = boundary_value(x4, y4, t)
-                    fb_value = flux(x4, y4, ub_value, eq, 2)
-                    set_node_vars!(ub, ub_value, eq, k, 3, i, ny + 1)
-                    set_node_vars!(Fb, fb_value, eq, k, 3, i, ny + 1)
-
-                    # Purely upwind
-                    # set_node_vars!(Ub, ub, eq, k, 4, i, ny)
-                    # set_node_vars!(Fb, fb, eq, k, 4, i, ny)
-                end
-            end
-        elseif top in (neumann, reflect)
-            @threaded for i in 1:nx
-                for k in Base.OneTo(nd)
-                    ub_node = get_node_vars(ub, eq, k, 4, i, ny)
-                    fb_node = get_node_vars(Fb, eq, k, 4, i, ny)
-                    set_node_vars!(ub, ub_node, eq, k, 3, i, ny + 1)
-                    set_node_vars!(Fb, fb_node, eq, k, 3, i, ny + 1)
-                    if top == reflect
-                        ub[3, k, 3, i, ny + 1] *= -1.0 # ρ * vel_y
-                        Fb[1, k, 3, i, ny + 1] *= -1.0 # ρ * vel_y
-                        Fb[2, k, 3, i, ny + 1] *= -1.0 # ρ * vel_x * vel_y
-                        Fb[4, k, 3, i, ny + 1] *= -1.0 # (ρ_e + p) * vel_y
-                    end
-                end
-            end
-        else
-            println("Incorrect bc specified at top")
-            @assert false
-        end
-
-        if scheme.limiter.name == "blend"
-            update_ghost_values_fn_blend!(eq, problem, grid, aux)
-        end
-
+    @unpack periodic_x, periodic_y = problem
+    if periodic_x && periodic_y
         return nothing
+    end
+
+    nx, ny = grid.size
+    @unpack degree, xg = op
+    nd = degree + 1
+    nvar = nvariables(eq)
+    @unpack dx, dy, xf, yf = grid
+    @unpack boundary_value, boundary_condition = problem
+    left, right, bottom, top = boundary_condition
+
+    if left == dirichlet
+        x1 = xf[1]
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                y1 = yf[j] + xg[k] * dy[j]
+                ub_value = boundary_value(x1, y1, t)
+                set_node_vars!(ub, ub_value, eq, k, 2, 0, j)
+                fb_value = flux(x1, y1, ub_value, eq, 1)
+                set_node_vars!(Fb, fb_value, eq, k, 2, 0, j)
+
+                # Purely upwind at boundary
+                set_node_vars!(ub, ub_value, eq, k, 1, 1, j)
+                set_node_vars!(Fb, fb_value, eq, k, 1, 1, j)
+            end
+        end
+    elseif left in (neumann, reflect)
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                ub_node = get_node_vars(ub, eq, k, 1, 1, j)
+                fb_node = get_node_vars(Fb, eq, k, 1, 1, j)
+                set_node_vars!(ub, ub_node, eq, k, 2, 0, j)
+                set_node_vars!(Fb, fb_node, eq, k, 2, 0, j)
+                if left == reflect
+                    ub[2, k, 2, 0, j] *= -1.0 # vel_x
+                    Fb[1, k, 2, 0, j] *= -1.0 # ρ * vel_x
+                    Fb[3, k, 2, 0, j] *= -1.0 # ρ * vel_x * vel_y
+                    Fb[4, k, 2, 0, j] *= -1.0 # (ρ_e + p) * vel_x
+                end
+            end
+        end
+    else
+        println("Incorrect bc specified at left.")
+        @assert false
+    end
+
+    if right == dirichlet
+        x2 = xf[nx + 1]
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                y2 = yf[j] + xg[k] * dy[j]
+                ub_value = boundary_value(x2, y2, t)
+                set_node_vars!(ub, ub_value, eq, k, 1, nx + 1, j)
+                fb_value = flux(x2, y2, ub_value, eq, 1)
+                set_node_vars!(Fb, fb_value, eq, k, 1, nx + 1, j)
+
+                # Purely upwind
+                # set_node_vars!(ub, ub_value, eq, k, 2, nx, j)
+                # set_node_vars!(Fb, fb, eq, k, 2, nx, j)
+            end
+        end
+    elseif right in (neumann, reflect)
+        @threaded for j in 1:ny
+            for k in 1:nd
+                ub_node = get_node_vars(ub, eq, k, 2, nx, j)
+                fb_node = get_node_vars(Fb, eq, k, 2, nx, j)
+                set_node_vars!(ub, ub_node, eq, k, 1, nx + 1, j)
+                set_node_vars!(Fb, fb_node, eq, k, 1, nx + 1, j)
+
+                if right == reflect
+                    ub[2, k, 1, nx + 1, j] *= -1.0 # ρ*u1
+                    Fb[1, k, 1, nx + 1, j] *= -1.0 # ρ*u1
+                    Fb[3, k, 1, nx + 1, j] *= -1.0 # ρ*u1*u2
+                    Fb[4, k, 1, nx + 1, j] *= -1.0 # (ρ_e + p) * u1
+                end
+            end
+        end
+    else
+        println("Incorrect bc specified at right.")
+        @assert false
+    end
+
+    if bottom == dirichlet
+        y3 = yf[1]
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                x3 = xf[i] + xg[k] * dx[i]
+                ub_value = boundary_value(x3, y3, t)
+                fb_value = flux(x3, y3, ub_value, eq, 2)
+                set_node_vars!(ub, ub_value, eq, k, 4, i, 0)
+                set_node_vars!(Fb, fb_value, eq, k, 4, i, 0)
+
+                # Purely upwind
+
+                # set_node_vars!(Ub, ub, eq, k, 3, i, 1)
+                # set_node_vars!(Fb, fb, eq, k, 3, i, 1)
+            end
+        end
+    elseif bottom in (neumann, reflect)
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                ub_node = get_node_vars(ub, eq, k, 3, i, 1)
+                fb_node = get_node_vars(Fb, eq, k, 3, i, 1)
+                set_node_vars!(ub, ub_node, eq, k, 4, i, 0)
+                set_node_vars!(Fb, fb_node, eq, k, 4, i, 0)
+                if bottom == reflect
+                    ub[3, k, 4, i, 0] *= -1.0 # ρ*vel_y
+                    Fb[1, k, 4, i, 0] *= -1.0 # ρ*vel_y
+                    Fb[2, k, 4, i, 0] *= -1.0 # ρ*vel_x*vel_y
+                    Fb[4, k, 4, i, 0] *= -1.0 # (ρ_e + p) * vel_y
+                end
+            end
+        end
+    else
+        @assert typeof(bottom)<:Tuple{Any, Any, Any} "$(typeof(bottom))"
+        bc! = bottom[1]
+        bc!(grid, eq, op, Fb, ub, aux)
+    end
+
+    if top == dirichlet
+        y4 = yf[ny + 1]
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                x4 = xf[i] + xg[k] * dx[i]
+                ub_value = boundary_value(x4, y4, t)
+                fb_value = flux(x4, y4, ub_value, eq, 2)
+                set_node_vars!(ub, ub_value, eq, k, 3, i, ny + 1)
+                set_node_vars!(Fb, fb_value, eq, k, 3, i, ny + 1)
+
+                # Purely upwind
+                # set_node_vars!(Ub, ub, eq, k, 4, i, ny)
+                # set_node_vars!(Fb, fb, eq, k, 4, i, ny)
+            end
+        end
+    elseif top in (neumann, reflect)
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                ub_node = get_node_vars(ub, eq, k, 4, i, ny)
+                fb_node = get_node_vars(Fb, eq, k, 4, i, ny)
+                set_node_vars!(ub, ub_node, eq, k, 3, i, ny + 1)
+                set_node_vars!(Fb, fb_node, eq, k, 3, i, ny + 1)
+                if top == reflect
+                    ub[3, k, 3, i, ny + 1] *= -1.0 # ρ * vel_y
+                    Fb[1, k, 3, i, ny + 1] *= -1.0 # ρ * vel_y
+                    Fb[2, k, 3, i, ny + 1] *= -1.0 # ρ * vel_x * vel_y
+                    Fb[4, k, 3, i, ny + 1] *= -1.0 # (ρ_e + p) * vel_y
+                end
+            end
+        end
+    else
+        println("Incorrect bc specified at top")
+        @assert false
+    end
+
+    if scheme.limiter.name == "blend"
+        update_ghost_values_fn_blend!(eq, problem, grid, aux)
+    end
+
+    return nothing
     end # timer
 end
 
@@ -1573,243 +1578,244 @@ function Tenkai.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
                                           grid, aux, op, cache, t, dt,
                                           scaling_factor = 1.0)
     @timeit aux.timer "Update ghost values" begin
-        @unpack Fb, Ub, ua = cache
-        update_ghost_values_periodic!(eq, problem, Fb, Ub)
+    #! format: noindent
+    @unpack Fb, Ub, ua = cache
+    update_ghost_values_periodic!(eq, problem, Fb, Ub)
 
-        @unpack periodic_x, periodic_y = problem
-        if periodic_x && periodic_y
-            return nothing
-        end
-
-        nx, ny = grid.size
-        nvar = nvariables(eq)
-        @unpack degree, xg, wg = op
-        nd = degree + 1
-        @unpack dx, dy, xf, yf = grid
-        @unpack boundary_condition, boundary_value = problem
-        left, right, bottom, top = boundary_condition
-
-        refresh!(u) = fill!(u, zero(eltype(u)))
-
-        pre_allocated = cache.ghost_cache
-
-        # Julia bug occuring here. Below, we have unnecessarily named
-        # x1,y1, x2, y2,.... We should have been able to just call them x,y
-        # Otherwise we were getting a type instability and variables were
-        # called Core.Box. This issue is probably related to
-        # https://discourse.julialang.org/t/type-instability-of-nested-function/57007
-        # https://invenia.github.io/blog/2019/10/30/julialang-features-part-1/#an-aside-on-boxing
-        # https://github.com/JuliaLang/julia/issues/15276
-        # https://docs.julialang.org/en/v1/manual/performance-tips/#man-performance-captured-1
-
-        dt_scaled = scaling_factor * dt
-        wg_scaled = scaling_factor * wg
-
-        # For Dirichlet bc, use upwind flux at faces by assigning both physical
-        # and ghost cells through the bc.
-        if left == dirichlet
-            x1 = xf[1]
-            @threaded for j in 1:ny
-                for k in Base.OneTo(nd)
-                    y1 = yf[j] + xg[k] * dy[j]
-                    ub, fb = pre_allocated[Threads.threadid()]
-                    refresh!.((ub, fb))
-                    for l in Base.OneTo(nd)
-                        tq = t + xg[l] * dt_scaled
-                        ub_value = problem.boundary_value(x1, y1, tq)
-                        fb_value = flux(x1, y1, ub_value, eq, 1)
-                        multiply_add_to_node_vars!(ub, wg_scaled[l], ub_value, eq, 1)
-                        multiply_add_to_node_vars!(fb, wg_scaled[l], fb_value, eq, 1)
-                    end
-                    ub_node = get_node_vars(ub, eq, 1)
-                    fb_node = get_node_vars(fb, eq, 1)
-                    set_node_vars!(Ub, ub_node, eq, k, 2, 0, j)
-                    set_node_vars!(Fb, fb_node, eq, k, 2, 0, j)
-
-                    # # Put hllc flux values
-                    # Ul = get_node_vars(Ub, eq, k, 2, 0, j)
-                    # Fl = get_node_vars(Fb, eq, k, 2, 0, j)
-                    # Ur = get_node_vars(Ub, eq, k, 1, 1, j)
-                    # Fr = get_node_vars(Fb, eq, k, 1, 1, j)
-                    # ual, uar = get_node_vars(ua, eq, 0, j), get_node_vars(ua, eq, 1, j)
-                    # X = SVector{2}(x1, y1)
-                    # Fn = hllc(X, ual, uar, Fl, Fr, Ul, Ur, eq, 1)
-                    # set_node_vars!(Ub, ub_node, eq, k, 1, 1, j)
-                    # set_node_vars!(Fb, Fn     , eq, k, 1, 1, j)
-
-                    # Purely upwind at boundary
-                    # if abs(y1) < 0.055
-                    set_node_vars!(Ub, ub_node, eq, k, 1, 1, j)
-                    set_node_vars!(Fb, fb_node, eq, k, 1, 1, j)
-                    # end
-                end
-            end
-        elseif left in (neumann, reflect)
-            @threaded for j in 1:ny
-                for k in Base.OneTo(nd)
-                    Ub_node = get_node_vars(Ub, eq, k, 1, 1, j)
-                    Fb_node = get_node_vars(Fb, eq, k, 1, 1, j)
-                    set_node_vars!(Ub, Ub_node, eq, k, 2, 0, j)
-                    set_node_vars!(Fb, Fb_node, eq, k, 2, 0, j)
-                    if left == reflect
-                        Ub[2, k, 2, 0, j] *= -1.0 # ρ*u1
-                        Fb[1, k, 2, 0, j] *= -1.0 # ρ*u1
-                        Fb[3, k, 2, 0, j] *= -1.0 # ρ*u1*u2
-                        Fb[4, k, 2, 0, j] *= -1.0 # (ρ_e + p) * u1
-                    end
-                end
-            end
-        else
-            println("Incorrect bc specified at left.")
-            @assert false
-        end
-
-        if right == dirichlet
-            x2 = xf[nx + 1]
-            @threaded for j in 1:ny
-                for k in Base.OneTo(nd)
-                    y2 = yf[j] + xg[k] * dy[j]
-                    ub, fb = pre_allocated[Threads.threadid()]
-                    refresh!.((ub, fb))
-                    for l in Base.OneTo(nd)
-                        tq = t + xg[l] * dt_scaled
-                        ubvalue = boundary_value(x2, y2, tq)
-                        fbvalue = flux(x2, y2, ubvalue, eq, 1)
-                        multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
-                        multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
-                    end
-                    ub_node = get_node_vars(ub, eq, 1)
-                    fb_node = get_node_vars(fb, eq, 1)
-                    set_node_vars!(Ub, ub_node, eq, k, 1, nx + 1, j)
-                    set_node_vars!(Fb, fb_node, eq, k, 1, nx + 1, j)
-
-                    # Purely upwind
-                    # set_node_vars!(Ub, ub_node, eq, k, 2, nx, j)
-                    # set_node_vars!(Fb, fb_node, eq, k, 2, nx, j)
-                end
-            end
-        elseif right in (reflect, neumann)
-            @threaded for j in 1:ny
-                for k in Base.OneTo(nd)
-                    Ub_node = get_node_vars(Ub, eq, k, 2, nx, j)
-                    Fb_node = get_node_vars(Fb, eq, k, 2, nx, j)
-                    set_node_vars!(Ub, Ub_node, eq, k, 1, nx + 1, j)
-                    set_node_vars!(Fb, Fb_node, eq, k, 1, nx + 1, j)
-
-                    if right == reflect
-                        Ub[2, k, 1, nx + 1, j] *= -1.0 # ρ*u1
-                        Fb[1, k, 1, nx + 1, j] *= -1.0 # ρ*u1
-                        Fb[3, k, 1, nx + 1, j] *= -1.0 # ρ*u1*u2
-                        Fb[4, k, 1, nx + 1, j] *= -1.0 # (ρ_e + p) * u1
-                    end
-                end
-            end
-        else
-            println("Incorrect bc specified at right.")
-            @assert false
-        end
-
-        if bottom == dirichlet
-            y3 = yf[1]
-            @threaded for i in 1:nx
-                for k in Base.OneTo(nd)
-                    x3 = xf[i] + xg[k] * dx[i]
-                    ub, fb = pre_allocated[Threads.threadid()]
-                    refresh!.((ub, fb))
-                    for l in Base.OneTo(nd)
-                        tq = t + xg[l] * dt_scaled
-                        ubvalue = boundary_value(x3, y3, tq)
-                        fbvalue = flux(x3, y3, ubvalue, eq, 2)
-                        multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
-                        multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
-                    end
-                    ub_node = get_node_vars(ub, eq, 1)
-                    fb_node = get_node_vars(fb, eq, 1)
-                    set_node_vars!(Ub, ub_node, eq, k, 4, i, 0)
-                    set_node_vars!(Fb, fb_node, eq, k, 4, i, 0)
-
-                    # Purely upwind
-
-                    # set_node_vars!(Ub, ub, eq, k, 3, i, 1)
-                    # set_node_vars!(Fb, fb, eq, k, 3, i, 1)
-                end
-            end
-        elseif bottom in (reflect, neumann)
-            @threaded for i in 1:nx
-                for k in Base.OneTo(nd)
-                    Ub_node = get_node_vars(Ub, eq, k, 3, i, 1)
-                    Fb_node = get_node_vars(Fb, eq, k, 3, i, 1)
-                    set_node_vars!(Ub, Ub_node, eq, k, 4, i, 0)
-                    set_node_vars!(Fb, Fb_node, eq, k, 4, i, 0)
-                    if bottom == reflect
-                        Ub[3, k, 4, i, 0] *= -1.0 # ρ * vel_y
-                        Fb[1, k, 4, i, 0] *= -1.0 # ρ * vel_y
-                        Fb[2, k, 4, i, 0] *= -1.0 # ρ * vel_x * vel_y
-                        Fb[4, k, 4, i, 0] *= -1.0 # (ρ_e + p) * vel_y
-                    end
-                end
-            end
-        elseif periodic_y
-            nothing
-        else
-            @assert typeof(bottom) <: Tuple{Any, Any, Any}
-            bc! = bottom[1]
-            bc!(grid, eq, op, Fb, Ub, aux)
-        end
-
-        if top == dirichlet
-            y4 = yf[ny + 1]
-            @threaded for i in 1:nx
-                for k in Base.OneTo(nd)
-                    x4 = xf[i] + xg[k] * dx[i]
-                    ub, fb = pre_allocated[Threads.threadid()]
-                    refresh!.((ub, fb))
-                    for l in Base.OneTo(nd)
-                        tq = t + xg[l] * dt_scaled
-                        ubvalue = boundary_value(x4, y4, tq)
-                        fbvalue = flux(x4, y4, ubvalue, eq, 2)
-                        multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
-                        multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
-                    end
-                    ub_node = get_node_vars(ub, eq, 1)
-                    fb_node = get_node_vars(fb, eq, 1)
-                    set_node_vars!(Ub, ub_node, eq, k, 3, i, ny + 1)
-                    set_node_vars!(Fb, fb_node, eq, k, 3, i, ny + 1)
-
-                    # Purely upwind
-                    # set_node_vars!(Ub, ub_node, eq, k, 4, i, ny)
-                    # set_node_vars!(Fb, fb_node, eq, k, 4, i, ny)
-                end
-            end
-        elseif top in (reflect, neumann)
-            @threaded for i in 1:nx
-                for k in Base.OneTo(nd)
-                    Ub_node = get_node_vars(Ub, eq, k, 4, i, ny)
-                    Fb_node = get_node_vars(Fb, eq, k, 4, i, ny)
-                    set_node_vars!(Ub, Ub_node, eq, k, 3, i, ny + 1)
-                    set_node_vars!(Fb, Fb_node, eq, k, 3, i, ny + 1)
-                    if top == reflect
-                        Ub[3, k, 3, i, ny + 1] *= -1.0 # ρ * vel_y
-                        Fb[1, k, 3, i, ny + 1] *= -1.0 # ρ * vel_y
-                        Fb[2, k, 3, i, ny + 1] *= -1.0 # ρ * vel_x * vel_y
-                        Fb[4, k, 3, i, ny + 1] *= -1.0 # (ρ_e + p) * vel_y
-                    end
-                end
-            end
-        elseif periodic_y
-            nothing
-        else
-            @assert false "Incorrect bc specific at top"
-        end
-        if scheme.limiter.name == "blend"
-            update_ghost_values_fn_blend!(eq, problem, grid, aux)
-        end
-
-        if scheme.limiter.name == "blend"
-            update_ghost_values_fn_blend!(eq, problem, grid, aux)
-        end
-
+    @unpack periodic_x, periodic_y = problem
+    if periodic_x && periodic_y
         return nothing
+    end
+
+    nx, ny = grid.size
+    nvar = nvariables(eq)
+    @unpack degree, xg, wg = op
+    nd = degree + 1
+    @unpack dx, dy, xf, yf = grid
+    @unpack boundary_condition, boundary_value = problem
+    left, right, bottom, top = boundary_condition
+
+    refresh!(u) = fill!(u, zero(eltype(u)))
+
+    pre_allocated = cache.ghost_cache
+
+    # Julia bug occuring here. Below, we have unnecessarily named
+    # x1,y1, x2, y2,.... We should have been able to just call them x,y
+    # Otherwise we were getting a type instability and variables were
+    # called Core.Box. This issue is probably related to
+    # https://discourse.julialang.org/t/type-instability-of-nested-function/57007
+    # https://invenia.github.io/blog/2019/10/30/julialang-features-part-1/#an-aside-on-boxing
+    # https://github.com/JuliaLang/julia/issues/15276
+    # https://docs.julialang.org/en/v1/manual/performance-tips/#man-performance-captured-1
+
+    dt_scaled = scaling_factor * dt
+    wg_scaled = scaling_factor * wg
+
+    # For Dirichlet bc, use upwind flux at faces by assigning both physical
+    # and ghost cells through the bc.
+    if left == dirichlet
+        x1 = xf[1]
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                y1 = yf[j] + xg[k] * dy[j]
+                ub, fb = pre_allocated[Threads.threadid()]
+                refresh!.((ub, fb))
+                for l in Base.OneTo(nd)
+                    tq = t + xg[l] * dt_scaled
+                    ub_value = problem.boundary_value(x1, y1, tq)
+                    fb_value = flux(x1, y1, ub_value, eq, 1)
+                    multiply_add_to_node_vars!(ub, wg_scaled[l], ub_value, eq, 1)
+                    multiply_add_to_node_vars!(fb, wg_scaled[l], fb_value, eq, 1)
+                end
+                ub_node = get_node_vars(ub, eq, 1)
+                fb_node = get_node_vars(fb, eq, 1)
+                set_node_vars!(Ub, ub_node, eq, k, 2, 0, j)
+                set_node_vars!(Fb, fb_node, eq, k, 2, 0, j)
+
+                # # Put hllc flux values
+                # Ul = get_node_vars(Ub, eq, k, 2, 0, j)
+                # Fl = get_node_vars(Fb, eq, k, 2, 0, j)
+                # Ur = get_node_vars(Ub, eq, k, 1, 1, j)
+                # Fr = get_node_vars(Fb, eq, k, 1, 1, j)
+                # ual, uar = get_node_vars(ua, eq, 0, j), get_node_vars(ua, eq, 1, j)
+                # X = SVector{2}(x1, y1)
+                # Fn = hllc(X, ual, uar, Fl, Fr, Ul, Ur, eq, 1)
+                # set_node_vars!(Ub, ub_node, eq, k, 1, 1, j)
+                # set_node_vars!(Fb, Fn     , eq, k, 1, 1, j)
+
+                # Purely upwind at boundary
+                # if abs(y1) < 0.055
+                set_node_vars!(Ub, ub_node, eq, k, 1, 1, j)
+                set_node_vars!(Fb, fb_node, eq, k, 1, 1, j)
+                # end
+            end
+        end
+    elseif left in (neumann, reflect)
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                Ub_node = get_node_vars(Ub, eq, k, 1, 1, j)
+                Fb_node = get_node_vars(Fb, eq, k, 1, 1, j)
+                set_node_vars!(Ub, Ub_node, eq, k, 2, 0, j)
+                set_node_vars!(Fb, Fb_node, eq, k, 2, 0, j)
+                if left == reflect
+                    Ub[2, k, 2, 0, j] *= -1.0 # ρ*u1
+                    Fb[1, k, 2, 0, j] *= -1.0 # ρ*u1
+                    Fb[3, k, 2, 0, j] *= -1.0 # ρ*u1*u2
+                    Fb[4, k, 2, 0, j] *= -1.0 # (ρ_e + p) * u1
+                end
+            end
+        end
+    else
+        println("Incorrect bc specified at left.")
+        @assert false
+    end
+
+    if right == dirichlet
+        x2 = xf[nx + 1]
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                y2 = yf[j] + xg[k] * dy[j]
+                ub, fb = pre_allocated[Threads.threadid()]
+                refresh!.((ub, fb))
+                for l in Base.OneTo(nd)
+                    tq = t + xg[l] * dt_scaled
+                    ubvalue = boundary_value(x2, y2, tq)
+                    fbvalue = flux(x2, y2, ubvalue, eq, 1)
+                    multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
+                    multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
+                end
+                ub_node = get_node_vars(ub, eq, 1)
+                fb_node = get_node_vars(fb, eq, 1)
+                set_node_vars!(Ub, ub_node, eq, k, 1, nx + 1, j)
+                set_node_vars!(Fb, fb_node, eq, k, 1, nx + 1, j)
+
+                # Purely upwind
+                # set_node_vars!(Ub, ub_node, eq, k, 2, nx, j)
+                # set_node_vars!(Fb, fb_node, eq, k, 2, nx, j)
+            end
+        end
+    elseif right in (reflect, neumann)
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                Ub_node = get_node_vars(Ub, eq, k, 2, nx, j)
+                Fb_node = get_node_vars(Fb, eq, k, 2, nx, j)
+                set_node_vars!(Ub, Ub_node, eq, k, 1, nx + 1, j)
+                set_node_vars!(Fb, Fb_node, eq, k, 1, nx + 1, j)
+
+                if right == reflect
+                    Ub[2, k, 1, nx + 1, j] *= -1.0 # ρ*u1
+                    Fb[1, k, 1, nx + 1, j] *= -1.0 # ρ*u1
+                    Fb[3, k, 1, nx + 1, j] *= -1.0 # ρ*u1*u2
+                    Fb[4, k, 1, nx + 1, j] *= -1.0 # (ρ_e + p) * u1
+                end
+            end
+        end
+    else
+        println("Incorrect bc specified at right.")
+        @assert false
+    end
+
+    if bottom == dirichlet
+        y3 = yf[1]
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                x3 = xf[i] + xg[k] * dx[i]
+                ub, fb = pre_allocated[Threads.threadid()]
+                refresh!.((ub, fb))
+                for l in Base.OneTo(nd)
+                    tq = t + xg[l] * dt_scaled
+                    ubvalue = boundary_value(x3, y3, tq)
+                    fbvalue = flux(x3, y3, ubvalue, eq, 2)
+                    multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
+                    multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
+                end
+                ub_node = get_node_vars(ub, eq, 1)
+                fb_node = get_node_vars(fb, eq, 1)
+                set_node_vars!(Ub, ub_node, eq, k, 4, i, 0)
+                set_node_vars!(Fb, fb_node, eq, k, 4, i, 0)
+
+                # Purely upwind
+
+                # set_node_vars!(Ub, ub, eq, k, 3, i, 1)
+                # set_node_vars!(Fb, fb, eq, k, 3, i, 1)
+            end
+        end
+    elseif bottom in (reflect, neumann)
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                Ub_node = get_node_vars(Ub, eq, k, 3, i, 1)
+                Fb_node = get_node_vars(Fb, eq, k, 3, i, 1)
+                set_node_vars!(Ub, Ub_node, eq, k, 4, i, 0)
+                set_node_vars!(Fb, Fb_node, eq, k, 4, i, 0)
+                if bottom == reflect
+                    Ub[3, k, 4, i, 0] *= -1.0 # ρ * vel_y
+                    Fb[1, k, 4, i, 0] *= -1.0 # ρ * vel_y
+                    Fb[2, k, 4, i, 0] *= -1.0 # ρ * vel_x * vel_y
+                    Fb[4, k, 4, i, 0] *= -1.0 # (ρ_e + p) * vel_y
+                end
+            end
+        end
+    elseif periodic_y
+        nothing
+    else
+        @assert typeof(bottom) <: Tuple{Any, Any, Any}
+        bc! = bottom[1]
+        bc!(grid, eq, op, Fb, Ub, aux)
+    end
+
+    if top == dirichlet
+        y4 = yf[ny + 1]
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                x4 = xf[i] + xg[k] * dx[i]
+                ub, fb = pre_allocated[Threads.threadid()]
+                refresh!.((ub, fb))
+                for l in Base.OneTo(nd)
+                    tq = t + xg[l] * dt_scaled
+                    ubvalue = boundary_value(x4, y4, tq)
+                    fbvalue = flux(x4, y4, ubvalue, eq, 2)
+                    multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
+                    multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
+                end
+                ub_node = get_node_vars(ub, eq, 1)
+                fb_node = get_node_vars(fb, eq, 1)
+                set_node_vars!(Ub, ub_node, eq, k, 3, i, ny + 1)
+                set_node_vars!(Fb, fb_node, eq, k, 3, i, ny + 1)
+
+                # Purely upwind
+                # set_node_vars!(Ub, ub_node, eq, k, 4, i, ny)
+                # set_node_vars!(Fb, fb_node, eq, k, 4, i, ny)
+            end
+        end
+    elseif top in (reflect, neumann)
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                Ub_node = get_node_vars(Ub, eq, k, 4, i, ny)
+                Fb_node = get_node_vars(Fb, eq, k, 4, i, ny)
+                set_node_vars!(Ub, Ub_node, eq, k, 3, i, ny + 1)
+                set_node_vars!(Fb, Fb_node, eq, k, 3, i, ny + 1)
+                if top == reflect
+                    Ub[3, k, 3, i, ny + 1] *= -1.0 # ρ * vel_y
+                    Fb[1, k, 3, i, ny + 1] *= -1.0 # ρ * vel_y
+                    Fb[2, k, 3, i, ny + 1] *= -1.0 # ρ * vel_x * vel_y
+                    Fb[4, k, 3, i, ny + 1] *= -1.0 # (ρ_e + p) * vel_y
+                end
+            end
+        end
+    elseif periodic_y
+        nothing
+    else
+        @assert false "Incorrect bc specific at top"
+    end
+    if scheme.limiter.name == "blend"
+        update_ghost_values_fn_blend!(eq, problem, grid, aux)
+    end
+
+    if scheme.limiter.name == "blend"
+        update_ghost_values_fn_blend!(eq, problem, grid, aux)
+    end
+
+    return nothing
     end # timer
 end
 
@@ -2029,71 +2035,72 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::Euler2D,
                             grid, problem, param, op,
                             z, u1, aux, ndigits = 3)
     @timeit aux.timer "Write solution" begin
-        @unpack final_time = problem
-        # Clear and re-create output directory
-        if fcount == 0
-            run(`rm -rf output`)
-            run(`mkdir output`)
-            save_mesh_file(grid, "output")
-        end
+    #! format: noindent
+    @unpack final_time = problem
+    # Clear and re-create output directory
+    if fcount == 0
+        run(`rm -rf output`)
+        run(`mkdir output`)
+        save_mesh_file(grid, "output")
+    end
 
-        nx, ny = grid.size
-        @unpack exact_solution = problem
-        exact(x) = exact_solution(x[1], x[2], time)
-        @unpack xc, yc = grid
-        filename = get_filename("output/avg", ndigits, fcount)
-        # filename = string("output/", filename)
-        vtk = vtk_grid(filename, xc, yc)
-        xy = [[xc[i], yc[j]] for i in 1:nx, j in 1:ny]
-        # KLUDGE - Do it efficiently
-        prim = @views copy(z[:, 1:nx, 1:ny])
-        exact_data = exact.(xy)
-        for j in 1:ny, i in 1:nx
-            @views con2prim!(eq, z[:, i, j], prim[:, i, j])
-        end
-        density_arr = prim[1, 1:nx, 1:ny]
-        velx_arr = prim[2, 1:nx, 1:ny]
-        vely_arr = prim[3, 1:nx, 1:ny]
-        pres_arr = prim[4, 1:nx, 1:ny]
-        vtk["sol"] = density_arr
-        vtk["Density"] = density_arr
-        vtk["Velocity_x"] = velx_arr
-        vtk["Velocity_y"] = vely_arr
-        vtk["Pressure"] = pres_arr
-        for j in 1:ny, i in 1:nx
-            @views con2prim!(eq, exact_data[i, j], prim[:, i, j])
-        end
-        @views vtk["Exact Density"] = prim[1, 1:nx, 1:ny]
-        @views vtk["Exact Velocity_x"] = prim[2, 1:nx, 1:ny]
-        @views vtk["Exact Velocity_y"] = prim[3, 1:nx, 1:ny]
-        @views vtk["Exact Pressure"] = prim[4, 1:nx, 1:ny]
-        # @views vtk["Exact Density"] = exact_data[1:nx,1:ny][1]
-        # @views vtk["Exact Velocity_x"] = exact_data[1:nx,1:ny][2]
-        # @views vtk["Exact Velocity_y"] = exact_data[1:nx,1:ny][3]
-        # @views vtk["Exact Pressure"] = exact_data[1:nx,1:ny][4]
-        vtk["CYCLE"] = iter
-        vtk["TIME"] = time
-        out = vtk_save(vtk)
-        println("Wrote file ", out[1])
-        write_poly(eq, grid, op, u1, fcount)
-        if final_time - time < 1e-10
-            cp("$filename.vtr", "./output/avg.vtr")
-            println("Wrote final average solution to avg.vtr.")
-        end
+    nx, ny = grid.size
+    @unpack exact_solution = problem
+    exact(x) = exact_solution(x[1], x[2], time)
+    @unpack xc, yc = grid
+    filename = get_filename("output/avg", ndigits, fcount)
+    # filename = string("output/", filename)
+    vtk = vtk_grid(filename, xc, yc)
+    xy = [[xc[i], yc[j]] for i in 1:nx, j in 1:ny]
+    # KLUDGE - Do it efficiently
+    prim = @views copy(z[:, 1:nx, 1:ny])
+    exact_data = exact.(xy)
+    for j in 1:ny, i in 1:nx
+        @views con2prim!(eq, z[:, i, j], prim[:, i, j])
+    end
+    density_arr = prim[1, 1:nx, 1:ny]
+    velx_arr = prim[2, 1:nx, 1:ny]
+    vely_arr = prim[3, 1:nx, 1:ny]
+    pres_arr = prim[4, 1:nx, 1:ny]
+    vtk["sol"] = density_arr
+    vtk["Density"] = density_arr
+    vtk["Velocity_x"] = velx_arr
+    vtk["Velocity_y"] = vely_arr
+    vtk["Pressure"] = pres_arr
+    for j in 1:ny, i in 1:nx
+        @views con2prim!(eq, exact_data[i, j], prim[:, i, j])
+    end
+    @views vtk["Exact Density"] = prim[1, 1:nx, 1:ny]
+    @views vtk["Exact Velocity_x"] = prim[2, 1:nx, 1:ny]
+    @views vtk["Exact Velocity_y"] = prim[3, 1:nx, 1:ny]
+    @views vtk["Exact Pressure"] = prim[4, 1:nx, 1:ny]
+    # @views vtk["Exact Density"] = exact_data[1:nx,1:ny][1]
+    # @views vtk["Exact Velocity_x"] = exact_data[1:nx,1:ny][2]
+    # @views vtk["Exact Velocity_y"] = exact_data[1:nx,1:ny][3]
+    # @views vtk["Exact Pressure"] = exact_data[1:nx,1:ny][4]
+    vtk["CYCLE"] = iter
+    vtk["TIME"] = time
+    out = vtk_save(vtk)
+    println("Wrote file ", out[1])
+    write_poly(eq, grid, op, u1, fcount)
+    if final_time - time < 1e-10
+        cp("$filename.vtr", "./output/avg.vtr")
+        println("Wrote final average solution to avg.vtr.")
+    end
 
-        fcount += 1
+    fcount += 1
 
-        # HDF5 file
-        element_variables = Dict()
-        element_variables[:density] = vec(density_arr)
-        element_variables[:velocity_x] = vec(velx_arr)
-        element_variables[:velocity_y] = vec(vely_arr)
-        element_variables[:pressure] = vec(pres_arr)
-        # element_variables[:indicator_shock_capturing] = vec(aux.blend.cache.alpha[1:nx,1:ny])
-        filename = save_solution_file(u1, time, dt, iter, grid, eq, op,
-                                      element_variables) # Save h5 file
-        println("Wrote ", filename)
-        return fcount
+    # HDF5 file
+    element_variables = Dict()
+    element_variables[:density] = vec(density_arr)
+    element_variables[:velocity_x] = vec(velx_arr)
+    element_variables[:velocity_y] = vec(vely_arr)
+    element_variables[:pressure] = vec(pres_arr)
+    # element_variables[:indicator_shock_capturing] = vec(aux.blend.cache.alpha[1:nx,1:ny])
+    filename = save_solution_file(u1, time, dt, iter, grid, eq, op,
+                                  element_variables) # Save h5 file
+    println("Wrote ", filename)
+    return fcount
     end # timer
 end
 

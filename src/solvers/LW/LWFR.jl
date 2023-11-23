@@ -50,8 +50,9 @@ update_ghost_values_lwfr!() = nothing
 #-------------------------------------------------------------------------------
 function update_solution_lwfr!(u1, res, aux)
     @timeit aux.timer "Update solution" begin
-        axpy!(-1.0, res, u1) # u1 = (-1.0)*res + u1
-        return nothing
+    #! format: noindent
+    axpy!(-1.0, res, u1) # u1 = (-1.0)*res + u1
+    return nothing
     end # timer
 end
 
@@ -61,25 +62,26 @@ end
 function compute_cell_residual!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb,
                                 Ub, cache)
     @timeit aux.timer "Cell Residual" begin
-        N = op.degree
-        if N == 1
-            compute_cell_residual_1!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb, Ub,
-                                     cache)
-        elseif N == 2
-            compute_cell_residual_2!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb, Ub,
-                                     cache)
-        elseif N == 3
-            compute_cell_residual_3!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb, Ub,
-                                     cache)
-        elseif N == 4
-            compute_cell_residual_4!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb, Ub,
-                                     cache)
-        else
-            println("compute_cell_residual: Not implemented for degree > 1")
-            @assert false
-        end
+    #! format: noindent
+    N = op.degree
+    if N == 1
+        compute_cell_residual_1!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb, Ub,
+                                 cache)
+    elseif N == 2
+        compute_cell_residual_2!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb, Ub,
+                                 cache)
+    elseif N == 3
+        compute_cell_residual_3!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb, Ub,
+                                 cache)
+    elseif N == 4
+        compute_cell_residual_4!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb, Ub,
+                                 cache)
+    else
+        println("compute_cell_residual: Not implemented for degree > 1")
+        @assert false
+    end
 
-        return nothing
+    return nothing
     end # timer
 end
 

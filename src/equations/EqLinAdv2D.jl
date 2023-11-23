@@ -137,16 +137,17 @@ function Tenkai.apply_bound_limiter!(eq::LinAdv2D, grid, scheme, param, op, ua,
         return nothing
     end
     @timeit aux.timer "Bound limiter" begin
-        # variables = (get_density, get_pressure)
-        # for variable in variables
-        #    correct_variable!(eq, variable, op, aux, grid, u1, ua)
-        # end # KLUDGE Fix the type instability and do it with a loop
-        # https://github.com/trixi-framework/Trixi.jl/blob/0fd86e4bd856d894de6a7514edcb9758bf6f8e1e/src/callbacks_stage/positivity_zhang_shu.jl#L39   correct_variable!(eq, get_density,  op, aux, grid, u1, ua)
+    #! format: noindent
+    # variables = (get_density, get_pressure)
+    # for variable in variables
+    #    correct_variable!(eq, variable, op, aux, grid, u1, ua)
+    # end # KLUDGE Fix the type instability and do it with a loop
+    # https://github.com/trixi-framework/Trixi.jl/blob/0fd86e4bd856d894de6a7514edcb9758bf6f8e1e/src/callbacks_stage/positivity_zhang_shu.jl#L39   correct_variable!(eq, get_density,  op, aux, grid, u1, ua)
 
-        # TODO - Allow user to pass these variables
-        correct_variable!(eq, (eq, u) -> first(u), op, aux, grid, u1, ua)
-        correct_variable!(eq, (eq, u) -> 1.0 - first(u), op, aux, grid, u1, ua)
-        return nothing
+    # TODO - Allow user to pass these variables
+    correct_variable!(eq, (eq, u) -> first(u), op, aux, grid, u1, ua)
+    correct_variable!(eq, (eq, u) -> 1.0 - first(u), op, aux, grid, u1, ua)
+    return nothing
     end # timer
 end
 

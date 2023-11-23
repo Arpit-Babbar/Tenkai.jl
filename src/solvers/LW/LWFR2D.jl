@@ -111,207 +111,208 @@ end
 function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2, 1},
                                    grid, aux, op, cache, t, dt, scaling_factor = 1)
     @timeit aux.timer "Update ghost values" begin
-        @unpack Fb, Ub = cache
-        update_ghost_values_periodic!(eq, problem, Fb, Ub)
+    #! format: noindent
+    @unpack Fb, Ub = cache
+    update_ghost_values_periodic!(eq, problem, Fb, Ub)
 
-        @unpack periodic_x, periodic_y = problem
-        if periodic_x && periodic_y
-            return nothing
-        end
-
-        nx, ny = grid.size
-        nvar = nvariables(eq)
-        @unpack degree, xg, wg = op
-        nd = degree + 1
-        @unpack dx, dy, xf, yf = grid
-        @unpack boundary_condition, boundary_value = problem
-        left, right, bottom, top = boundary_condition
-
-        refresh!(u) = fill!(u, 0.0)
-
-        dt_scaled = scaling_factor * dt
-        wg_scaled = scaling_factor * wg
-
-        # For Dirichlet bc, use upwind flux at faces by assigning both physical
-        # and ghost cells through the bc.
-        if left == dirichlet
-            pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
-            @threaded for j in 1:ny
-                x = xf[1]
-                for k in 1:nd
-                    y = yf[j] + xg[k] * dy[j]
-                    # KLUDGE - Don't allocate so much!
-                    ub, fb = pre_allocated[Threads.threadid()]
-                    for l in 1:nd
-                        tq = t + xg[l] * dt_scaled
-                        ubvalue = boundary_value(x, y, tq)
-                        fbvalue = flux(x, y, ubvalue, eq, 1)
-                        for n in 1:nvar
-                            ub[n] += ubvalue[n] * wg_scaled[l]
-                            fb[n] += fbvalue[n] * wg_scaled[l]
-                        end
-                    end
-                    for n in 1:nvar
-                        Ub[n, k, 1, 1, j] = Ub[n, k, 2, 0, j] = ub[n] # upwind
-                        Fb[n, k, 1, 1, j] = Fb[n, k, 2, 0, j] = fb[n] # upwind
-                    end
-                end
-            end
-        elseif left in [neumann, reflect]
-            @threaded for j in 1:ny
-                for k in 1:nd
-                    for n in 1:nvar
-                        Ub[n, k, 2, 0, j] = Ub[n, k, 1, 1, j]
-                        Fb[n, k, 2, 0, j] = Fb[n, k, 1, 1, j]
-                    end
-                    if left == reflect
-                        Ub[2, k, 2, 0, j] *= -1.0
-                        Fb[1, k, 2, 0, j] *= -1.0
-                        Fb[3, k, 2, 0, j] *= -1.0
-                        Fb[4, k, 2, 0, j] *= -1.0
-                    end
-                end
-            end
-        else
-            println("Incorrect bc specified at left.")
-            @assert false
-        end
-
-        if right == dirichlet
-            pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
-            @threaded for j in 1:ny
-                x = xf[nx + 1]
-                for k in 1:nd
-                    y = yf[j] + xg[k] * dy[j]
-                    # KLUDGE - Improve
-                    ub, fb = pre_allocated[Threads.threadid()]
-                    for l in 1:nd
-                        tq = t + xg[l] * dt_scaled
-                        ubvalue = boundary_value(x, y, tq)
-                        fbvalue = flux(x, y, ubvalue, eq, 1)
-                        for n in 1:nvar
-                            ub[n] += ubvalue[n] * wg_scaled[l]
-                            fb[n] += fbvalue[n] * wg_scaled[l]
-                        end
-                    end
-                    for n in 1:nvar
-                        Ub[n, k, 2, nx, j] = Ub[n, k, 1, nx + 1, j] = ub[n] # upwind
-                        Fb[n, k, 2, nx, j] = Fb[n, k, 1, nx + 1, j] = fb[n] # upwind
-                    end
-                end
-            end
-        elseif right in [reflect, neumann]
-            @threaded for j in 1:ny
-                for k in 1:nd
-                    for n in 1:nvar
-                        Ub[n, k, 1, nx + 1, j] = Ub[n, k, 2, nx, j]
-                        Fb[n, k, 1, nx + 1, j] = Fb[n, k, 2, nx, j]
-                    end
-                    if right == reflect
-                        Ub[2, k, 1, nx + 1, j] *= -1.0
-                        Fb[1, k, 1, nx + 1, j] *= -1.0
-                        Fb[3, k, 1, nx + 1, j] *= -1.0
-                        Fb[4, k, 1, nx + 1, j] *= -1.0
-                    end
-                end
-            end
-        else
-            println("Incorrect bc specified at right.")
-            @assert false
-        end
-
-        if bottom == dirichlet
-            pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
-            @threaded for i in 1:nx
-                y = yf[1]
-                for k in 1:nd
-                    x = xf[i] + xg[k] * dx[i]
-                    ub, fb = pre_allocated[Threads.threadid()]
-                    for l in 1:nd
-                        tq = t + xg[l] * dt_scaled
-                        ubvalue = boundary_value(x, y, tq)
-                        fbvalue = flux(x, y, ubvalue, eq, 2)
-                        for n in 1:nvar
-                            ub[n] += ubvalue[n] * wg_scaled[l]
-                            fb[n] += fbvalue[n] * wg_scaled[l]
-                        end
-                    end
-                    for n in 1:nvar
-                        Ub[n, k, 3, i, 1] = Ub[n, k, 4, i, 0] = ub[n] # upwind
-                        Fb[n, k, 3, i, 1] = Fb[n, k, 4, i, 0] = fb[n] # upwind
-                    end
-                end
-            end
-        elseif bottom in [reflect, neumann, dirichlet]
-            @threaded for i in 1:nx
-                for k in 1:nd
-                    for n in 1:nvar
-                        Ub[n, k, 4, i, 0] = Ub[n, k, 3, i, 1]
-                        Fb[n, k, 4, i, 0] = Fb[n, k, 3, i, 1]
-                    end
-                    if bottom == reflect
-                        Ub[3, k, 4, i, 0] *= -1.0
-                        Fb[1, k, 4, i, 0] *= -1.0
-                        Fb[2, k, 4, i, 0] *= -1.0
-                        Fb[4, k, 4, i, 0] *= -1.0
-                    end
-                end
-            end
-        elseif periodic_y
-            nothing
-        else
-            @assert typeof(bottom) <: Tuple{Any, Any, Any}
-            bc! = bottom[1]
-            bc!(grid, eq, op, Fb, Ub)
-        end
-        if top == dirichlet
-            pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
-            @threaded for i in 1:nx
-                y = yf[ny + 1]
-                for k in 1:nd
-                    x = xf[i] + xg[k] * dx[i]
-                    ub, fb = pre_allocated[Threads.threadid()]
-                    for l in 1:nd
-                        tq = t + xg[l] * dt_scaled
-                        ubvalue = boundary_value(x, y, tq)
-                        fbvalue = flux(x, y, ubvalue, eq, 2)
-                        for n in 1:nvar
-                            ub[n] += ubvalue[n] * wg_scaled[l]
-                            fb[n] += fbvalue[n] * wg_scaled[l]
-                        end
-                    end
-                    for n in 1:nvar
-                        Ub[n, k, 4, i, ny] = Ub[n, k, 3, i, ny + 1] = ub[n] # upwind
-                        Fb[n, k, 4, i, ny] = Fb[n, k, 3, i, ny + 1] = fb[n] # upwind
-                    end
-                end
-            end
-        elseif top in [reflect, neumann]
-            @threaded for i in 1:nx
-                for k in 1:nd
-                    for n in 1:nvar
-                        Ub[n, k, 3, i, ny + 1] = Ub[n, k, 4, i, ny]
-                        Fb[n, k, 3, i, ny + 1] = Fb[n, k, 4, i, ny]
-                    end
-                    if top == reflect
-                        Ub[3, k, 3, i, ny + 1] *= -1.0
-                        Fb[1, k, 3, i, ny + 1] *= -1.0
-                        Fb[2, k, 3, i, ny + 1] *= -1.0
-                        Fb[4, k, 3, i, ny + 1] *= -1.0
-                    end
-                end
-            end
-        elseif periodic_y
-            nothing
-        else
-            @assert typeof(top)<:Tuple{Any, Any, Any} "Incorrect bc specified at top"
-        end
-
-        if scheme.limiter.name == "blend"
-            update_ghost_values_fn_blend!(eq, problem, grid, aux)
-        end
-
+    @unpack periodic_x, periodic_y = problem
+    if periodic_x && periodic_y
         return nothing
+    end
+
+    nx, ny = grid.size
+    nvar = nvariables(eq)
+    @unpack degree, xg, wg = op
+    nd = degree + 1
+    @unpack dx, dy, xf, yf = grid
+    @unpack boundary_condition, boundary_value = problem
+    left, right, bottom, top = boundary_condition
+
+    refresh!(u) = fill!(u, 0.0)
+
+    dt_scaled = scaling_factor * dt
+    wg_scaled = scaling_factor * wg
+
+    # For Dirichlet bc, use upwind flux at faces by assigning both physical
+    # and ghost cells through the bc.
+    if left == dirichlet
+        pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
+        @threaded for j in 1:ny
+            x = xf[1]
+            for k in 1:nd
+                y = yf[j] + xg[k] * dy[j]
+                # KLUDGE - Don't allocate so much!
+                ub, fb = pre_allocated[Threads.threadid()]
+                for l in 1:nd
+                    tq = t + xg[l] * dt_scaled
+                    ubvalue = boundary_value(x, y, tq)
+                    fbvalue = flux(x, y, ubvalue, eq, 1)
+                    for n in 1:nvar
+                        ub[n] += ubvalue[n] * wg_scaled[l]
+                        fb[n] += fbvalue[n] * wg_scaled[l]
+                    end
+                end
+                for n in 1:nvar
+                    Ub[n, k, 1, 1, j] = Ub[n, k, 2, 0, j] = ub[n] # upwind
+                    Fb[n, k, 1, 1, j] = Fb[n, k, 2, 0, j] = fb[n] # upwind
+                end
+            end
+        end
+    elseif left in [neumann, reflect]
+        @threaded for j in 1:ny
+            for k in 1:nd
+                for n in 1:nvar
+                    Ub[n, k, 2, 0, j] = Ub[n, k, 1, 1, j]
+                    Fb[n, k, 2, 0, j] = Fb[n, k, 1, 1, j]
+                end
+                if left == reflect
+                    Ub[2, k, 2, 0, j] *= -1.0
+                    Fb[1, k, 2, 0, j] *= -1.0
+                    Fb[3, k, 2, 0, j] *= -1.0
+                    Fb[4, k, 2, 0, j] *= -1.0
+                end
+            end
+        end
+    else
+        println("Incorrect bc specified at left.")
+        @assert false
+    end
+
+    if right == dirichlet
+        pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
+        @threaded for j in 1:ny
+            x = xf[nx + 1]
+            for k in 1:nd
+                y = yf[j] + xg[k] * dy[j]
+                # KLUDGE - Improve
+                ub, fb = pre_allocated[Threads.threadid()]
+                for l in 1:nd
+                    tq = t + xg[l] * dt_scaled
+                    ubvalue = boundary_value(x, y, tq)
+                    fbvalue = flux(x, y, ubvalue, eq, 1)
+                    for n in 1:nvar
+                        ub[n] += ubvalue[n] * wg_scaled[l]
+                        fb[n] += fbvalue[n] * wg_scaled[l]
+                    end
+                end
+                for n in 1:nvar
+                    Ub[n, k, 2, nx, j] = Ub[n, k, 1, nx + 1, j] = ub[n] # upwind
+                    Fb[n, k, 2, nx, j] = Fb[n, k, 1, nx + 1, j] = fb[n] # upwind
+                end
+            end
+        end
+    elseif right in [reflect, neumann]
+        @threaded for j in 1:ny
+            for k in 1:nd
+                for n in 1:nvar
+                    Ub[n, k, 1, nx + 1, j] = Ub[n, k, 2, nx, j]
+                    Fb[n, k, 1, nx + 1, j] = Fb[n, k, 2, nx, j]
+                end
+                if right == reflect
+                    Ub[2, k, 1, nx + 1, j] *= -1.0
+                    Fb[1, k, 1, nx + 1, j] *= -1.0
+                    Fb[3, k, 1, nx + 1, j] *= -1.0
+                    Fb[4, k, 1, nx + 1, j] *= -1.0
+                end
+            end
+        end
+    else
+        println("Incorrect bc specified at right.")
+        @assert false
+    end
+
+    if bottom == dirichlet
+        pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
+        @threaded for i in 1:nx
+            y = yf[1]
+            for k in 1:nd
+                x = xf[i] + xg[k] * dx[i]
+                ub, fb = pre_allocated[Threads.threadid()]
+                for l in 1:nd
+                    tq = t + xg[l] * dt_scaled
+                    ubvalue = boundary_value(x, y, tq)
+                    fbvalue = flux(x, y, ubvalue, eq, 2)
+                    for n in 1:nvar
+                        ub[n] += ubvalue[n] * wg_scaled[l]
+                        fb[n] += fbvalue[n] * wg_scaled[l]
+                    end
+                end
+                for n in 1:nvar
+                    Ub[n, k, 3, i, 1] = Ub[n, k, 4, i, 0] = ub[n] # upwind
+                    Fb[n, k, 3, i, 1] = Fb[n, k, 4, i, 0] = fb[n] # upwind
+                end
+            end
+        end
+    elseif bottom in [reflect, neumann, dirichlet]
+        @threaded for i in 1:nx
+            for k in 1:nd
+                for n in 1:nvar
+                    Ub[n, k, 4, i, 0] = Ub[n, k, 3, i, 1]
+                    Fb[n, k, 4, i, 0] = Fb[n, k, 3, i, 1]
+                end
+                if bottom == reflect
+                    Ub[3, k, 4, i, 0] *= -1.0
+                    Fb[1, k, 4, i, 0] *= -1.0
+                    Fb[2, k, 4, i, 0] *= -1.0
+                    Fb[4, k, 4, i, 0] *= -1.0
+                end
+            end
+        end
+    elseif periodic_y
+        nothing
+    else
+        @assert typeof(bottom) <: Tuple{Any, Any, Any}
+        bc! = bottom[1]
+        bc!(grid, eq, op, Fb, Ub)
+    end
+    if top == dirichlet
+        pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
+        @threaded for i in 1:nx
+            y = yf[ny + 1]
+            for k in 1:nd
+                x = xf[i] + xg[k] * dx[i]
+                ub, fb = pre_allocated[Threads.threadid()]
+                for l in 1:nd
+                    tq = t + xg[l] * dt_scaled
+                    ubvalue = boundary_value(x, y, tq)
+                    fbvalue = flux(x, y, ubvalue, eq, 2)
+                    for n in 1:nvar
+                        ub[n] += ubvalue[n] * wg_scaled[l]
+                        fb[n] += fbvalue[n] * wg_scaled[l]
+                    end
+                end
+                for n in 1:nvar
+                    Ub[n, k, 4, i, ny] = Ub[n, k, 3, i, ny + 1] = ub[n] # upwind
+                    Fb[n, k, 4, i, ny] = Fb[n, k, 3, i, ny + 1] = fb[n] # upwind
+                end
+            end
+        end
+    elseif top in [reflect, neumann]
+        @threaded for i in 1:nx
+            for k in 1:nd
+                for n in 1:nvar
+                    Ub[n, k, 3, i, ny + 1] = Ub[n, k, 4, i, ny]
+                    Fb[n, k, 3, i, ny + 1] = Fb[n, k, 4, i, ny]
+                end
+                if top == reflect
+                    Ub[3, k, 3, i, ny + 1] *= -1.0
+                    Fb[1, k, 3, i, ny + 1] *= -1.0
+                    Fb[2, k, 3, i, ny + 1] *= -1.0
+                    Fb[4, k, 3, i, ny + 1] *= -1.0
+                end
+            end
+        end
+    elseif periodic_y
+        nothing
+    else
+        @assert typeof(top)<:Tuple{Any, Any, Any} "Incorrect bc specified at top"
+    end
+
+    if scheme.limiter.name == "blend"
+        update_ghost_values_fn_blend!(eq, problem, grid, aux)
+    end
+
+    return nothing
     end # timer
 end
 
