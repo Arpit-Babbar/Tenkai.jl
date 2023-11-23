@@ -1922,6 +1922,16 @@ function get_blended_flux_x(el_x, el_y, jy, eq::AbstractEquations{2}, dt, grid,
     # Test whether lower order update is even admissible
     c_ll = (dt / dx[el_x - 1]) / (wg[nd] * λx_ll) # c is such that u_new = u_prev - c*(Fn-fn)
     low_update_ll = u_ll_node - c_ll * (fn - fn_inner_ll)
+    test_update_ll = u_ll_node - c_ll * (Fn - fn_inner_ll)
+    if is_admissible(eq, low_update_ll) == false && el_x > 1
+        # @warn "Low x-flux not admissible at " (el_x-1),el_y,xf,y
+    end
+
+    if !(is_admissible(eq, test_update_ll))
+        @debug "Zhang-Shu fix needed at " (el_x - 1), el_y, xf, y
+        Fn = zhang_shu_flux_fix(eq, u_ll_node, low_update_ll,
+                                Fn, fn_inner_ll, fn, c_ll)
+    end
 
     # Now we see the update at solution point in element (el_x,el_y)
     u_rr_node = get_node_vars(u1, eq, 1, jy, el_x, el_y)
@@ -1932,32 +1942,16 @@ function get_blended_flux_x(el_x, el_y, jy, eq::AbstractEquations{2}, dt, grid,
     # Test whether lower order update is even admissible
     c_rr = -(dt / dx[el_x]) / (wg[1] * λx_rr) # c is such that u_new = u_prev - c*(Fn-fn)
     low_update_rr = u_rr_node - c_rr * (fn - fn_inner_rr)
-
-    if is_admissible(eq, low_update_ll) == false && el_x > 1
-        # @warn "Low x-flux not admissible at " (el_x-1),el_y,xf,y
-    end
-
     if is_admissible(eq, low_update_rr) == false && el_x < nx + 1
         # @warn "Lower x-flux not admissible at " el_x,el_y,xf,y
     end
-
-    test_update_ll = u_ll_node - c_ll * (Fn - fn_inner_ll)
     test_update_rr = u_rr_node - c_rr * (Fn - fn_inner_rr)
 
-    if !(is_admissible(eq, test_update_ll) && is_admissible(eq, test_update_rr))
+    if !(is_admissible(eq, test_update_rr))
         @debug "Zhang-Shu fix needed at " (el_x - 1), el_y, xf, y
-        Fn = zhang_shu_flux_fix(eq, Fn, fn,                   # eq, high order flux, low order flux
-                                u_ll_node, u_rr_node,         # Previous time level
-                                low_update_ll, low_update_rr, # low order updates
-                                fn_inner_ll, fn_inner_rr,     # flux from inner solution points
-                                c_ll, c_rr)
+        Fn = zhang_shu_flux_fix(eq, u_rr_node, low_update_rr, Fn, fn_inner_rr,
+                                fn, c_rr)
     end
-
-    # if is_admissible(eq, test_update_rr) == false
-    #    @debug "Zhang-Shu fix needed at " el_x, el_y, xf, y
-    #    Fn = zhang_shu_flux_fix(eq, u_rr_node, low_update_rr, Fn, fn_inner_rr,
-    #                            fn, -(dt/dx[el_x]) / (wg[1]*λx_rr))
-    # end
 
     return Fn
 end
