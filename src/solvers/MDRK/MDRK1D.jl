@@ -158,7 +158,8 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op,
         u = @view u1[:, :, cell]
         r = @view res[:, :, cell]
         blend.blend_cell_residual!(cell, eq, scheme, aux, lamx, dt, dx,
-                                   grid.xf[cell], op, u1, u, cache.ua, nothing, r)
+                                   grid.xf[cell], op, u1, u, cache.ua, nothing, r,
+                                   0.5)
         # Interpolate to faces
         for i in Base.OneTo(nd)
             U_node = get_node_vars(U, eq, i)

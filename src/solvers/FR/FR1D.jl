@@ -226,7 +226,8 @@ end
 # Add numerical flux to residual
 #-------------------------------------------------------------------------------
 function compute_face_residual!(eq::AbstractEquations{1}, grid, op, scheme,
-                                param, aux, t, dt, u1, Fb, Ub, ua, res)
+                                param, aux, t, dt, u1, Fb, Ub, ua, res,
+                                scaling_factor = 1.0)
     @timeit aux.timer "Face residual" begin
     #! format: noindent
     @unpack xg, wg, bl, br = op
@@ -247,7 +248,7 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, scheme,
                                                    dt, grid, op,
                                                    scheme, param,
                                                    Fn, aux, nothing,
-                                                   res)
+                                                   res, scaling_factor)
         for ix in 1:nd
             for n in 1:nvariables(eq)
                 res[n, ix, i - 1] += dt / dx[i - 1] * blend_fac[1] * Fn[n] * br[ix]
@@ -1449,7 +1450,8 @@ end
 # 1st order FV cell residual
 @inbounds @inline function blend_cell_residual_fo!(cell, eq::AbstractEquations{1},
                                                    scheme, aux, lamx,
-                                                   dt, dx, xf, op, u1, u, ua, f, r)
+                                                   dt, dx, xf, op, u1, u, ua, f, r,
+                                                   scaling_factor = 1.0)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead, it's supposed
     #! format: noindent
     # to be 0.25 microseconds
@@ -1472,11 +1474,9 @@ end
     fill!(resl, zero(eltype(resl)))
     for j in 2:nd
         xx = xxf[j]
-        # @views ul, ur = u[:,j-1], u[:,j]
-        # fl, fr = flux(xx, ul, eq), flux(xx, ur, eq)
-        fn = @views num_flux(xx, u[:, j - 1], u[:, j],
-                             f[:, j - 1], f[:, j],
-                             u[:, j - 1], u[:, j], eq, 1)
+        @views ul, ur = u[:,j-1], u[:,j]
+        fl, fr = flux(xx, ul, eq), flux(xx, ur, eq)
+        fn = scaling_factor * num_flux(xx, ul, ur, fl, fr, ul, ur, eq, 1)
         for n in 1:nvar
             resl[n, j - 1] += fn[n] / wg[j - 1]
             resl[n, j] -= fn[n] / wg[j]
@@ -1491,7 +1491,8 @@ end
 @inbounds @inline function blend_face_residual_fo!(i, xf, u1, ua,
                                                    eq::AbstractEquations{1},
                                                    dt, grid, op, scheme, param,
-                                                   Fn, aux, lamx, res)
+                                                   Fn, aux, lamx, res,
+                                                   scaling_factor)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead,
     #! format: noindent
     # it's supposed to be 0.25 microseconds
@@ -1516,7 +1517,7 @@ end
     ul, ur = @views u1[:, nd, i - 1], u1[:, 1, i]
     fl = flux(xf, ul, eq)
     fr = flux(xf, ur, eq)
-    fn = num_flux(xf, ul, ur, fl, fr, ul, ur, eq, 1)
+    fn = scaling_factor * num_flux(xf, ul, ur, fl, fr, ul, ur, eq, 1)
 
     # alp = test_alp(i, eq, dt, grid, blend, scheme, xf, u1, fn, Fn, lamx, op, alp)
 
@@ -1928,7 +1929,8 @@ end
 end
 
 @inline function trivial_cell_residual(i, eq::AbstractEquations{1}, num_flux,
-                                       aux, lamx, dt, dx, xf, op, u1, u, ua, f, r)
+                                       aux, lamx, dt, dx, xf, op, u1, u, ua, f, r,
+                                       scaling_factor=1)
     return nothing
 end
 
@@ -2003,7 +2005,7 @@ end
 
 @inline function trivial_face_residual(i, x, u1, ua, eq::AbstractEquations{1},
                                        dt, grid, op, scheme, param, Fn, aux,
-                                       lamx, res)
+                                       lamx, res, scaling_factor=1)
     return Fn, (1.0, 1.0)
 end
 

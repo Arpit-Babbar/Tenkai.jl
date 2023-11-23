@@ -41,7 +41,7 @@ using MuladdMacro
 #-------------------------------------------------------------------------------
 function perform_mdrk_step!(eq, t, iter, fcount, dt, grid, problem, scheme,
                             param, aux, op, uprev, ua, res, Fb, Ub, cache,
-                            unew, cell_residual!, boundary_scaling_factor)
+                            unew, cell_residual!, stage_scaling_factor)
     @timeit aux.timer "MDRK Stages" begin
     #! format: noindent
     pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme,
@@ -51,9 +51,9 @@ function perform_mdrk_step!(eq, t, iter, fcount, dt, grid, problem, scheme,
                                                      cache)
 
     update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache, t,
-                              dt, boundary_scaling_factor)
+                              dt, stage_scaling_factor)
     compute_face_residual!(eq, grid, op, scheme, param, aux, t, dt, uprev,
-                           Fb, Ub, ua, res)
+                           Fb, Ub, ua, res, stage_scaling_factor)
     @turbo unew .= uprev # Does nothing in the second stage. TODO - Fix this for performance
     update_solution_lwfr!(unew, res, aux) # s1: us = u1 - res, s2: u1 = u1 - res
     compute_cell_average!(ua, unew, t, eq, grid, problem, scheme, aux, op)
