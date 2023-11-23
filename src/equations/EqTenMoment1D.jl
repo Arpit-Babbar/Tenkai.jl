@@ -322,171 +322,174 @@ varnames(eq::TenMoment1D, i::Int) = eq.varnames[i]
 function Tenkai.initialize_plot(eq::TenMoment1D, op, grid, problem, scheme, timer, u1,
                                 ua)
     @timeit timer "Write solution" begin
-        @timeit timer "Initialize write solution" begin
-            # Clear and re-create output directory
-            rm("output", force = true, recursive = true)
-            mkdir("output")
+    #! format: noindent
+    @timeit timer "Initialize write solution" begin
+    #! format: noindent
+    # Clear and re-create output directory
+    rm("output", force = true, recursive = true)
+    mkdir("output")
 
-            xc = grid.xc
-            nx = grid.size
-            @unpack xg = op
-            nd = op.degree + 1
-            nu = max(nd, 2)
-            xu = LinRange(0.0, 1.0, nu)
-            Vu = Vandermonde_lag(xg, xu)
-            xf = grid.xf
-            nvar = nvariables(eq)
-            # Create plot objects to be later collected as subplots
+    xc = grid.xc
+    nx = grid.size
+    @unpack xg = op
+    nd = op.degree + 1
+    nu = max(nd, 2)
+    xu = LinRange(0.0, 1.0, nu)
+    Vu = Vandermonde_lag(xg, xu)
+    xf = grid.xf
+    nvar = nvariables(eq)
+    # Create plot objects to be later collected as subplots
 
-            # Creating a subplot for title
-            p_title = plot(title = "Cell averages plot, $nx cells, t = 0.0",
-                           grid = false, showaxis = false, bottom_margin = 0Plots.px)
-            p_ua, p_u1 = [plot() for _ in 1:nvar], [plot() for _ in 1:nvar]
-            labels = varnames(eq)
-            y = zeros(nx) # put dummy to fix plotly bug with OffsetArrays
-            for n in 1:nvar
-                @views plot!(p_ua[n], xc, y, label = "Approximate",
-                             linestyle = :dot, seriestype = :scatter,
-                             color = :blue, markerstrokestyle = :dot,
-                             markershape = :circle, markersize = 2,
-                             markerstrokealpha = 0)
-                xlabel!(p_ua[n], "x")
-                ylabel!(p_ua[n], labels[n])
-            end
-            l_super = @layout[a{0.01h}; b c d; e f g] # Selecting layout for p_title being title
-            p_ua = plot(p_title, p_ua..., layout = l_super,
-                        size = (1500, 500)) # Make subplots
+    # Creating a subplot for title
+    p_title = plot(title = "Cell averages plot, $nx cells, t = 0.0",
+                   grid = false, showaxis = false, bottom_margin = 0Plots.px)
+    p_ua, p_u1 = [plot() for _ in 1:nvar], [plot() for _ in 1:nvar]
+    labels = varnames(eq)
+    y = zeros(nx) # put dummy to fix plotly bug with OffsetArrays
+    for n in 1:nvar
+        @views plot!(p_ua[n], xc, y, label = "Approximate",
+                     linestyle = :dot, seriestype = :scatter,
+                     color = :blue, markerstrokestyle = :dot,
+                     markershape = :circle, markersize = 2,
+                     markerstrokealpha = 0)
+        xlabel!(p_ua[n], "x")
+        ylabel!(p_ua[n], labels[n])
+    end
+    l_super = @layout[a{0.01h}; b c d; e f g] # Selecting layout for p_title being title
+    p_ua = plot(p_title, p_ua..., layout = l_super,
+                size = (1500, 500)) # Make subplots
 
-            # Set up p_u1 to contain polynomial approximation as a different curve
-            # for each cell
-            x = LinRange(xf[1], xf[2], nu)
-            up1 = zeros(nvar, nd)
-            u = zeros(nu)
-            for ii in 1:nd
-                u_node = get_node_vars(u1, eq, ii, 1)
-                up1[:, ii] .= con2prim(eq, u_node)
-            end
+    # Set up p_u1 to contain polynomial approximation as a different curve
+    # for each cell
+    x = LinRange(xf[1], xf[2], nu)
+    up1 = zeros(nvar, nd)
+    u = zeros(nu)
+    for ii in 1:nd
+        u_node = get_node_vars(u1, eq, ii, 1)
+        up1[:, ii] .= con2prim(eq, u_node)
+    end
 
-            for n in 1:nvar
-                u = @views Vu * up1[n, :]
-                plot!(p_u1[n], x, u, color = :red, legend = false)
-                xlabel!(p_u1[n], "x")
-                ylabel!(p_u1[n], labels[n])
-            end
+    for n in 1:nvar
+        u = @views Vu * up1[n, :]
+        plot!(p_u1[n], x, u, color = :red, legend = false)
+        xlabel!(p_u1[n], "x")
+        ylabel!(p_u1[n], labels[n])
+    end
 
-            for i in 2:nx
-                for ii in 1:nd
-                    u_node = get_node_vars(u1, eq, ii, i)
-                    up1[:, ii] .= con2prim(eq, u_node)
-                end
-                x = LinRange(xf[i], xf[i + 1], nu)
-                for n in 1:nvar
-                    u = @views Vu * up1[n, :]
-                    plot!(p_u1[n], x, u, color = :red, label = nothing, legend = false)
-                end
-            end
+    for i in 2:nx
+        for ii in 1:nd
+            u_node = get_node_vars(u1, eq, ii, i)
+            up1[:, ii] .= con2prim(eq, u_node)
+        end
+        x = LinRange(xf[i], xf[i + 1], nu)
+        for n in 1:nvar
+            u = @views Vu * up1[n, :]
+            plot!(p_u1[n], x, u, color = :red, label = nothing, legend = false)
+        end
+    end
 
-            l = @layout[a{0.01h}; b c d; e f g] # Selecting layout for p_title being title
-            p_u1 = plot(p_title, p_u1..., layout = l,
-                        size = (1700, 500)) # Make subplots
+    l = @layout[a{0.01h}; b c d; e f g] # Selecting layout for p_title being title
+    p_u1 = plot(p_title, p_u1..., layout = l,
+                size = (1700, 500)) # Make subplots
 
-            anim_ua, anim_u1 = Animation(), Animation() # Initialize animation objects
-            plot_data = PlotData(p_ua, anim_ua, p_u1, anim_u1)
-            return plot_data
-        end # timer
+    anim_ua, anim_u1 = Animation(), Animation() # Initialize animation objects
+    plot_data = PlotData(p_ua, anim_ua, p_u1, anim_u1)
+    return plot_data
+    end # timer
     end # timer
 end
 
 function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::TenMoment1D, grid,
                             problem, param, op, ua, u1, aux, ndigits = 3)
     @timeit aux.timer "Write solution" begin
-        @unpack plot_data = aux
-        avg_filename = get_filename("output/avg", ndigits, fcount)
-        @unpack p_ua, p_u1, anim_ua, anim_u1 = plot_data
-        @unpack final_time = problem
-        xc = grid.xc
-        nx = grid.size
-        @unpack xg = op
-        nd = op.degree + 1
-        nu = max(nd, 2)
-        xu = LinRange(0.0, 1.0, nu)
-        Vu = Vandermonde_lag(xg, xu)
-        nvar = nvariables(eq)
-        @unpack save_time_interval, save_iter_interval, animate = param
-        avg_file = open("$avg_filename.txt", "w")
-        up_ = zeros(nvar)
-        ylims = [[Inf, -Inf] for _ in 1:nvar] # set ylims for plots of all variables
-        for i in 1:nx
-            ua_node = get_node_vars(ua, eq, i)
-            up_ .= con2prim(eq, ua_node)
-            @printf(avg_file, "%e %e %e %e %e %e %e \n", xc[i], up_...)
-            # TOTHINK - Check efficiency of printf
-            for n in eachvariable(eq)
-                p_ua[n + 1][1][:y][i] = @views up_[n]    # Update y-series
-                ylims[n][1] = min(ylims[n][1], up_[n]) # Compute ymin
-                ylims[n][2] = max(ylims[n][2], up_[n]) # Compute ymax
-            end
+    #! format: noindent
+    @unpack plot_data = aux
+    avg_filename = get_filename("output/avg", ndigits, fcount)
+    @unpack p_ua, p_u1, anim_ua, anim_u1 = plot_data
+    @unpack final_time = problem
+    xc = grid.xc
+    nx = grid.size
+    @unpack xg = op
+    nd = op.degree + 1
+    nu = max(nd, 2)
+    xu = LinRange(0.0, 1.0, nu)
+    Vu = Vandermonde_lag(xg, xu)
+    nvar = nvariables(eq)
+    @unpack save_time_interval, save_iter_interval, animate = param
+    avg_file = open("$avg_filename.txt", "w")
+    up_ = zeros(nvar)
+    ylims = [[Inf, -Inf] for _ in 1:nvar] # set ylims for plots of all variables
+    for i in 1:nx
+        ua_node = get_node_vars(ua, eq, i)
+        up_ .= con2prim(eq, ua_node)
+        @printf(avg_file, "%e %e %e %e %e %e %e \n", xc[i], up_...)
+        # TOTHINK - Check efficiency of printf
+        for n in eachvariable(eq)
+            p_ua[n + 1][1][:y][i] = @views up_[n]    # Update y-series
+            ylims[n][1] = min(ylims[n][1], up_[n]) # Compute ymin
+            ylims[n][2] = max(ylims[n][2], up_[n]) # Compute ymax
         end
-        close(avg_file)
-        for n in 1:nvar # set ymin, ymax for ua, u1 plots
-            ylims!(p_ua[n + 1], (ylims[n][1] - 0.1, ylims[n][2] + 0.1))
-            ylims!(p_u1[n + 1], (ylims[n][1] - 0.1, ylims[n][2] + 0.1))
-        end
-        t = round(time; digits = 3)
-        title!(p_ua[1], "Cell averages plot, $nx cells, t = $t")
-        sol_filename = get_filename("output/sol", ndigits, fcount)
-        sol_file = open(sol_filename * ".txt", "w")
-        up1 = zeros(nvar, nd)
+    end
+    close(avg_file)
+    for n in 1:nvar # set ymin, ymax for ua, u1 plots
+        ylims!(p_ua[n + 1], (ylims[n][1] - 0.1, ylims[n][2] + 0.1))
+        ylims!(p_u1[n + 1], (ylims[n][1] - 0.1, ylims[n][2] + 0.1))
+    end
+    t = round(time; digits = 3)
+    title!(p_ua[1], "Cell averages plot, $nx cells, t = $t")
+    sol_filename = get_filename("output/sol", ndigits, fcount)
+    sol_file = open(sol_filename * ".txt", "w")
+    up1 = zeros(nvar, nd)
 
-        u = zeros(nvar, nu)
-        x = zeros(nu)
-        for i in 1:nx
-            for ii in 1:nd
-                u_node = get_node_vars(u1, eq, ii, i)
-                up1[:, ii] .= con2prim(eq, u_node)
-            end
-            @. x = grid.xf[i] + grid.dx[i] * xu
-            @views mul!(u, up1, Vu')
-            for n in 1:nvar
-                p_u1[n + 1][i][:y] = u[n, :]
-            end
-            for ii in 1:nu
-                u_node = get_node_vars(u, eq, ii)
-                @printf(sol_file, "%e %e %e %e %e %e %e \n", x[ii], u_node...)
-            end
+    u = zeros(nvar, nu)
+    x = zeros(nu)
+    for i in 1:nx
+        for ii in 1:nd
+            u_node = get_node_vars(u1, eq, ii, i)
+            up1[:, ii] .= con2prim(eq, u_node)
         end
-        close(sol_file)
-        title!(p_u1[1], "Numerical Solution, $nx cells, t = $t")
-        println("Wrote $sol_filename.txt, $avg_filename.txt")
-        if problem.final_time - time < 1e-10
-            cp("$avg_filename.txt", "./output/avg.txt", force = true)
-            cp("$sol_filename.txt", "./output/sol.txt", force = true)
-            println("Wrote final solution to avg.txt, sol.txt.")
+        @. x = grid.xf[i] + grid.dx[i] * xu
+        @views mul!(u, up1, Vu')
+        for n in 1:nvar
+            p_u1[n + 1][i][:y] = u[n, :]
         end
-        if animate == true
-            if abs(time - final_time) < 1.0e-10
+        for ii in 1:nu
+            u_node = get_node_vars(u, eq, ii)
+            @printf(sol_file, "%e %e %e %e %e %e %e \n", x[ii], u_node...)
+        end
+    end
+    close(sol_file)
+    title!(p_u1[1], "Numerical Solution, $nx cells, t = $t")
+    println("Wrote $sol_filename.txt, $avg_filename.txt")
+    if problem.final_time - time < 1e-10
+        cp("$avg_filename.txt", "./output/avg.txt", force = true)
+        cp("$sol_filename.txt", "./output/sol.txt", force = true)
+        println("Wrote final solution to avg.txt, sol.txt.")
+    end
+    if animate == true
+        if abs(time - final_time) < 1.0e-10
+            frame(anim_ua, p_ua)
+            frame(anim_u1, p_u1)
+        end
+        if save_iter_interval > 0
+            animate_iter_interval = save_iter_interval
+            if mod(iter, animate_iter_interval) == 0
                 frame(anim_ua, p_ua)
                 frame(anim_u1, p_u1)
             end
-            if save_iter_interval > 0
-                animate_iter_interval = save_iter_interval
-                if mod(iter, animate_iter_interval) == 0
-                    frame(anim_ua, p_ua)
-                    frame(anim_u1, p_u1)
-                end
-            elseif save_time_interval > 0
-                animate_time_interval = save_time_interval
-                k1, k2 = ceil(time / animate_time_interval),
-                         floor(time / animate_time_interval)
-                if (abs(time - k1 * animate_time_interval) < 1e-10 ||
-                    abs(time - k2 * animate_time_interval) < 1e-10)
-                    frame(anim_ua, p_ua)
-                    frame(anim_u1, p_u1)
-                end
+        elseif save_time_interval > 0
+            animate_time_interval = save_time_interval
+            k1, k2 = ceil(time / animate_time_interval),
+                     floor(time / animate_time_interval)
+            if (abs(time - k1 * animate_time_interval) < 1e-10 ||
+                abs(time - k2 * animate_time_interval) < 1e-10)
+                frame(anim_ua, p_ua)
+                frame(anim_u1, p_u1)
             end
         end
-        fcount += 1
-        return fcount
+    end
+    fcount += 1
+    return fcount
     end # timer
 end
 
@@ -542,52 +545,53 @@ end
 function post_process_soln(eq::TenMoment1D, aux, problem, param)
     @unpack timer, error_file = aux
     @timeit timer "Write solution" begin
-        println("Post processing solution")
-        @unpack plot_data = aux
-        @unpack p_ua, p_u1, anim_ua, anim_u1 = plot_data
-        @unpack animate, saveto = param
-        @unpack initial_value = problem
+    #! format: noindent
+    println("Post processing solution")
+    @unpack plot_data = aux
+    @unpack p_ua, p_u1, anim_ua, anim_u1 = plot_data
+    @unpack animate, saveto = param
+    @unpack initial_value = problem
 
-        exact_data = exact_solution_data(initial_value)
-        @show exact_data
-        if exact_data !== nothing
-            for n in eachvariable(eq)
-                @views plot!(p_ua[n + 1], exact_data[:, 1], exact_data[:, n + 1],
-                             label = "Exact",
-                             color = :black)
-                @views plot!(p_u1[n + 1], exact_data[:, 1], exact_data[:, n + 1],
-                             label = "Exact",
-                             color = :black, legend = true)
-                ymin = min(minimum(p_ua[n + 1][1][:y]), minimum(exact_data[:, n + 1]))
-                ymax = max(maximum(p_ua[n + 1][1][:y]), maximum(exact_data[:, n + 1]))
-                ylims!(p_ua[n + 1], (ymin - 0.1, ymax + 0.1))
-                ylims!(p_u1[n + 1], (ymin - 0.1, ymax + 0.1))
-            end
+    exact_data = exact_solution_data(initial_value)
+    @show exact_data
+    if exact_data !== nothing
+        for n in eachvariable(eq)
+            @views plot!(p_ua[n + 1], exact_data[:, 1], exact_data[:, n + 1],
+                         label = "Exact",
+                         color = :black)
+            @views plot!(p_u1[n + 1], exact_data[:, 1], exact_data[:, n + 1],
+                         label = "Exact",
+                         color = :black, legend = true)
+            ymin = min(minimum(p_ua[n + 1][1][:y]), minimum(exact_data[:, n + 1]))
+            ymax = max(maximum(p_ua[n + 1][1][:y]), maximum(exact_data[:, n + 1]))
+            ylims!(p_ua[n + 1], (ymin - 0.1, ymax + 0.1))
+            ylims!(p_u1[n + 1], (ymin - 0.1, ymax + 0.1))
         end
-        savefig(p_ua, "output/avg.png")
-        savefig(p_u1, "output/sol.png")
-        savefig(p_ua, "output/avg.html")
-        savefig(p_u1, "output/sol.html")
-        if animate == true
-            gif(anim_ua, "output/avg.mp4", fps = 5)
-            gif(anim_u1, "output/sol.mp4", fps = 5)
-        end
-        println("Wrote avg, sol in gif,html,png format to output directory.")
-        plot(p_ua)
-        plot(p_u1)
+    end
+    savefig(p_ua, "output/avg.png")
+    savefig(p_u1, "output/sol.png")
+    savefig(p_ua, "output/avg.html")
+    savefig(p_u1, "output/sol.html")
+    if animate == true
+        gif(anim_ua, "output/avg.mp4", fps = 5)
+        gif(anim_u1, "output/sol.mp4", fps = 5)
+    end
+    println("Wrote avg, sol in gif,html,png format to output directory.")
+    plot(p_ua)
+    plot(p_u1)
 
-        close(error_file)
-        if saveto != "none"
-            if saveto[end] == "/"
-                saveto = saveto[1:(end - 1)]
-            end
-            mkpath(saveto)
-            for file in readdir("./output")
-                cp("./output/$file", "$saveto/$file", force = true)
-            end
-            cp("./error.txt", "$saveto/error.txt", force = true)
-            println("Saved output files to $saveto")
+    close(error_file)
+    if saveto != "none"
+        if saveto[end] == "/"
+            saveto = saveto[1:(end - 1)]
         end
+        mkpath(saveto)
+        for file in readdir("./output")
+            cp("./output/$file", "$saveto/$file", force = true)
+        end
+        cp("./error.txt", "$saveto/error.txt", force = true)
+        println("Saved output files to $saveto")
+    end
     end # timer
 
     # Print timer data on screen

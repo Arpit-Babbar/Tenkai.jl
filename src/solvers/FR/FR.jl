@@ -706,19 +706,20 @@ end
 
 function apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     @timeit aux.timer "Limiter" begin
-        # TOTHINK - (very small) allocations happening outside limiter funcs?
-        # Are they just because of the assertion in tvbβ or is there a worrisome cause?
-        @unpack limiter = scheme
-        if limiter.name == "tvb"
-            apply_tvb_limiter!(eq, problem, scheme, grid, param, op, ua, u1, aux)
-        elseif limiter.name == "tvbβ"
-            apply_tvb_limiterβ!(eq, problem, scheme, grid, param, op, ua, u1, aux)
-        elseif limiter.name == "hierarchical"
-            apply_hierarchical_limiter!(eq, problem, scheme, grid, param, op, ua, u1,
-                                        aux)
-        end
-        apply_bound_limiter!(eq, grid, scheme, param, op, ua, u1, aux)
-        return nothing
+    #! format: noindent
+    # TOTHINK - (very small) allocations happening outside limiter funcs?
+    # Are they just because of the assertion in tvbβ or is there a worrisome cause?
+    @unpack limiter = scheme
+    if limiter.name == "tvb"
+        apply_tvb_limiter!(eq, problem, scheme, grid, param, op, ua, u1, aux)
+    elseif limiter.name == "tvbβ"
+        apply_tvb_limiterβ!(eq, problem, scheme, grid, param, op, ua, u1, aux)
+    elseif limiter.name == "hierarchical"
+        apply_hierarchical_limiter!(eq, problem, scheme, grid, param, op, ua, u1,
+                                    aux)
+    end
+    apply_bound_limiter!(eq, grid, scheme, param, op, ua, u1, aux)
+    return nothing
     end # timer
 end
 
@@ -784,19 +785,21 @@ end
 function pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme,
                               param, aux, op, u1, ua)
     @timeit aux.timer "Limiter" begin
-        @timeit aux.timer "Pre process limiter" begin
-            # TOTHINK - (very small) allocations happening outside limiter funcs?
-            # Are they just because of the assertion in tvbβ or is there a worrisome cause?
-            @unpack limiter = scheme
-            if limiter.name == "blend"
-                update_ghost_values_u1!(eq, problem, grid, op, u1, aux, t)
-                modal_smoothness_indicator(eq, t, iter, fcount, dt, grid, scheme,
-                                           problem, param, aux, op, u1, ua)
-                return nothing
-            elseif limiter.name == "tvb"
-                return nothing
-            end
-        end # timer
+    #! format: noindent
+    @timeit aux.timer "Pre process limiter" begin
+    #! format: noindent
+    # TOTHINK - (very small) allocations happening outside limiter funcs?
+    # Are they just because of the assertion in tvbβ or is there a worrisome cause?
+    @unpack limiter = scheme
+    if limiter.name == "blend"
+        update_ghost_values_u1!(eq, problem, grid, op, u1, aux, t)
+        modal_smoothness_indicator(eq, t, iter, fcount, dt, grid, scheme,
+                                   problem, param, aux, op, u1, ua)
+        return nothing
+    elseif limiter.name == "tvb"
+        return nothing
+    end
+    end # timer
     end # timer
 end
 
@@ -877,26 +880,27 @@ end
 #-------------------------------------------------------------------------------
 function adjust_time_step(problem, param, t, dt, aux)
     @timeit aux.timer "Time step computation" begin
-        # Adjust to reach final time exactly
-        @unpack final_time = problem
-        if t + dt > final_time
-            dt = final_time - t
+    #! format: noindent
+    # Adjust to reach final time exactly
+    @unpack final_time = problem
+    if t + dt > final_time
+        dt = final_time - t
+        return dt
+    end
+
+    # Adjust to reach next solution saving time
+    @unpack save_time_interval = param
+    if save_time_interval > 0.0
+        next_save_time = ceil(t / save_time_interval) * save_time_interval
+        # If t is not a plotting time, we check if the next time
+        # would step over the plotting time to adjust dt
+        if abs(t - next_save_time) > 1e-10 && t + dt - next_save_time > -1e-10
+            dt = next_save_time - t
             return dt
         end
+    end
 
-        # Adjust to reach next solution saving time
-        @unpack save_time_interval = param
-        if save_time_interval > 0.0
-            next_save_time = ceil(t / save_time_interval) * save_time_interval
-            # If t is not a plotting time, we check if the next time
-            # would step over the plotting time to adjust dt
-            if abs(t - next_save_time) > 1e-10 && t + dt - next_save_time > -1e-10
-                dt = next_save_time - t
-                return dt
-            end
-        end
-
-        return dt
+    return dt
     end # timer
 end
 
