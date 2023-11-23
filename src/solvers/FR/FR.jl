@@ -606,16 +606,6 @@ function zhang_shu_flux_fix(eq::AbstractEquations,
     return Fn
 end
 
-function zhang_shu_flux_fix(eq::AbstractEquations,
-                            Fn, fn,                   # eq, high order flux, low order flux
-                            u_prev_ll, u_prev_rr,     # solution at previous time level
-                            u_low_ll, u_low_rr,       # low order updates
-                            fn_inner_ll, fn_inner_rr, # flux from inner solution points
-                            c_ll, c_rr)
-    # This method is to be defined for each equation
-    return Fn
-end
-
 function admissibility_tolerance(eq::AbstractEquations)
     return 0.0
 end
