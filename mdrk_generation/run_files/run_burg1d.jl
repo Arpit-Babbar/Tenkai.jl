@@ -1,51 +1,59 @@
-using StaticArrays
 using Tenkai
-Eq = Tenkai.EqLinAdv2D
+using Plots
+Eq = Tenkai.EqBurg1D
+plotlyjs()
 
-xmin, xmax = 0.0, 1.0
-ymin, ymax = 0.0, 1.0
-final_time = 0.1 * pi
-boundary_condition = (dirichlet, dirichlet, dirichlet, dirichlet)
-velocity, initial_value, exact_solution = Eq.composite2d_data
-boundary_value = exact_solution
 #------------------------------------------------------------------------------
+xmin, xmax = 0.0, 2.0 * pi
+initial_value = Eq.initial_value_burger_sin
+boundary_value = Eq.zero_boundary_value # dummy function
+boundary_condition = (periodic, periodic)
+final_time = 2.0
+
+exact_solution = Eq.exact_solution_burger_sin
+
 degree = 3
 solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
-bound_limit = "no"
 bflux = evaluate
 numerical_flux = Eq.rusanov
+bound_limit = "no"
 
-nx, ny = 100, 100
-bounds = ([-Inf], [Inf])
+nx = 100
 cfl = 0.0
-tvbM = 100.0
+bounds = ([-0.2], [0.2])
+tvbM = 0.0
 save_iter_interval = 0
-save_time_interval = 0.1 * pi
+save_time_interval = 0.0 # final_time/10.0
 compute_error_interval = 0
-cfl_safety_factor = 0.5
-pure_fv = false
+diss = "2"
+animate = true
 #------------------------------------------------------------------------------
-grid_size = [nx, ny]
-domain = [xmin, xmax, ymin, ymax]
+grid_size = nx
+domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
-eq = Eq.get_equation(velocity)
-limiter = setup_limiter_blend(blend_type = mh_blend(eq),
+equation = Eq.get_equation()
+no_limiter = setup_limiter_none()
+blend_limiter = setup_limiter_blend(
+                              blend_type = mh_blend(equation),
+                              # indicating_variables = Eq.rho_p_indicator!,
                               indicating_variables = conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner",
                               debug_blend = false,
-                              smooth_alpha = true,
-                              pure_fv = pure_fv)
-# limiter = setup_limiter_tvb(eq; tvbM = tvbM)
+                              pure_fv = false
+                             )
+limiter = no_limiter
 scheme = Scheme(solver, degree, solution_points, correction_function,
-                numerical_flux, bound_limit, limiter, bflux)
+                numerical_flux, bound_limit, limiter, bflux, diss)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
-                   cfl_safety_factor = cfl_safety_factor)
+                   animate = animate, saveto = "none")
 #------------------------------------------------------------------------------
-sol = Tenkai.solve(eq, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
-return sol;
+println(sol["errors"])
+
+return sol

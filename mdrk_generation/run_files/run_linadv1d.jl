@@ -12,10 +12,10 @@ final_time = 0.8
 velocity, initial_value, exact_solution = Eq.smooth_sin1d_data
 boundary_value = exact_solution
 
-degree = 4
+degree = 3
 solver = "mdrk"
-solution_points = "gll"
-correction_function = "g2"
+solution_points = "gl"
+correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "no"
 bflux = evaluate
@@ -30,6 +30,8 @@ animate_ = true
 
 cfl_safety_factor = 0.98
 
+diss = "2"
+
 #------------------------------------------------------------------------------
 grid_size = nx
 domain = [xmin, xmax]
@@ -38,7 +40,7 @@ problem = Problem(domain, initial_value, boundary_value,
 equation = Eq.get_equation(velocity)
 limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
-                numerical_flux, bound_limit, limiter, bflux)
+                numerical_flux, bound_limit, limiter, bflux, diss)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval, animate = animate_,
                    cfl_safety_factor = cfl_safety_factor, time_scheme = "Tsit5")

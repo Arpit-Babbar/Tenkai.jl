@@ -12,8 +12,10 @@ include("mpl.jl")
 
 include("reproduce_base.jl")
 
-function my_save_fig_python(test_case, figure, name)
-    fig_dir = joinpath(rep_dir(), "figures", test_case)
+markers_array() = ["s", "o", "^", "*", "D", ">", "p"]
+colors_array() = ["green", "royalblue", "red", "m", "c", "y", "k"]
+function my_save_fig_python(test_case, figure, name;
+                            fig_dir = joinpath(rep_dir(), "figures", test_case))
     mkpath(fig_dir)
     figure.savefig(joinpath(fig_dir, name))
     return nothing
@@ -38,8 +40,8 @@ function plot_euler_python(test_case, title; plt_type = "sol",
     end
     labels = ["FO", "MH", "TVB"]
     n_plots = length(plot_names)
-    markers = ["s", "o", "^", "*", "D", ">", "p"]
-    colors = ["green", "royalblue", "red", "m", "c", "y", "k"]
+    markers = markers_array()
+    colors = colors_array()
     if legends !== nothing
         @assert length(legends) == n_plots
     end
@@ -328,7 +330,7 @@ function format_with_powers(y, _)
     end
 end
 
-function set_ticks!(ax, log_sub, ticks_formatter)
+function set_ticks!(ax, log_sub, ticks_formatter; dim = 2)
     # Remove scientific notation and set xticks
     # https://stackoverflow.com/a/49306588/3904031
 
@@ -336,7 +338,11 @@ function set_ticks!(ax, log_sub, ticks_formatter)
         if y > 1e-4
             # y_ = parse(Int64, y)
             y_ = Int64(y)
-            return "\$$y_^2\$"
+            if dim == 2
+                return "\$$y_^2\$"
+            else
+                return "\$$y_\$"
+            end
         else
             return @sprintf "%.4E" y
         end
@@ -361,11 +367,15 @@ end
 
 function add_theo_factors!(ax, ncells, error, degree, i,
                            theo_factor_even, theo_factor_odd)
-    d = parse(Int64, degree)
+    if degree isa Int64
+        d = degree
+    else
+        d = parse(Int64, degree)
+    end
     min_y = minimum(error[1:(end - 1)])
     @show error, min_y
     xaxis = ncells[(end - 1):end]
-    slope = parse(Int64, degree) + 1
+    slope = d + 1
     if iseven(slope)
         theo_factor = theo_factor_even
     else
@@ -373,7 +383,7 @@ function add_theo_factors!(ax, ncells, error, degree, i,
     end
     y0 = theo_factor * min_y
     y = (1.0 ./ xaxis) .^ slope * y0 * xaxis[1]^slope
-    markers = ["s", "o", "*"]
+    markers = ["s", "o", "*", "^"]
     # if i == 1
     ax.loglog(xaxis, y, label = "\$ O(M^{-$(d + 1)})\$", linestyle = "--",
               marker = markers[i], c = "grey",
@@ -484,12 +494,12 @@ function plot_python_ndofs_vs_y(; legend = nothing,
 end
 
 fig_size_() = (6.4, 4.8) # Default size actually
-plot_python_ncells_vs_y(degrees = ["3", "4"], saveto_dir = ".", log_sub = 2.5,
-                        error_norm = "l2", limiter = "blend", figsize = fig_size_())
-plot_python_ncells_vs_y(degrees = ["3", "4"], saveto_dir = ".", log_sub = 2.5,
-                        error_norm = "l2", limiter = "no_limiter", figsize = fig_size_())
+# plot_python_ncells_vs_y(degrees = ["3", "4"], saveto_dir = ".", log_sub = 2.5,
+#                         error_norm = "l2", limiter = "blend", figsize = fig_size_())
+# plot_python_ncells_vs_y(degrees = ["3", "4"], saveto_dir = ".", log_sub = 2.5,
+#                         error_norm = "l2", limiter = "no_limiter", figsize = fig_size_())
 
-plot_python_ndofs_vs_y(degrees = ["3", "4"], saveto_dir = ".", log_sub = 2.5,
-                       error_norm = "l2", limiter = "blend", figsize = fig_size_())
-plot_python_ndofs_vs_y(degrees = ["3", "4"], saveto_dir = ".", log_sub = 2.5,
-                       error_norm = "l2", limiter = "no_limiter", figsize = fig_size_())
+# plot_python_ndofs_vs_y(degrees = ["3", "4"], saveto_dir = ".", log_sub = 2.5,
+#                        error_norm = "l2", limiter = "blend", figsize = fig_size_())
+# plot_python_ndofs_vs_y(degrees = ["3", "4"], saveto_dir = ".", log_sub = 2.5,
+#                        error_norm = "l2", limiter = "no_limiter", figsize = fig_size_())

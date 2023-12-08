@@ -1,12 +1,14 @@
 module Tenkai
 
 src_dir = @__DIR__ # Directory of file
+base_dir = "$src_dir/.."
 data_dir = "$src_dir/../data/"
 # base_dir = "$src_dir/../base"
 eq_dir = "$src_dir/equations"
 kernels_dir = "$src_dir/kernels"
 grid_dir = "$src_dir/grids"
 utils_dir = "$src_dir/../utils"
+repro_dir = "$src_dir/../reproducibility"
 solvers_dir = "$src_dir/solvers"
 fr_dir = "$solvers_dir/FR"
 mdrk_dir = "$solvers_dir/MDRK"

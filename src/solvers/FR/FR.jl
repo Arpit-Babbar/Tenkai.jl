@@ -268,22 +268,22 @@ end
 # for things to keep in mind
 #-------------------------------------------------------------------------------
 macro threaded(expr)
-    return esc(quote
-                   let
-                       if Threads.nthreads() == 1
-                           $(expr)
-                       else
-                           Threads.@threads $(expr)
-                       end
-                   end
-               end)
+    # return esc(quote
+    #                let
+    #                    if Threads.nthreads() == 1
+    #                        $(expr)
+    #                    else
+    #                        Threads.@threads $(expr)
+    #                    end
+    #                end
+    #            end)
 
     # Use this for a single threaded code without restarting REPL
-    # return esc(quote
-    #   let
-    #      $(expr)
-    #   end
-    # end)
+    return esc(quote
+      let
+         $(expr)
+      end
+    end)
 
     # Use this for Polyester threads
     #  return esc(quote Polyester.@batch $(expr) end) #  < - Polyester threads, to be tested

@@ -13,8 +13,8 @@ final_time = 0.001
 
 boundary_value = exact_solution # dummy function
 
-degree = 4
-solver = "lwfr"
+degree = 3
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov

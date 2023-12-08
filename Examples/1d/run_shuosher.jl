@@ -16,15 +16,15 @@ final_time = 1.8
 initial_value = Eq.shuosher
 exact_solution = Eq.exact_solution_shuosher # Dummy function
 
-degree = 4
-solver = "lwfr"
+degree = 3
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
 
-nx = ceil(Int64, 2000 / (degree + 1))
+nx = 400
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 300.0
@@ -51,7 +51,6 @@ limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = indicator_model,
                               constant_node_factor = 1.0,
-                              # a = 0.26085411638212247, c = 1.657759170623426,
                               amax = 1.0,
                               debug_blend = debug_blend,
                               pure_fv = pure_fv)
@@ -65,9 +64,6 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    animate = animate,
                    cfl_safety_factor = cfl_safety_factor,
                    time_scheme = "SSPRK54")
-#------------------------------------------------------------------------------
-problem, scheme, param = ParseCommandLine(problem, param, scheme,
-                                          equation, ARGS)
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 

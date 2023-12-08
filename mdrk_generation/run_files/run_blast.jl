@@ -37,6 +37,7 @@ compute_error_interval = 0
 indicator_model = "gassner"
 debug_blend = false
 cfl_safety_factor = 0.95
+diss = "2"
 pure_fv = false
 #------------------------------------------------------------------------------
 grid_size = nx
@@ -56,10 +57,11 @@ limiter = setup_limiter_blend(blend_type = mh_blend(equation),
 # limiter = setup_limiter_hierarchical(alpha = 1.0,
 #                                      reconstruction = characteristic_reconstruction)
 scheme = Scheme(solver, degree, solution_points, correction_function,
-                numerical_flux, bound_limit, limiter, bflux)
+                numerical_flux, bound_limit, limiter, bflux, diss)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval;
                    animate = animate, cfl_safety_factor = cfl_safety_factor,
+                   saveto = "none",
                    time_scheme = "SSPRK33")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
