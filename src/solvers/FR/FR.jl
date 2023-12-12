@@ -268,22 +268,22 @@ end
 # for things to keep in mind
 #-------------------------------------------------------------------------------
 macro threaded(expr)
-    # return esc(quote
-    #                let
-    #                    if Threads.nthreads() == 1
-    #                        $(expr)
-    #                    else
-    #                        Threads.@threads $(expr)
-    #                    end
-    #                end
-    #            end)
+    return esc(quote
+                   let
+                       if Threads.nthreads() == 1
+                           $(expr)
+                       else
+                           Threads.@threads $(expr)
+                       end
+                   end
+               end)
 
     # Use this for a single threaded code without restarting REPL
-    return esc(quote
-      let
-         $(expr)
-      end
-    end)
+    # return esc(quote
+    #   let
+    #      $(expr)
+    #   end
+    # end)
 
     # Use this for Polyester threads
     #  return esc(quote Polyester.@batch $(expr) end) #  < - Polyester threads, to be tested
@@ -747,8 +747,17 @@ function minmod(a, b, c, beta, Mdx2)
 end
 
 function finite_differences(h1, h2, ul, u, ur)
-    back_diff = (u - ul) / h1
-    fwd_diff = (ur - u) / h2
+    # TODO - This is only be needed for GLL points. Use multiple dispatch maybe
+    if abs(h1) < 1e-12
+        back_diff = zero(u)
+    else
+        back_diff = (u - ul) / h1
+    end
+    if abs(h2) < 1e-12
+        fwd_diff = zero(u)
+    else
+        fwd_diff = (ur - u) / h2
+    end
     a, b, c = -(h2 / (h1 * (h1 + h2))), (h2 - h1) / (h1 * h2), (h1 / (h2 * (h1 + h2)))
     cent_diff = a * ul + b * u + c * ur
     # cent_diff = (ur - ul) / (h1 + h2)

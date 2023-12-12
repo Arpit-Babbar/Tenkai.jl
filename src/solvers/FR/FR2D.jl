@@ -1883,6 +1883,196 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2}, scheme
     end # timer
 end
 
+function blend_cell_residual_muscl_rk!(el_x, el_y, eq::AbstractEquations{2}, scheme,
+                                       aux, dt, grid, dx, dy, xf, yf, op, u1, ::Any, f,
+                                       res, scaling_factor = 1.0)
+    @timeit_debug aux.timer "Blending limiter" begin
+    #! format: noindent
+    @unpack blend = aux
+    @unpack tvbM = blend.parameters
+    @unpack xg, wg = op
+    num_flux = scheme.numerical_flux
+    nd = length(xg)
+    nvar = nvariables(eq)
+
+    id = Threads.threadid()
+    xxf, yyf = blend.cache.subcell_faces[id]
+    xe, ye = blend.cache.solution_points[id] # cell points & 2 from neighbours
+    ue, = blend.cache.ue[id][1] # solution values in cell + 2 from neighbours
+    unph, = blend.cache.unph[id][1] # face values evolved to to time level n+1/2
+    dt = blend.cache.dt[1] # For support with DiffEq
+    scaled_dt = scaling_factor * dt
+    @unpack fn_low = blend.cache
+    alpha = blend.cache.alpha[el_x, el_y]
+
+    @unpack conservative2recon!, recon2conservative! = blend.subroutines
+
+    u = @view u1[:, :, :, el_x, el_y]
+    r = @view res[:, :, :, el_x, el_y]
+
+    # limit the higher order part
+    lmul!(1.0 - alpha, r)
+
+    # compute subcell faces
+    xxf[0], yyf[0] = xf, yf
+    for ii in Base.OneTo(nd)
+        xxf[ii] = xxf[ii - 1] + dx * wg[ii]
+        yyf[ii] = yyf[ii - 1] + dy * wg[ii]
+    end
+
+    # Get solution points
+    # xe[0] = xf - dx[el_x-1]*(1.0-xg[nd])
+    xe[0] = xf - grid.dx[el_x - 1] * (1.0 - xg[nd])   # Last solution point of left cell
+    xe[1:nd] .= xf .+ dx * xg          # Solution points inside the cell
+    xe[nd + 1] = xf + grid.dx[el_x + 1] * (1.0 + xg[1]) # First point of right cell
+
+    ye[0] = yf - grid.dy[el_y - 1] * (1.0 - xg[nd]) # Last solution point of lower cell
+    ye[1:nd] .= yf .+ dy * xg                         # solution points inside the cell
+    ye[nd + 1] = yf + grid.dy[el_y + 1] * (1.0 + xg[1])  # First point of upper cell
+
+    # EFFICIENCY - Add @turbo here
+    # @show size(ue), size(u), size(blend.cache.ue[id][1][1])
+    for j in Base.OneTo(nd), i in Base.OneTo(nd), n in eachvariable(eq)
+        ue[n, i, j] = u[n, i, j] # values from current cell
+    end
+
+    # EFFICIENCY - Add @turbo here
+    for k in Base.OneTo(nd), n in eachvariable(eq)
+        ue[n, 0, k] = u1[n, nd, k, el_x - 1, el_y] # values from left neighbour
+        ue[n, nd + 1, k] = u1[n, 1, k, el_x + 1, el_y] # values from right neighbour
+
+        ue[n, k, 0] = u1[n, k, nd, el_x, el_y - 1] # values from lower neighbour
+        ue[n, k, nd + 1] = u1[n, k, 1, el_x, el_y + 1] # values from upper neighbour
+    end
+
+    # Loop over subcells
+    for jj in Base.OneTo(nd), ii in Base.OneTo(nd)
+        u_ = get_node_vars(ue, eq, ii, jj)
+        ul = get_node_vars(ue, eq, ii - 1, jj)
+        ur = get_node_vars(ue, eq, ii + 1, jj)
+        ud = get_node_vars(ue, eq, ii, jj - 1)
+        uu = get_node_vars(ue, eq, ii, jj + 1)
+
+        # TOTHINK - Add this feature
+        # u_, ul, ur, ud, uu = conservative2recon.((u_,ul,ur,ud,uu))
+
+        # Compute finite differences
+        Δx1, Δx2 = xe[ii] - xe[ii - 1], xe[ii + 1] - xe[ii]
+        back_x, cent_x, fwd_x = finite_differences(Δx1, Δx2, ul, u_, ur)
+        Δy1, Δy2 = ye[jj] - ye[jj - 1], ye[jj + 1] - ye[jj]
+        back_y, cent_y, fwd_y = finite_differences(Δy1, Δy2, ud, u_, uu)
+
+        Mdx2 = tvbM * Δx1
+        Mdy2 = tvbM * Δy1
+
+        # Slopes of linear approximation in cell
+        # Ideally, I'd name both the tuples as slope_tuple, but that
+        # was giving a type instability
+        # beta1 = 2.0
+        # if blend.parameters.pure_fv == true # KLUDGE - Do this in blend.paramaeters
+        beta1, beta2 = 2.0 - alpha, 2.0 - alpha # Unfortunate way to fix type instability
+        # else
+        #    beta1, beta2 = 2.0 - alpha, 2.0 - alpha
+        # end
+
+        slope_tuple_x = (minmod(cent_x[n], back_x[n], fwd_x[n], beta1, Mdx2)
+                         for n in eachvariable(eq))
+
+        slope_x = SVector{nvar}(slope_tuple_x)
+        # beta2 = 2.00.0
+        slope_tuple_y = (minmod(cent_y[n], back_y[n], fwd_y[n], beta2, Mdy2)
+                         for n in eachvariable(eq))
+        slope_y = SVector{nvar}(slope_tuple_y)
+        ufl = u_ + slope_x * (xxf[ii - 1] - xe[ii]) # left  face value u_{i-1/2,j}
+        ufr = u_ + slope_x * (xxf[ii] - xe[ii]) # right face value u_{i+1/2,j}
+
+        ufd = u_ + slope_y * (yyf[jj - 1] - ye[jj]) # lower face value u_{i,j-1/2}
+        ufu = u_ + slope_y * (yyf[jj] - ye[jj]) # upper face value u_{i,j+1/2}
+
+        # KLUDGE - u_star's are not needed in this function, just create and use them
+        # in limit_slope
+
+        u_star_l = u_ + 2.0 * slope_x * (xxf[ii - 1] - xe[ii])
+        u_star_r = u_ + 2.0 * slope_x * (xxf[ii] - xe[ii])
+
+        u_star_d = u_ + 2.0 * slope_y * (yyf[jj - 1] - ye[jj])
+        u_star_u = u_ + 2.0 * slope_y * (yyf[jj] - ye[jj])
+
+        ufl, ufr = limit_slope(eq, slope_x, ufl, u_star_l, ufr, u_star_r, u_,
+                               xxf[ii - 1] - xe[ii], xxf[ii] - xe[ii])
+        ufd, ufu = limit_slope(eq, slope_y, ufd, u_star_d, ufu, u_star_u, u_,
+                               yyf[jj - 1] - ye[jj], yyf[jj] - ye[jj])
+
+        # TOTHINK - Add this feature
+        # Convert back to conservative variables for update
+        # ufl, ufr, ufd, ufu = recon2conservative.((ufl,ufr,ufd,ufu))
+
+        # Use finite difference method to evolve face values to time level n+1/2
+
+        set_node_vars!(unph, ufl, eq, 1, ii, jj) # Left face
+        set_node_vars!(unph, ufr, eq, 2, ii, jj)  # Right face
+        set_node_vars!(unph, ufd, eq, 3, ii, jj) # Bottom face
+        set_node_vars!(unph, ufu, eq, 4, ii, jj) # Top face
+    end
+
+    # Now we loop over faces and perform the update
+
+    # loop over vertical inner faces between (ii-1,jj) and (ii,jj)
+    for ii in 2:nd # Supercell faces will be done in blend_face_residual
+        xx = xxf[ii - 1] # face x coordinate, offset because index starts from 0
+        for jj in Base.OneTo(nd)
+            yy = yf + dy * xg[jj] # y coordinate same as solution point
+            X = SVector(xx, yy)
+            ul = get_node_vars(unph, eq, 2, ii - 1, jj)
+            ur = get_node_vars(unph, eq, 1, ii, jj)
+            fl, fr = flux(xx, yy, ul, eq, 1), flux(xx, yy, ur, eq, 1)
+            fn = scaling_factor * num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
+            multiply_add_to_node_vars!(r, # r[ii-1,jj] += dt/(dx*wg[ii-1])*fn
+                                       alpha * dt / (dx * wg[ii - 1]),
+                                       fn,
+                                       eq, ii - 1, jj)
+            multiply_add_to_node_vars!(r, # r[ii,jj] += dt/(dx*wg[ii])*fn
+                                       -alpha * dt / (dx * wg[ii]),
+                                       fn,
+                                       eq, ii, jj)
+            # TOTHINK - Can checking this at every iteration be avoided?
+            if ii == 2
+                set_node_vars!(fn_low, fn, eq, jj, 1, el_x, el_y)
+            elseif ii == nd
+                set_node_vars!(fn_low, fn, eq, jj, 2, el_x, el_y)
+            end
+        end
+    end
+
+    # loop over horizontal inner faces between (ii,jj-1) and (ii,jj)
+    for jj in 2:nd
+        yy = yyf[jj - 1] # face y coordinate, offset because index starts from 0
+        for ii in Base.OneTo(nd)
+            xx = xf + dx * xg[ii] # face x coordinate picked same as the soln point
+            X = SVector(xx, yy)
+            ud = get_node_vars(unph, eq, 4, ii, jj - 1)
+            uu = get_node_vars(unph, eq, 3, ii, jj)
+            gd, gu = flux(xx, yy, ud, eq, 2), flux(xx, yy, uu, eq, 2)
+            gn = scaling_factor * num_flux(X, ud, uu, gd, gu, ud, uu, eq, 2)
+            multiply_add_to_node_vars!(r, # r[ii,jj-1]+=alpha*dt/(dy*wg[jj-1])*gn
+                                       alpha * dt / (dy * wg[jj - 1]),
+                                       gn,
+                                       eq, ii, jj - 1)
+            multiply_add_to_node_vars!(r, # r[ii,jj]-=alpha*dt/(dy*wg[jj])*gn
+                                       -alpha * dt / (dy * wg[jj]),
+                                       gn,
+                                       eq, ii, jj)
+            # TOTHINK - Can checking this at every iteration be avoided
+            if jj == 2
+                set_node_vars!(fn_low, gn, eq, ii, 3, el_x, el_y)
+            elseif jj == nd
+                set_node_vars!(fn_low, gn, eq, ii, 4, el_x, el_y)
+            end
+        end
+    end
+    end # timer
+end
+
 function blending_flux_factors(::AbstractEquations{2}, ::Any, ::Any,
                                ::Any)
     # This method is different for different equations
@@ -2239,9 +2429,208 @@ function blend_face_residual_muscl_x!(el_x, el_y, jy, xf, y, u1, ua,
     end # timer
 end
 
+function blend_face_residual_muscl_rk_x!(el_x, el_y, jy, xf, y, u1, ua,
+                                         eq::AbstractEquations{2, <:Any}, dt, grid,
+                                         op, scheme, param, Fn, aux, res,
+                                         scaling_factor = 1.0)
+    @timeit_debug aux.timer "Blending limiter" begin
+    #! format: noindent
+    @unpack blend = aux
+    @unpack alpha = blend.cache
+    @unpack dx, dy = grid
+    @unpack tvbM = blend.parameters
+    @unpack bc_x = blend.subroutines
+    nvar = nvariables(eq)
+    num_flux = scheme.numerical_flux
+
+    id = Threads.threadid()
+
+    unph_, = blend.cache.unph[id][1]
+    unph = @view unph_[:, 1:2, 1, 1] # Load nvar x 2 array to save storage
+
+    dt = blend.cache.dt[1] # For support with DiffEq
+    dt_scaled = scaling_factor * dt
+
+    @unpack xg, wg = op
+    nd = length(xg)
+
+    # The two solution points neighbouring the super face have a numerical flux
+    # which is to be obtained after blending with the time averaged flux.
+    # Thus, the evolution for those points has two be done here.
+
+    # Since there are two points, we store relevant arrays in 2-tuples and loop
+    # Those solution values, locations and corresponding (subcell) faces
+    # are all stored. The first element corresponds to last point of left array
+    # and second element corresponds to first element of right array
+
+    # |-----||-----|
+    # |     ||     |
+    # |     ||     |
+    # |-----||-----|
+
+    # We first find u^{n+1/2}_{±} at the face. For ±, there are two
+    # relevant iterations of loops respectively. To do everything in one loop, we stack all
+    # quantities relevant to the computation at the very beginning
+
+    # Stack all relevant arrays (ul, u, ur) both for
+    arrays1_x = (get_node_vars(u1, eq, nd - 1, jy, el_x - 1, el_y),
+                 get_node_vars(u1, eq, nd, jy, el_x - 1, el_y),
+                 get_node_vars(u1, eq, 1, jy, el_x, el_y))
+    arrays2_x = (get_node_vars(u1, eq, nd, jy, el_x - 1, el_y),
+                 get_node_vars(u1, eq, 1, jy, el_x, el_y),
+                 get_node_vars(u1, eq, 2, jy, el_x, el_y))
+
+    solns_x = (arrays1_x, arrays2_x)
+
+    # Stack x coordinates of solution points (xl, x, xr)
+    sol_coords_x = ((xf - dx[el_x - 1] + xg[nd - 1] * dx[el_x - 1], # xl
+                     xf - dx[el_x - 1] + xg[nd] * dx[el_x - 1],   # x
+                     xf + xg[1] * dx[el_x]),                  # xr
+
+                    # Corresponding to solns2_x
+                    (xf - dx[el_x - 1] + xg[nd] * dx[el_x - 1], # xl
+                     xf + xg[1] * dx[el_x],                 # x
+                     xf + xg[2] * dx[el_x]))
+
+    # For the y-direction values, the indices may go outside of the cell
+    # so we have to break into cases.
+    if jy == 1
+        ud_1 = get_node_vars(u1, eq, nd, nd, el_x - 1, el_y - 1) # value below u from arrays1
+        ud_2 = get_node_vars(u1, eq, 1, nd, el_x, el_y - 1) # value below u from arrays2
+
+        # Solution point below y
+        yd_1 = yd_2 = grid.yf[el_y] - dy[el_y - 1] + xg[nd] * dy[el_y - 1]
+
+        # Face between y and yd
+        yfd_1 = yfd_2 = grid.yf[el_y]
+    else
+        ud_1 = get_node_vars(u1, eq, nd, jy - 1, el_x - 1, el_y)
+        ud_2 = get_node_vars(u1, eq, 1, jy - 1, el_x, el_y)
+
+        # Solution points
+        yd_1 = yd_2 = grid.yf[el_y] + xg[jy - 1] * dy[el_y]
+
+        # Face between y and yd
+        yfd_1 = yfd_2 = grid.yf[el_y]
+        for jjy in 1:(jy - 1)
+            yfd_1 += wg[jjy] * dy[el_y - 1]
+        end
+        yfd_2 = yfd_1
+    end
+
+    if jy == nd
+        uu_1 = get_node_vars(u1, eq, nd, 1, el_x - 1, el_y + 1)
+        uu_2 = get_node_vars(u1, eq, 1, 1, el_x, el_y + 1)
+
+        # Solution points
+        yu_1 = yu_2 = grid.yf[el_y + 1] + xg[1] * grid.dy[el_y + 1]
+
+        # Faces
+        yfu_1 = yfu_2 = grid.yf[el_y + 1] # + wg[1]*grid.dy[el_y+1]
+    else
+        uu_1 = get_node_vars(u1, eq, nd, jy + 1, el_x - 1, el_y)
+        uu_2 = get_node_vars(u1, eq, 1, jy + 1, el_x, el_y)
+
+        # Solution points
+        yu_1 = yu_2 = grid.yf[el_y] + xg[jy + 1] * grid.dy[el_y]
+
+        # Faces
+        yfu_1 = yfu_2 = grid.yf[el_y]
+        for jjy in 1:jy
+            yfu_1 = yfu_2 += wg[jjy] * grid.dy[el_y]
+        end
+    end
+
+    solns_y = ((ud_1, uu_1), (ud_2, uu_2))
+
+    sol_coords_y = ((yd_1, yu_1), (yd_2, yu_2))
+
+    # Stack x coordinates of faces (xfl, xfr)
+    face_coords_x = ((xf - wg[nd] * dx[el_x - 1], xf), # (xfl, xfr)
+                     (xf, xf + wg[1] * dx[el_x]))   # (xfl, xfr)
+    face_coords_y = ((yfd_1, yfu_1), (yfd_2, yfu_2))
+
+    # betas = (2.0 - alpha[el_x - 1, el_y], 2.0 - alpha[el_x, el_y])
+    betas = (1.0, 1.0)
+
+    if blend.parameters.pure_fv == true
+        betas = (2.0, 2.0)
+    end
+
+    for i in 1:2 # Loop over cells
+        ul, u_, ur = solns_x[i]
+        ud, uu = solns_y[i]
+
+        # TOTHINK - Add this feature
+        # u_, ul, ur = conservative2recon.((u_,ul,ur))
+
+        xl, x, xr = sol_coords_x[i]
+        yd, yu = sol_coords_y[i]
+        xfl, xfr = face_coords_x[i]
+        yfd, yfu = face_coords_y[i]
+
+        Δx1, Δx2 = x - xl, xr - x
+        Δy1, Δy2 = y - yd, yu - y
+        back_x, cent_x, fwd_x = finite_differences(Δx1, Δx2, ul, u_, ur)
+        back_y, cent_y, fwd_y = finite_differences(Δy1, Δy2, ud, u_, uu)
+        beta = betas[i]
+        Mdx2 = tvbM * Δx1
+        Mdy2 = tvbM * Δy1
+        slope_tuple_x = (minmod(cent_x[n], back_x[n], fwd_x[n], beta, Mdx2)
+                         for n in eachvariable(eq))
+        slope_tuple_y = (minmod(cent_y[n], back_y[n], fwd_y[n], beta, Mdy2)
+                         for n in eachvariable(eq))
+        slope_x = SVector{nvar}(slope_tuple_x)
+        slope_y = SVector{nvar}(slope_tuple_y)
+
+        ufl = u_ + slope_x * (xfl - x)
+        ufr = u_ + slope_x * (xfr - x)
+        ufd = u_ + slope_y * (yfd - y)
+        ufu = u_ + slope_y * (yfu - y)
+
+        u_star_l = u_ + 2.0 * slope_x * (xfl - x)
+        u_star_r = u_ + 2.0 * slope_x * (xfr - x)
+        u_star_d = u_ + 2.0 * slope_y * (yfd - y)
+        u_star_u = u_ + 2.0 * slope_y * (yfu - y)
+
+        ufl, ufr = limit_slope(eq, slope_x, ufl, u_star_l, ufr, u_star_r, u_,
+                               xfl - x, xfr - x)
+
+        ufd, ufu = limit_slope(eq, slope_y, ufd, u_star_d, ufu, u_star_u, u_,
+                               yfd - y, yfu - y)
+        # TOTHINK - Add this feature
+        # Convert back to conservative variables for update
+        # ufl, ufr = recon2conservative.((ufl,ufr))
+
+        if i == 1
+            uf = ufr # The relevant face is on the right
+        elseif i == 2
+            uf = ufl # The relevant face is on the left
+        end
+
+        # Use finite difference method to evolve face values to time level n+1/2
+        set_node_vars!(unph, uf, eq, i)
+    end
+    ul = get_node_vars(unph, eq, 1)
+    ur = get_node_vars(unph, eq, 2)
+    fl, fr = flux(xf, y, ul, eq, 1), flux(xf, y, ur, eq, 1)
+    X = SVector(xf, y)
+    fn = scaling_factor * num_flux( X, ul, ur, fl, fr, ul, ur, eq, 1)
+
+    # Repetetition block
+    Fn = get_blended_flux_x(el_x, el_y, jy, eq, dt, grid,
+                            blend, scheme, xf, y, u1, ua, fn, Fn, op)
+
+    # This subroutine allows user to specify boundary conditions
+    Fn = bc_x(u1, eq, op, xf, y, jy, el_x, el_y, Fn)
+
+    return Fn, (1.0 - alpha[el_x - 1, el_y], 1.0 - alpha[el_x, el_y])
+    end # timer
+end
+
 function get_blended_flux_y(el_x, el_y, ix, eq::AbstractEquations{2}, dt, grid,
                             blend, scheme, x, yf, u1, ua, fn, Fn, op)
-    if scheme.solver_enum == rkfr
+    if scheme.solver_enum == rkfr # TODO - Don't do this for GL points
         return Fn
     end
 
@@ -2262,37 +2651,42 @@ function get_blended_flux_y(el_x, el_y, ix, eq::AbstractEquations{2}, dt, grid,
     λx_rr, λy_rr = blending_flux_factors(eq, ua_rr_node, dx[el_x], dy[el_y])
 
     u_ll_node = get_node_vars(u1, eq, ix, nd, el_x, el_y - 1)
-    u_rr_node = get_node_vars(u1, eq, ix, 1, el_x, el_y)
 
     # lower order flux on neighbouring subcell face
     fn_inner_ll = get_node_vars(fn_low, eq, ix, 4, el_x, el_y - 1)
-    fn_inner_rr = get_node_vars(fn_low, eq, ix, 3, el_x, el_y)
 
     c_ll = (dt / dy[el_y - 1]) / (wg[nd] * λy_ll)
-    c_rr = -(dt / dy[el_y]) / (wg[1] * λy_rr)
 
     # test whether lower order update is even admissible
     low_update_ll = u_ll_node - c_ll * (fn - fn_inner_ll)
-    low_update_rr = u_rr_node - c_rr * (fn - fn_inner_rr)
+    test_update_ll = u_ll_node - c_ll * (Fn - fn_inner_ll)
 
     if is_admissible(eq, low_update_ll) == false && el_y > 1
         # @warn "Low y-flux not admissible at " el_x,(el_y-1),x,yf
     end
 
+    if !(is_admissible(eq, test_update_ll))
+        @debug "Zhang-Shu fix needed at " el_x, (el_y-1), xf, y
+        Fn = zhang_shu_flux_fix(eq, u_ll_node, low_update_ll,
+                                Fn, fn_inner_ll, fn, c_ll)
+    end
+
+
+    u_rr_node = get_node_vars(u1, eq, ix, 1, el_x, el_y)
+    fn_inner_rr = get_node_vars(fn_low, eq, ix, 3, el_x, el_y)
+    c_rr = -(dt / dy[el_y]) / (wg[1] * λy_rr)
+    low_update_rr = u_rr_node - c_rr * (fn - fn_inner_rr)
+
     if is_admissible(eq, low_update_rr) == false && el_y < ny + 1
         # @warn "Lower y-flux not admissible at " el_x,el_y,x,yf
     end
 
-    test_update_ll = u_ll_node - c_ll * (Fn - fn_inner_ll)
     test_update_rr = u_rr_node - c_rr * (Fn - fn_inner_rr)
 
-    if !(is_admissible(eq, test_update_ll) && is_admissible(eq, test_update_rr))
-        @debug "Using first order y-flux at " el_x, (el_y - 1), x, yf
-        Fn = zhang_shu_flux_fix(eq, Fn, fn,                   # eq, high order flux, low order flux
-                                u_ll_node, u_rr_node,         # Previous time level
-                                low_update_ll, low_update_rr, # low order updates
-                                fn_inner_ll, fn_inner_rr,     # flux from inner solution points
-                                c_ll, c_rr)
+    if !(is_admissible(eq, test_update_rr))
+        @debug "Zhang-Shu fix needed at " (el_x - 1), el_y, xf, y
+        Fn = zhang_shu_flux_fix(eq, u_rr_node, low_update_rr, Fn, fn_inner_rr,
+                                fn, c_rr)
     end
 
     return Fn
@@ -2568,6 +2962,211 @@ function blend_face_residual_muscl_y!(el_x, el_y, ix, x, yf, u1, ua,
     end # timer
 end
 
+function blend_face_residual_muscl_rk_y!(el_x, el_y, ix, x, yf, u1, ua,
+                                         eq::AbstractEquations{2, <:Any}, dt, grid, op,
+                                         scheme, param, Fn, aux, res,
+                                         scaling_factor = 1.0)
+    @timeit_debug aux.timer "Blending limiter" begin
+    #! format: noindent
+    @unpack blend = aux
+    @unpack alpha = blend.cache
+    @unpack tvbM = blend.parameters
+    @unpack dx, dy = grid
+    num_flux = scheme.numerical_flux
+    nvar = nvariables(eq)
+
+    id = Threads.threadid()
+
+    dt = blend.cache.dt[1] # For support with DiffEq
+    dt_scaled = scaling_factor * dt
+
+    unph_, = blend.cache.unph[id][1]
+    unph = @view unph_[:, 1:2, 1, 1] # Load nvar x 2 array
+
+    @unpack xg, wg = op
+    nd = length(xg)
+
+    # The two solution points neighbouring the super face have a numerical flux
+    # which is to be obtained after blending with the time averaged flux.
+    # Thus, the evolution for those points has two be done here.
+
+    # Since there are two points, we store relevant arrays in 2-tuples and loop
+    # Those solution values, locations and corresponding (subcell) faces
+    # are all stored. The first element corresponds to last point of left array
+    # and second element corresponds to first element of right array
+
+    # |-----||-----|
+    # |     ||     |
+    # |     ||     |
+    # |-----||-----|
+
+    # We first find u^{n+1/2}_{±} at the face. For that, there are two
+    # relevant cells. To do everything in one loop, we stack all
+    # quantities relevant to the computation at the very beginning
+
+    # Stack all relevant arrays (ul, u, ur)
+
+    arrays1_y = (get_node_vars(u1, eq, ix, nd - 1, el_x, el_y - 1),
+                 get_node_vars(u1, eq, ix, nd, el_x, el_y - 1),
+                 get_node_vars(u1, eq, ix, 1, el_x, el_y))
+    arrays2_y = (get_node_vars(u1, eq, ix, nd, el_x, el_y - 1),
+                 get_node_vars(u1, eq, ix, 1, el_x, el_y),
+                 get_node_vars(u1, eq, ix, 2, el_x, el_y))
+
+    solns_y = (arrays1_y, arrays2_y)
+
+    sol_coords_y = ((yf - dy[el_y - 1] + xg[nd - 1] * dy[el_y - 1], # yd
+                     yf - dy[el_y - 1] + xg[nd] * dy[el_y - 1],   # y
+                     yf + xg[1] * dy[el_y]),                 # yu
+                    (yf - dy[el_y - 1] + xg[nd] * dy[el_y - 1],   # yd
+                     yf + xg[1] * dy[el_y],                   # y
+                     yf + xg[2] * dy[el_y]))
+
+    if ix == 1
+        ul_1 = get_node_vars(u1, eq, nd, nd, el_x - 1, el_y - 1)
+        ul_2 = get_node_vars(u1, eq, nd, 1, el_x - 1, el_y)
+
+        # Solution points left of x
+        xl_1 = xl_2 = grid.xf[el_x] - dx[el_x - 1] + xg[nd] * dx[el_x - 1]
+
+        # Face between xfl and x
+        xfl_1 = xfl_2 = grid.xf[el_x]
+    else
+        ul_1 = get_node_vars(u1, eq, ix - 1, nd, el_x, el_y - 1)
+        ul_2 = get_node_vars(u1, eq, ix - 1, 1, el_x, el_y)
+
+        # Solution points left of x
+        xl_1 = xl_2 = grid.xf[el_x] + dx[el_x] * xg[ix - 1]
+
+        # Face between xl and x
+        xfl_1 = xfl_2 = grid.xf[el_x]
+        for iix in 1:(ix - 1)
+            xfl_2 += dx[el_x] * wg[iix]
+        end
+        xfl_1 = xfl_2
+    end
+
+    if ix == nd
+        ur_1 = get_node_vars(u1, eq, 1, nd, el_x + 1, el_y - 1)
+        ur_2 = get_node_vars(u1, eq, 1, 1, el_x + 1, el_y)
+
+        # Solution points right of x
+        xr_1 = xr_2 = grid.xf[el_x + 1] + xg[1] * grid.dx[el_x + 1]
+
+        # Face between x and xr
+        xfr_1 = xfr_2 = grid.xf[el_x + 1]
+
+    else
+        ur_1 = get_node_vars(u1, eq, ix + 1, nd, el_x, el_y - 1)
+        ur_2 = get_node_vars(u1, eq, ix + 1, nd, el_x, el_y)
+
+        # Solution points right of x
+        xr_1 = xr_2 = grid.xf[el_x] + xg[ix + 1] * grid.dx[el_x]
+
+        # Face between x and xr
+        xfr_1 = xfr_2 = grid.xf[el_x]
+        for iix in 1:ix
+            xfr_2 += wg[iix] * grid.dx[el_x]
+        end
+        xfr_1 = xfr_2
+    end
+
+    solns_x = ((ul_1, ur_1), (ul_2, ur_2))
+
+    # stack x coordinates of solution points (yd, y, yu)
+    sol_coords_x = ((xl_1, xr_1), (xl_2, xr_2))
+
+    face_coords_y = ((yf - wg[nd] * dy[el_y - 1], yf), # yfl, yf
+                     (yf, yf + wg[1] * dy[el_y]))
+    face_coords_x = ((xfl_1, xfr_1), (xfl_2, xfr_2))
+
+    betas = (2.0 - alpha[el_x, el_y - 1], 2.0 - alpha[el_x, el_y])
+    if blend.parameters.pure_fv == true
+        betas = (2.0, 2.0)
+    end
+
+    for i in 1:2 # Loop over the two relevant cells
+        ud, u_, uu = solns_y[i]
+        ul, ur = solns_x[i]
+
+        # TOTHINK - Add this feature
+        # ud, u_, uu = conservative2recon.((ud,u_,uu))
+
+        yd, y, yu = sol_coords_y[i]
+        xl, xr = sol_coords_x[i]
+        yfd, yfu = face_coords_y[i]
+        xfl, xfr = face_coords_x[i]
+        Δy1, Δy2 = y - yd, yu - y
+        Δx1, Δx2 = x - xl, xr - x
+        back_y, cent_y, fwd_y = finite_differences(Δy1, Δy2, ud, u_, uu)
+        back_x, cent_x, fwd_x = finite_differences(Δx1, Δx2, ul, u_, ur)
+        beta = betas[i]
+        Mdy2 = tvbM * Δy1
+        slope_tuple_y = (minmod(cent_y[n], back_y[n], fwd_y[n], beta, Mdy2)
+                         for n in eachvariable(eq))
+        Mdx2 = tvbM * Δx1
+        slope_tuple_x = (minmod(cent_x[n], back_x[n], fwd_x[n], beta, Mdx2)
+                         for n in eachvariable(eq))
+        slope_y = SVector{nvar}(slope_tuple_y)
+        slope_x = SVector{nvar}(slope_tuple_x)
+
+        ufd = u_ + slope_y * (yfd - y)
+        ufu = u_ + slope_y * (yfu - y)
+        ufl = u_ + slope_x * (xfl - x)
+        ufr = u_ + slope_x * (xfr - x)
+
+        u_star_d = u_ + 2.0 * slope_y * (yfd - y)
+        u_star_u = u_ + 2.0 * slope_y * (yfu - y)
+        u_star_l = u_ + 2.0 * slope_x * (xfl - x)
+        u_star_r = u_ + 2.0 * slope_x * (xfr - x)
+
+        ufd, ufu = limit_slope(eq, slope_y, ufd, u_star_d, ufu, u_star_u, u_,
+                               yfd - y, yfu - y)
+        ufl, ufr = limit_slope(eq, slope_x, ufl, u_star_l, ufr, u_star_r, u_,
+                               xfl - x, xfr - x)
+
+        # TOTHINK - add this feature
+        # Convert back to conservative variables for update
+        # ufl, ufr = recon2conservative.((ufl, ufr))
+
+        if i == 1
+            uf = ufu # relevant face is the one above
+        elseif i == 2
+            uf = ufd # relevant face is the one below
+        end
+
+        # use finite difference method to evolve face values to time n+1/2
+        set_node_vars!(unph, uf, eq, i)
+    end
+
+    ud = get_node_vars(unph, eq, 1)
+    uu = get_node_vars(unph, eq, 2)
+    gd, gu = flux(x, yf, ud, eq, 2), flux(x, yf, uu, eq, 2)
+    X = SVector(x, yf)
+    fn = scaling_factor * num_flux(X, ud, uu, gd, gu, ud, uu, eq, 2)
+
+    Fn = get_blended_flux_y(el_x, el_y, ix, eq, dt, grid, blend,
+                            scheme, x, yf, u1, ua, fn, Fn, op)
+
+    # r = @view res[:,ix,:,el_x,el_y-1]
+
+    # multiply_add_to_node_vars!(r, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
+    #                            alpha[el_x,el_y-1] * dt/(dy[el_y-1]*wg[nd]),
+    #                            Fn,
+    #                            eq, nd
+    #                            )
+
+    # r = @view res[:,ix,:,el_x,el_y]
+
+    # multiply_add_to_node_vars!(r, # r[1] -= alpha*dt/(dy*wg[1])*Fn
+    #                            - alpha[el_x,el_y] * dt/(dy[el_y]*wg[1]),
+    #                            Fn,
+    #                            eq, 1)
+
+    return Fn, (1.0 - alpha[el_x, el_y - 1], 1.0 - alpha[el_x, el_y])
+    end # timer
+end
+
 fo_blend(::AbstractEquations{2, <:Any}) = (;
                                            cell_residual! = blend_cell_residual_fo!,
                                            face_residual_x! = blend_face_residual_fo_x!,
@@ -2579,6 +3178,12 @@ mh_blend(::AbstractEquations{2, <:Any}) = (;
                                            face_residual_x! = blend_face_residual_muscl_x!,
                                            face_residual_y! = blend_face_residual_muscl_y!,
                                            name = "muscl")
+
+muscl_blend(::AbstractEquations{2, <:Any}) = (;
+                                           cell_residual! = blend_cell_residual_muscl_rk!,
+                                           face_residual_x! = blend_face_residual_muscl_rk_x!,
+                                           face_residual_y! = blend_face_residual_muscl_rk_y!,
+                                           name = "muscl_rk")
 
 function trivial_cell_residual(i, j, eq::AbstractEquations{2}, scheme, aux,
                                dt, grid, dx, dy, xf, yf, op, u1, u, f, r,
