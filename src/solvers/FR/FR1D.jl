@@ -1447,6 +1447,26 @@ end
 # compute_fv_cell_residual! computes the residual that is from subcell faces
 # which are in the interior of big cell.
 #-------------------------------------------------------------------------------
+@inbounds @inline function store_low_flux!(u, cell, xf, dx, op, blend,
+                                           eq::AbstractEquations{1},
+                                           scaling_factor)
+    @unpack wg = op
+    @unpack numflux = blend
+    fn_low = @view blend.fn_low[:, :, cell]
+    nd = length(wg)
+    xxf = (xf + wg[1] * dx, xf + dx * (1.0 - wg[end]))
+    face_indices = (2, nd)
+    for ii in 1:2
+        xx = xxf[ii]
+        j = face_indices[ii]
+        @views ul, ur = u[:, j - 1], u[:, j]
+        fl, fr = flux(xx, ul, eq), flux(xx, ur, eq)
+        fn = scaling_factor * numflux(xx, ul, ur, fl, fr, ul, ur, eq, 1)
+        fn_low[:, ii] .= fn
+    end
+    return nothing
+end
+
 # 1st order FV cell residual
 @inbounds @inline function blend_cell_residual_fo!(cell, eq::AbstractEquations{1},
                                                    scheme, aux, lamx,
@@ -1456,16 +1476,19 @@ end
     #! format: noindent
     # to be 0.25 microseconds
     @unpack blend = aux
-    # if blend.alpha[i] < 1e-12
-    #    return nothing
-    # end
     @unpack Vl, Vr, xg, wg = op
+    fn_low = @view blend.fn_low[:, :, cell]
     num_flux = scheme.numerical_flux
     nd = length(xg)
+
+    if blend.alpha[cell] < 1e-12
+        store_low_flux!(u, cell, xf, dx, op, blend, eq, scaling_factor)
+        return nothing
+    end
+
     resl = blend.resl
     nvar = nvariables(eq)
     @unpack xxf, fn = blend
-    fn_low = @view blend.fn_low[:, :, cell]
     # Get subcell faces
     xxf[0] = xf
     for ii in Base.OneTo(nd)
@@ -1474,7 +1497,7 @@ end
     fill!(resl, zero(eltype(resl)))
     for j in 2:nd
         xx = xxf[j]
-        @views ul, ur = u[:,j-1], u[:,j]
+        @views ul, ur = u[:, j - 1], u[:, j]
         fl, fr = flux(xx, ul, eq), flux(xx, ur, eq)
         fn = scaling_factor * num_flux(xx, ul, ur, fl, fr, ul, ur, eq, 1)
         for n in 1:nvar
@@ -1488,6 +1511,23 @@ end
     end # timer
 end
 
+@inbounds @inline function blend_flux_only(i, op, scheme, blend, grid,
+                                           xf, u1, eq::AbstractEquations{1}, dt, alp,
+                                           Fn, lamx, scaling_factor)
+    nd = length(op.xg)
+    num_flux = scheme.numerical_flux
+    # Test for non-admissibility using a lower order flux candidate
+    # which will probably be a FO flux, saved from previous checks.
+    @views ul, ur = u1[:, nd, i - 1], u1[:, 1, i]
+    fl = flux(xf, ul, eq)
+    fr = flux(xf, ur, eq)
+    fn = scaling_factor * num_flux(xf, ul, ur, fl, fr, ul, ur, eq, 1)
+    Fn = (1.0 - alp) * Fn + alp * fn
+    Fn = get_blended_flux(i, eq, dt, grid, blend, scheme, xf, u1, fn, Fn,
+                          lamx, op, alp)
+    return Fn, (1.0, 1.0)
+end
+
 @inbounds @inline function blend_face_residual_fo!(i, xf, u1, ua,
                                                    eq::AbstractEquations{1},
                                                    dt, grid, op, scheme, param,
@@ -1498,13 +1538,17 @@ end
     # it's supposed to be 0.25 microseconds
     @unpack blend = aux
     alpha = blend.alpha # factor of non-smooth part
-    alp = 0.5 * (alpha[i - 1] + alpha[i])
     num_flux = scheme.numerical_flux
     @unpack dx = grid
     nvar = nvariables(eq)
 
     @unpack xg, wg = op
     nd = length(xg)
+    alp = 0.5 * (alpha[i - 1] + alpha[i])
+    if alp < 1e-12
+        blend_flux_only(i, op, scheme, blend, grid, xf, u1, eq, dt, alp, Fn, lamx,
+                         scaling_factor)
+    end
 
     # Reuse arrays to save memory
     @unpack fl, fr, fn = blend
@@ -1592,9 +1636,10 @@ end
     #! format: noindent
     # to be 0.25 microseconds
     @unpack blend = aux
-    # if blend.alpha[cell] < 1e-12
-    #    return nothing
-    # end
+    if blend.alpha[cell] < 1e-12
+        store_low_flux!(u, cell, xf, dx, op, blend, eq, scaling_factor)
+        return nothing
+    end
     fn_low = @view blend.fn_low[:, :, cell]
     @unpack Vl, Vr, xg, wg = op
     nd = length(xg)
@@ -1657,6 +1702,8 @@ end
 
         h1, h2 = xe[ii] - xe[ii - 1], xe[ii + 1] - xe[ii]
         back, cent, fwd = finite_differences(h1, h2, ul, u_, ur)
+        #    # TOTHINK - Confirm that cent_diff is giving benefit in some case.
+        #    # In linear advection, smooth test, it gave no advantage
 
         slope_tuple = (minmod(cent[n], back[n], fwd[n], beta, 0.0)
                        for n in eachvariable(eq))
@@ -1667,23 +1714,6 @@ end
         ufr = u_ + slope * (xxf[ii] - xe[ii]) # right face value u_j^{n,+}
         u_s_l = u_ + slope * 2.0 * (xxf[ii - 1] - xe[ii]) # u_j^{*,-}
         u_s_r = u_ + slope * 2.0 * (xxf[ii] - xe[ii]) # u_j^{*,+}
-        # for n=1:nvar
-        #    h1, h2 = xe[ii]-xe[ii-1], xe[ii+1] - xe[ii]
-        #    a,b,c = -( h2/(h1*(h1+h2)) ), (h2-h1)/(h1*h2), ( h1/(h2*(h1+h2)) )
-        #    cent_diff = ( a * ue[n,ii-1] + b * ue[n,ii] + c * ue[n,ii+1]  )
-        #    # TOTHINK - Confirm that cent_diff is giving benefit in some case.
-        #    # In linear advection, smooth test, it gave no advantage
-        #    slope[n] = minmod(
-        #                       cent_diff,
-        #                       beta*(ue[n,ii]-ue[n,ii-1])/(xe[ii]-xe[ii-1]),
-        #                      #  (ue[n,ii+1]-ue[n,ii-1])/(xe[ii+1]-xe[ii-1]),
-        #                       beta*(ue[n,ii+1]-ue[n,ii])/(xe[ii+1]-xe[ii]),
-        #                       0.0) # parameter M = 0.0
-        #    ufl[n] = ue[n,ii] + slope[n]*(xxf[ii-1] - xe[ii]) # left face value u_j^{n,-}
-        #    ufr[n] = ue[n,ii] + slope[n]*(xxf[ii]   - xe[ii]) # right face value u_j^{n,+}
-        #    u_s_l[n] = ue[n,ii] + slope[n]*2.0*(xxf[ii-1] - xe[ii]) # u_j^{*,-}
-        #    u_s_r[n] = ue[n,ii] + slope[n]*2.0*(xxf[ii]   - xe[ii]) # u_j^{*,+}
-        # end
 
         # Convert back to conservative for update
         recon2cons(u) = blend.recon2conservative!(u, ua, eq)
@@ -1756,9 +1786,9 @@ end
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead
     #! format: noindent
     @unpack blend = aux
-    # if blend.alpha[i] < 1e-12 && blend.alpha[i-1] < 1e-12
-    #    return Fn, 1.0, 1.0
-    # end
+    if blend.alpha[i] < 1e-12 && blend.alpha[i - 1] < 1e-12
+        return Fn, (1.0, 1.0)
+    end
     alpha = blend.alpha # factor of non-smooth part
     @unpack xg, wg = op
     nd = length(xg)
@@ -1895,7 +1925,8 @@ end
     @views fl = flux(xf, unph_l, eq)
     @views fr = flux(xf, unph_r, eq)
 
-    fn = scaling_factor * num_flux(xf, unph_l, unph_r, fl, fr, unph_l, unph_r, eq, 1)
+    fn = scaling_factor *
+         num_flux(xf, unph_l, unph_r, fl, fr, unph_l, unph_r, eq, 1)
 
     # If positivity fails, set
     # it's supposed to be 0.25 microseconds
@@ -1933,7 +1964,7 @@ end
 
 @inline function trivial_cell_residual(i, eq::AbstractEquations{1}, num_flux,
                                        aux, lamx, dt, dx, xf, op, u1, u, ua, f, r,
-                                       scaling_factor=1)
+                                       scaling_factor = 1)
     return nothing
 end
 
@@ -2008,7 +2039,7 @@ end
 
 @inline function trivial_face_residual(i, x, u1, ua, eq::AbstractEquations{1},
                                        dt, grid, op, scheme, param, Fn, aux,
-                                       lamx, res, scaling_factor=1)
+                                       lamx, res, scaling_factor = 1)
     return Fn, (1.0, 1.0)
 end
 

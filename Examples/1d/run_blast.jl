@@ -16,7 +16,7 @@ initial_value = Eq.blast
 exact_solution = Eq.exact_blast # dummy function
 boundary_value = Eq.exact_blast # dummy function
 
-degree = 3
+degree = 4
 solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
@@ -67,3 +67,7 @@ sol = Tenkai.solve(equation, problem, scheme, param);
 print(sol["errors"])
 
 return sol
+sol
+
+correct_sol_with_mh # contains correct solution with mh blending.
+print(correct_sol_with_mh["errors"])
