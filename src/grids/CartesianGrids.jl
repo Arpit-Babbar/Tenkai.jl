@@ -70,6 +70,16 @@ function save_mesh_file(mesh::CartesianGrid2D, output_directory)
     mkpath(output_directory)
 
     xmin, xmax, ymin, ymax = mesh.domain
+    mapping(x,y) = (xmin + (xmax - xmin)ymin + (ymax - ymin)*y)
+
+    # From src/meshes/structured_mesh.jl in Trixi.jl
+    coordinates_min = (xmin, ymin)
+    coordinates_max = (xmax, ymax)
+    mapping_as_string = """
+        coordinates_min = $coordinates_min
+        coordinates_max = $coordinates_max
+        mapping = coordinates2mapping(coordinates_min, coordinates_max)
+        """
 
     filename = joinpath(output_directory, "mesh.h5")
 
@@ -83,6 +93,7 @@ function save_mesh_file(mesh::CartesianGrid2D, output_directory)
         attributes(file)["xmax"] = xmax
         attributes(file)["ymin"] = ymin
         attributes(file)["ymax"] = ymax
+        attributes(file)["mapping"] = mapping_as_string
     end
 
     return filename

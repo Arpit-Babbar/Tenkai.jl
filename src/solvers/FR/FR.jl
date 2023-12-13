@@ -748,19 +748,16 @@ end
 
 function finite_differences(h1, h2, ul, u, ur)
     # TODO - This is only be needed for GLL points. Use multiple dispatch maybe
-    if abs(h1) < 1e-12
-        back_diff = zero(u)
-    else
-        back_diff = (u - ul) / h1
-    end
-    if abs(h2) < 1e-12
-        fwd_diff = zero(u)
-    else
-        fwd_diff = (ur - u) / h2
-    end
+    fwd_diff = (ur - u) / h2
+    back_diff = (u - ul) / h1
     a, b, c = -(h2 / (h1 * (h1 + h2))), (h2 - h1) / (h1 * h2), (h1 / (h2 * (h1 + h2)))
     cent_diff = a * ul + b * u + c * ur
-    # cent_diff = (ur - ul) / (h1 + h2)
+    if abs(h1) < 1e-12
+        back_diff = cent_diff = zero(u)
+    end
+    if abs(h2) < 1e-12
+        fwd_diff = cent_diff = zero(u)
+    end
     return back_diff, cent_diff, fwd_diff
 end
 
