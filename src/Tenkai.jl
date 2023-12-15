@@ -170,6 +170,7 @@ include("$fr_dir/FR2D.jl")
                set_blend_dt!,
                fo_blend,
                mh_blend,
+               muscl_blend,
                blending_flux_factors,
                zhang_shu_flux_fix,
                limit_slope,
@@ -208,7 +209,7 @@ characteristic_reconstruction = (;
 
 (export conservative_reconstruction, primitive_reconstruction,
         characteristic_reconstruction, conservative_indicator!,
-        fo_blend, mh_blend)
+        fo_blend, mh_blend, muscl_blend)
 
 (export
         setup_limiter_tvb,

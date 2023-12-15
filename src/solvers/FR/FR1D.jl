@@ -1844,20 +1844,6 @@ end
     ufl, ufr = u_ + slope * (xfl - x), u_ + slope * (xfr - x)
     u_s_l, u_s_r = u_ + 2.0 * slope * (xfl - x), u_ + 2.0 * slope * (xfr - x)
 
-    # for n=1:nvar
-    #    h1, h2 = x - xl, xr - x
-    #    a,b,c = -( h2/(h1*(h1+h2)) ), (h2-h1)/(h1*h2), ( h1/(h2*(h1+h2)) )
-    #    cent_diff = ( a * um1[n] + b * u_[n] + c * up1[n]  )
-    #    slope[n] = minmod(
-    #                       cent_diff,
-    #                       beta * ( u_[n]  - um1[n] ) / (x-xl),  # u-um1
-    #                       beta * ( up1[n] - u_[n]  ) / (xr-x),  # up1-u
-    #                       0.0 )
-    #    # left, right face values at current time level
-    #    ufl[n], ufr[n] = u_[n] + slope[n]*(xfl-x), u_[n] + slope[n]*(xfr-x)
-    #    u_s_l[n], u_s_r[n] = u_[n] + 2.0*slope[n]*(xfl-x), u_[n] + 2.0*slope[n]*(xfr-x)
-    # end
-
     recon2cons_l(u) = blend.recon2conservative!(u, ual, eq)
 
     ufl, ufr, u_s_l, u_s_r = recon2cons_l.((ufl, ufr, u_s_l, u_s_r))
