@@ -11,15 +11,15 @@ boundary_value = exact_solution # dummy function
 boundary_condition = (periodic, periodic, periodic, periodic)
 final_time = 0.1
 
-degree = 1
-solver = "lwfr"
+degree = 3
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
 bound_limit = "no"
 bflux = evaluate
 numerical_flux = Eq.rusanov
 
-nx, ny = 640, 640
+nx, ny = 50, 50
 bounds = ([-Inf], [Inf])
 cfl = 0.0
 save_iter_interval = 0
@@ -39,7 +39,7 @@ limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               constant_node_factor = 1.0,
                               debug_blend = false,
                               pure_fv = true)
-# limiter = setup_limiter_none()
+limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,

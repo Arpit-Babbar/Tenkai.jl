@@ -50,12 +50,6 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
     # Cell residual cache
 
     nt = Threads.nthreads()
-    cell_array_sizes = Dict(1 => 10, 2 => 11, 3 => 14, 4 => 15)
-    big_eval_data_sizes = Dict(1 => 12, 2 => 32, 3 => 40, 4 => 56)
-    small_eval_data_sizes = Dict(1 => 4, 2 => 4, 3 => 4, 4 => 4)
-    cell_array_size = cell_array_sizes[degree]
-    big_eval_data_size = big_eval_data_sizes[degree]
-    small_eval_data_size = small_eval_data_sizes[degree]
 
     # Construct `cache_size` number of objects with `constructor`
     # and store them in an SVector
@@ -72,15 +66,12 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
     end
 
     MArr = MArray{Tuple{nvariables(eq), nd, nd}, Float64}
-    cell_arrays = alloc_for_threads(MArr, cell_array_size)
+    cell_arrays = alloc_for_threads(MArr, 7)
 
     MEval = MArray{Tuple{nvariables(eq), nd}, Float64}
-    eval_data_big = alloc_for_threads(MEval, big_eval_data_size)
+    eval_data_big = alloc_for_threads(MEval, 20)
 
-    MEval_small = MArray{Tuple{nvariables(eq), 1}, Float64}
-    eval_data_small = alloc_for_threads(MEval_small, small_eval_data_size)
-
-    eval_data = (; eval_data_big, eval_data_small)
+    eval_data = (; eval_data_big)
 
     # Ghost values cache
 

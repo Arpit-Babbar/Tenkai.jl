@@ -713,7 +713,8 @@ function correct_variable!(eq::AbstractEquations{2}, variable, op, aux, grid,
     nd = op.degree + 1
 
     var_min_avg = 1e-10
-    for el_y in 1:ny, el_x in 1:nx
+    @threaded for element in CartesianIndices((1:nx, 1:ny))
+        el_x, el_y = element[1], element[2]
         ua_ = get_node_vars(ua, eq, el_x, el_y)
         var_min_avg = min(var_min_avg, variable(eq, ua_))
         if var_min_avg < admissibility_tolerance(eq)
