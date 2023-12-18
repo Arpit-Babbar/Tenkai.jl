@@ -38,16 +38,13 @@ limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               indicator_model = "gassner",
                               constant_node_factor = 1.0,
                               debug_blend = false,
-                              pure_fv = true)
+                              pure_fv = false)
 limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
-                   animate = animate)
-#------------------------------------------------------------------------------
-problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
-                                          ARGS)
+                   animate = animate, time_scheme = "RK4")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 

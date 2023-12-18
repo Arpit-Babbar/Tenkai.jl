@@ -11,6 +11,7 @@ using Polyester
 using MuladdMacro
 using OffsetArrays
 using StaticArrays
+using LoopVectorization
 
 using ..FR: @threaded
 using ..FR2D: update_ghost_values_periodic!, update_ghost_values_fn_blend!
@@ -19,6 +20,10 @@ import Tenkai.LWFR2D: extrap_bflux!
 using ..Equations: AbstractEquations, nvariables, eachvariable
 @muladd begin
 #! format: noindent
+
+@inline @inbounds function refresh!(u)
+    @turbo u .= zero(eltype(u))
+end
 
 function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
     function gArray(nvar, nx, ny)
@@ -85,18 +90,15 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
     return cache
 end
 
-function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data, eval_data_big,
+@inline @inbounds function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data, eval_data_big,
                           xg, Vl, Vr, F, G, F2, G2, Fb, Fb2, aux)
     @unpack nvar = eq
     nd = length(xg)
-    refresh!(u) = fill!(u, zero(eltype(u)))
 
     # Load pre-allocated arrays
     u, el_x, el_y = cell_data
-    id = Threads.threadid()
 
-    (ul, ur, uu, ud, upl, uppl, upr, uppr, upd, uppd, upu, uppu, uml, umml,
-    umr, ummr, umd, ummd, umu, ummu) = eval_data_big
+    ul, ur, uu, ud, upl, upr, upd, upu, uml, umr, umd, umu = eval_data_big
     xl, xr = grid.xf[el_x], grid.xf[el_x + 1]
     yd, yu = grid.yf[el_y], grid.yf[el_y + 1]
     dx, dy = grid.dx[el_x], grid.dy[el_y]
@@ -144,36 +146,16 @@ function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data, eval_data_b
         gmd = flux(x, yd, umd_node, eq, 2)
         gmu = flux(x, yu, umu_node, eq, 2)
 
-        uppl_node = get_node_vars(uppl, eq, i)
-        uppr_node = get_node_vars(uppr, eq, i)
-        uppd_node = get_node_vars(uppd, eq, i)
-        uppu_node = get_node_vars(uppu, eq, i)
-
-        fppl = flux(xl, y, uppl_node, eq, 1)
-        fppr = flux(xr, y, uppr_node, eq, 1)
-        gppd = flux(x, yd, uppd_node, eq, 2)
-        gppu = flux(x, yu, uppu_node, eq, 2)
-
-        umml_node = get_node_vars(umml, eq, i)
-        ummr_node = get_node_vars(ummr, eq, i)
-        ummd_node = get_node_vars(ummd, eq, i)
-        ummu_node = get_node_vars(ummu, eq, i)
-
-        fmml = flux(xl, y, umml_node, eq, 1)
-        fmmr = flux(xr, y, ummr_node, eq, 1)
-        gmmd = flux(x, yd, ummd_node, eq, 2)
-        gmmu = flux(x, yu, ummu_node, eq, 2)
-
-        ftl_node = 1.0 / 12.0 * (-fppl + 8.0 * fpl - 8.0 * fml + fmml)
-        ftr_node = 1.0 / 12.0 * (-fppr + 8.0 * fpr - 8.0 * fmr + fmmr)
+        ftl_node = 0.5 * (fpl - fml)
+        ftr_node = 0.5 * (fpr - fmr)
 
         multiply_add_to_node_vars!(Fb, 0.125, ftl_node, eq, i, 1)
         multiply_add_to_node_vars!(Fb, 0.125, ftr_node, eq, i, 2)
         multiply_add_to_node_vars!(Fb2, 1.0 / 6.0, ftl_node, eq, i, 1)
         multiply_add_to_node_vars!(Fb2, 1.0 / 6.0, ftr_node, eq, i, 2)
 
-        gtd_node = 1.0 / 12.0 * (-gppd + 8.0 * gpd - 8.0 * gmd + gmmd)
-        gtu_node = 1.0 / 12.0 * (-gppu + 8.0 * gpu - 8.0 * gmu + gmmu)
+        gtd_node = 0.5 * (gpd - gmd)
+        gtu_node = 0.5 * (gpu - gmu)
 
         multiply_add_to_node_vars!(Fb, 0.125, gtd_node, eq, i, 3)
         multiply_add_to_node_vars!(Fb, 0.125, gtu_node, eq, i, 4)
@@ -182,15 +164,13 @@ function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data, eval_data_b
     end
 end
 
-function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data, eval_data_big,
+@inbounds @inline function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data, eval_data_big,
                           xg, Vl, Vr, F, G, Fb, Fb2, aux, ::Nothing)
     @unpack nvar = eq
     nd = length(xg)
-    refresh!(u) = fill!(u, zero(eltype(u)))
 
     # Load pre-allocated arrays
     el_x, el_y = cell_data
-    id = Threads.threadid()
 
     (_, _, _, _, upl, uppl, upr, uppr, upd, uppd, upu, uppu, uml, umml,
     umr, ummr, umd, ummd, umu, ummu) = eval_data_big
@@ -266,7 +246,7 @@ function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data, eval_data_b
     end
 end
 
-function extrap_bflux!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
+@inbounds @inline function extrap_bflux!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
                        xg, Vl, Vr, F, G, F2, G2, Fb, Fb2, aux, n = nothing)
     @unpack nvar = eq
     nd = length(xg)
@@ -285,7 +265,7 @@ function extrap_bflux!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
     end
 end
 
-function extrap_bflux!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
+@inbounds @inline function extrap_bflux!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
                        xg, Vl, Vr, F, G, Fb, Fb2, aux, n = nothing)
     @unpack nvar = eq
     nd = length(xg)
@@ -311,7 +291,6 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
     nx, ny = grid.size
-    refresh!(u) = fill!(u, zero(eltype(u)))
 
     # Select boundary flux
     @unpack blend_cell_residual! = aux.blend.subroutines
@@ -331,8 +310,7 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
 
         eval_data_big = eval_data.eval_data_big[id]
         refresh!.(eval_data_big)
-        (ul, ur, uu, ud, upl, uppl, upr, uppr, upd, uppd, upu, uppu, uml, umml,
-        umr, ummr, umd, ummd, umu, ummu) = eval_data_big
+        ul, ur, uu, ud, upl, upr, upd, upu, uml, umr, umd, umu = eval_data_big
 
         refresh!(ut)
 
@@ -368,8 +346,6 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
 
             um = u_node - ut_node
             up = u_node + ut_node
-            umm = u_node - 2.0 * ut_node
-            upp = u_node + 2.0 * ut_node
 
             # For efficient computation of time averaged flux at interfaces
             # ul = u * V
@@ -392,23 +368,11 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
             multiply_add_to_node_vars!(umd, Vl[j], um, eq, i)
             multiply_add_to_node_vars!(umu, Vr[j], um, eq, i)
 
-            multiply_add_to_node_vars!(uppl, Vl[i], upp, eq, j)
-            multiply_add_to_node_vars!(uppr, Vr[i], upp, eq, j)
-            multiply_add_to_node_vars!(uppd, Vl[j], upp, eq, i)
-            multiply_add_to_node_vars!(uppu, Vr[j], upp, eq, i)
-
-            multiply_add_to_node_vars!(umml, Vl[i], umm, eq, j)
-            multiply_add_to_node_vars!(ummr, Vr[i], umm, eq, j)
-            multiply_add_to_node_vars!(ummd, Vl[j], umm, eq, i)
-            multiply_add_to_node_vars!(ummu, Vr[j], umm, eq, i)
-
             fm, gm = flux(x, y, um, eq)
             fp, gp = flux(x, y, up, eq)
-            fmm, gmm = flux(x, y, umm, eq)
-            fpp, gpp = flux(x, y, upp, eq)
 
-            ft = 1.0 / 12.0 * (-fpp + 8.0 * fp - 8.0 * fm + fmm)
-            gt = 1.0 / 12.0 * (-gpp + 8.0 * gp - 8.0 * gm + gmm)
+            ft = 0.5 * (fp - fm)
+            gt = 0.5 * (gp - gm)
             multiply_add_to_node_vars!(F, 0.125, ft, eq, i, j)
             multiply_add_to_node_vars!(G, 0.125, gt, eq, i, j)
             multiply_add_to_node_vars!(U, 0.125, ut_node, eq, i, j)
@@ -439,9 +403,9 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
             multiply_add_to_node_vars!(Ub, Vr[j], U_, eq, i, 4, el_x, el_y)
         end
 
-        F2[:, :, :, el_x, el_y] .= F2_loc
-        G2[:, :, :, el_x, el_y] .= G2_loc
-        U2[:, :, :, el_x, el_y] .= U2_loc
+        @turbo F2[:, :, :, el_x, el_y] .= F2_loc
+        @turbo G2[:, :, :, el_x, el_y] .= G2_loc
+        @turbo U2[:, :, :, el_x, el_y] .= U2_loc
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, grid, dx, dy,
@@ -464,7 +428,6 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op,
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
     nx, ny = grid.size
-    refresh!(u) = fill!(u, zero(eltype(u)))
 
     # Select boundary flux
     @unpack blend_cell_residual! = aux.blend.subroutines
@@ -487,9 +450,12 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op,
         (_, _, _, _, upl, uppl, upr, uppr, upd, uppd, upu, uppu, uml, umml,
         umr, ummr, umd, ummd, umu, ummu) = eval_data_big
 
-        F .= @view F2[:, :, :, el_x, el_y]
-        G .= @view G2[:, :, :, el_x, el_y]
-        U .= @view U2[:, :, :, el_x, el_y]
+        F2_ = @view F2[:, :, :, el_x, el_y]
+        G2_ = @view G2[:, :, :, el_x, el_y]
+        U2_ = @view U2[:, :, :, el_x, el_y]
+        @turbo F .= F2_
+        @turbo G .= G2_
+        @turbo U .= U2_
 
         refresh!(ust)
 
