@@ -11,6 +11,7 @@ using StaticArrays
 using WriteVTK
 using FLoops
 using LoopVectorization
+using DelimitedFiles
 using LinearAlgebra: lmul!, mul!
 
 import Trixi
@@ -23,17 +24,18 @@ using Tenkai.FR: admissibility_tolerance
 
 using ..Basis
 
-(using ..FR: periodic, dirichlet, neumann, reflect,
-             lwfr, rkfr,
-             minmod, finite_differences,
-             @threaded, Problem, Scheme, Parameters,
-             get_filename,
-             alloc_for_threads,
-             get_node_vars, set_node_vars!,
-             get_first_node_vars, get_second_node_vars,
-             add_to_node_vars!, subtract_from_node_vars!,
-             multiply_add_to_node_vars!, multiply_add_set_node_vars!,
-             comp_wise_mutiply_node_vars!, zhang_shu_flux_fix)
+using ..FR: periodic, dirichlet, neumann, reflect,
+            lwfr, rkfr,
+            minmod, finite_differences,
+            @threaded, Problem, Scheme, Parameters,
+            get_filename,
+            alloc_for_threads,
+            get_node_vars, set_node_vars!,
+            get_first_node_vars, get_second_node_vars,
+            add_to_node_vars!, subtract_from_node_vars!,
+            multiply_add_to_node_vars!, multiply_add_set_node_vars!,
+            comp_wise_mutiply_node_vars!, zhang_shu_flux_fix,
+            save_solution
 
 using ..Equations: AbstractEquations, nvariables, eachvariable
 
@@ -1038,7 +1040,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
     @unpack amax = blend.parameters      # maximum factor of the lower order term
     @unpack tolE = blend.parameters      # tolerance for denominator
     @unpack E = blend.cache            # content in high frequency nodes
-    @unpack alpha, alpha_temp = blend.cache    # vector containing smoothness indicator values
+    @unpack alpha_max, alpha, alpha_temp = blend.cache    # vector containing smoothness indicator values
     @unpack (c, a, amin, a0, a1, smooth_alpha, smooth_factor) = blend.parameters # smoothing coefficients
     @unpack get_indicating_variables! = blend.subroutines
     @unpack cache = blend
@@ -1150,12 +1152,71 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
         blend.cache.dt[1] = dt # hacky fix for compatibility with OrdinaryDiffEq
     end
 
+    @threaded for element in CartesianIndices((1:nx, 1:ny))
+        el_x, el_y = element[1], element[2]
+        alpha_max[el_x, el_y] = max(alpha[el_x, el_y], alpha_max[el_x, el_y])
+    end
+
     if limiter.pure_fv == true
         @assert scheme.limiter.name == "blend"
         @turbo alpha .= one(eltype(alpha))
     end
 
+    # KLUDGE - Should this be in apply_limiter! function?
+    debug_blend_limiter!(eq, grid, problem, scheme, param, aux, op,
+                         dt, t, iter, fcount, ua, u1)
+
     return nothing
+    end # timer
+end
+
+function debug_blend_limiter!(eq::AbstractEquations{2}, grid, problem, scheme,
+                              param, aux,
+                              op, dt, t, iter, fcount, ua, u1)
+    @unpack blend, plot_data = aux
+    if blend.parameters.debug == false
+        return nothing
+    end
+    @timeit aux.timer "Debug blending limiter" begin
+    #! format: noindent
+    @unpack limiter = scheme
+    @unpack final_time = problem
+
+    @unpack alpha = blend.cache
+    nx, ny = grid.size
+    alpha_ = @view alpha[1:nx, 1:ny]
+    total_activations = length(alpha_[alpha_ .> 1e-12])
+    push!(blend.cache.total_activations, total_activations)
+    push!(blend.cache.times, t)
+
+    # Save energy and alpha data to output
+    if save_solution(problem, param, t, iter) == true || t < 1e-12 ||
+       final_time - (t + dt) < 1e-10
+        ndigits = 3 # KLUDGE - Add option to change
+        filename = get_filename("output/alpha", ndigits, fcount)
+        vtk_alpha = vtk_grid(filename, grid.xc, grid.yc)
+        vtk_alpha["alpha"] = alpha_
+        vtk_alpha["CYCLE"] = iter
+        vtk_alpha["TIME"] = t
+        vtk_alpha["Total activations"] = total_activations
+        out = vtk_save(vtk_alpha)
+        println("Wrote file ", out[1])
+        if final_time - (t + dt) < 1e-10
+            cp("$filename.vtr", "output/alpha.vtr", force = true)
+
+            max_filename = "output/alpha_max"
+            alpha_max = @view blend.cache.alpha_max[1:nx, 1:ny]
+            vtk_alpha_max = vtk_grid(max_filename, grid.xc, grid.yc)
+            vtk_alpha_max["alpha_max"] = alpha_max
+            vtk_alpha_max["CYCLE"] = iter
+            vtk_alpha_max["TIME"] = t
+            vtk_alpha_max["Total activations"] = length(alpha_max[alpha_max .> 1e-12])
+            out_max = vtk_save(vtk_alpha_max)
+            println("Wrote file ", out_max[1])
+
+            writedlm("output/time_vs_activations", zip(blend.cache.times, blend.cache.total_activations))
+        end
+    end
     end # timer
 end
 
@@ -1267,7 +1328,7 @@ function Blend(eq::AbstractEquations{2}, op, grid,
     # Big arrays
     E = zeros(nx, ny)
     alpha = OffsetArray(zeros(nx + 2, ny + 2), OffsetArrays.Origin(0, 0))
-    alpha_temp = similar(alpha)
+    alpha_temp, alpha_max = (similar(alpha) for _ in 1:2)
     fn_low = OffsetArray(zeros(nvar,
                                nd, # Dofs on each face
                                4,  # 4 faces
@@ -1302,11 +1363,12 @@ function Blend(eq::AbstractEquations{2}, op, grid,
 
     Pn2m = nodal2modal(xg)
 
-    cache = (; alpha, alpha_temp, E, ue,
+    cache = (; alpha, alpha_temp, alpha_max, E, ue,
              subcell_faces,
              solution_points,
              fn_low, dt = MVector(1.0),
-             nodal_modal, unph, Pn2m, slopes)
+             nodal_modal, unph, Pn2m, slopes,
+             times = [], total_activations = [])
 
     println("Setting up $blend_type blending limiter with $indicator_model "
             *
@@ -3471,7 +3533,7 @@ function write_soln!(base_name, fcount, iter, time, dt,
     end # timer
 end
 
-function post_process_soln(::AbstractEquations{2}, aux, problem, param)
+function post_process_soln(::AbstractEquations{2}, aux, problem, param, scheme)
     @unpack timer, error_file = aux
     # Print timer data on screen
     print_timer(timer, sortby = :firstexec)

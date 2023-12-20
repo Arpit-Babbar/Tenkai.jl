@@ -542,7 +542,7 @@ function exact_solution_data(iv::typeof(two_rare_iv))
     return exact_data
 end
 
-function post_process_soln(eq::TenMoment1D, aux, problem, param)
+function post_process_soln(eq::TenMoment1D, aux, problem, param, scheme)
     @unpack timer, error_file = aux
     @timeit timer "Write solution" begin
     #! format: noindent

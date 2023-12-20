@@ -1,11 +1,12 @@
 module LWFR
 
-(using Tenkai: set_initial_condition!,
-               compute_cell_average!,
-               compute_face_residual!,
-               write_soln!,
-               compute_error,
-               post_process_soln)
+using Tenkai: set_initial_condition!,
+              compute_cell_average!,
+              compute_face_residual!,
+              write_soln!,
+              compute_error,
+              post_process_soln,
+              modal_smoothness_indicator # KLUDGE - This shouldn't be here
 
 #------------------------------------------------------------------------------
 # Extending methods needed in FR.jl which are defined here
@@ -125,6 +126,7 @@ function solve_lwfr(eq, problem, scheme, param, grid, op, aux, cache)
     # Compute initial error norm
     error_norm = compute_error(problem, grid, eq, aux, op, u1, t)
 
+    local dt
     println("Starting time stepping")
     while t < final_time
         dt = compute_time_step(eq, grid, aux, op, cfl, u1, ua)
@@ -153,11 +155,17 @@ function solve_lwfr(eq, problem, scheme, param, grid, op, aux, cache)
         end
     end
     error_norm = compute_error(problem, grid, eq, aux, op, u1, t)
-    post_process_soln(eq, aux, problem, param)
+    post_process_soln(eq, aux, problem, param, scheme)
+
+    # KLUDGE - Move to post_process_solution
+    if scheme.limiter.name == "blend"
+        modal_smoothness_indicator(eq, t, iter, fcount, dt, grid, scheme,
+                                   problem, param, aux, op, u1, ua)
+    end
 
     return Dict("u" => u1, "ua" => ua, "errors" => error_norm,
                 "plot_data" => aux.plot_data, "grid" => grid,
-                "op" => op)
+                "op" => op, "scheme" => scheme)
 end
 end # @muladd
 

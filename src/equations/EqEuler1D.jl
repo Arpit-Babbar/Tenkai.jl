@@ -1139,7 +1139,7 @@ function exact_solution_data(test_case)
     return exact_data
 end
 
-function Tenkai.post_process_soln(eq::Euler1D, aux, problem, param)
+function Tenkai.post_process_soln(eq::Euler1D, aux, problem, param, scheme)
     @unpack timer, error_file = aux
     @timeit timer "Write solution" begin
     #! format: noindent

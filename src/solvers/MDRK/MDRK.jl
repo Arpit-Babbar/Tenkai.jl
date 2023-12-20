@@ -129,7 +129,7 @@ function solve_mdrk(eq, problem, scheme, param, grid, op, aux, cache)
         end
     end
     error_norm = compute_error(problem, grid, eq, aux, op, u1, t)
-    post_process_soln(eq, aux, problem, param)
+    post_process_soln(eq, aux, problem, param, scheme)
 
     return Dict("u" => u1, "ua" => ua, "errors" => error_norm,
                 "plot_data" => aux.plot_data, "grid" => grid,

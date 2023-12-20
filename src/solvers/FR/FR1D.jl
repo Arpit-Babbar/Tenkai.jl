@@ -2469,7 +2469,7 @@ function write_soln!(base_name, fcount, iter, time, dt,
     end # timer
 end
 
-function post_process_soln(eq::AbstractEquations{1, 1}, aux, problem, param)
+function post_process_soln(eq::AbstractEquations{1, 1}, aux, problem, param, scheme)
     @timeit aux.timer "Write solution" begin
     #! format: noindent
     @unpack plot_data, error_file, timer = aux
