@@ -63,7 +63,7 @@ end
     return SVector(ρ, ρv1, ρv2, E11, E12, E22)
 end
 
-@inbounds @inline prim2con(eq::TenMoment1D, prim) = tenmom_prim2con
+@inbounds @inline prim2con(eq::TenMoment1D, prim) = tenmom_prim2con(prim)
 
 # The flux is given by
 # (ρ v1, P11 + ρ v1^2, P12 + ρ v1*v2, (E + P) ⊗ v)
@@ -154,6 +154,46 @@ end
                                                                                eq::TenMoment1D,
                                                                                dir,
                                                                                hll_speeds_min_max)
+
+
+@inbounds @inline function hllc3(x, ual, uar, Fl, Fr, Ul, Ur, eq::TenMoment1D, dir,
+                                 wave_speeds::Function)
+    sl, sr = wave_speeds(eq, ual, uar)
+    # Supersonic cases
+    # Fl, Fr = flux(x, ual, eq), flux(x, uar, eq) # TEMPORARY (hopefully)
+    # Ul, Ur = ual, uar # TEMPORARY (hopefully)
+    if sl > 0.0
+        return Fl
+    elseif sr < 0.0
+        return Fr
+    end
+    ml = Fl - sl * Ul
+    mr = Fr - sr * Ur
+    v1s = (mr[2] - ml[2]) / (mr[1] - ml[1])
+    v2s = (mr[3] - ml[3]) / (mr[1] - ml[1])
+    P11s = (ml[2]*mr[1] - ml[1]*mr[2]) / (mr[1] - ml[1]) # TODO - Can use a simpler expression
+    P12s = (ml[3]*mr[1] - ml[1]*mr[3]) / (mr[1] - ml[1])
+    dsl, dsr = v1s - sl, v1s - sr
+    @assert dsl > 0.0 && dsr < 0.0 "Middle contact v1s=$v1s outside [sl, sr]=[$sl,$sr]"
+    if v1s > 0.0
+        rhosl = ml[1] / dsl
+        E11sl = (ml[4] - v1s * P11s) / dsl
+        E12sl = (ml[5] - 0.5 * (P11s * v2s + P12s * v1s)) / dsl
+        E22sl = (ml[6] - P12s * v2s) / dsl
+        Usl = SVector(rhosl, rhosl * v1s, rhosl * v2s, E11sl, E12sl, E22sl)
+        return Fl + sl * (Usl - Ul)
+    else
+        rhosr = mr[1] / dsr
+        E11sr = (mr[4] - v1s * P11s) / dsr
+        E12sr = (mr[5] - 0.5 * (P11s * v2s + P12s * v1s)) / dsr
+        E22sr = (mr[6] - P12s * v2s) / dsr
+        Usr = SVector(rhosr, rhosr * v1s, rhosr * v2s, E11sr, E12sr, E22sr)
+        return Fr + sr * (Usr - Ur)
+    end
+end
+
+@inbounds @inline hllc3(x, ual, uar, Fl, Fr, Ul, Ur, eq::TenMoment1D, dir) = hllc3(
+    x, ual, uar, Fl, Fr, Ul, Ur, eq::TenMoment1D, dir, hll_speeds_min_max)
 
 function max_abs_eigen_value(eq::TenMoment1D, u)
     ρ = u[1]
