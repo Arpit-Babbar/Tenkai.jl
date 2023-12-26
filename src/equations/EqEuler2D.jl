@@ -646,7 +646,7 @@ end
 
 # Taken from Trixi
 
-@inline @inbounds function hll_speeds(ual, uar, dir, eq)
+@inline @inbounds function hll_speeds(ual, uar, dir, eq::Euler2D)
     # Calculate primitive variables and speed of sound
     @unpack γ_minus_1 = eq
     rho_ll, rho_v1_ll, rho_v2_ll, rho_e_ll = ual

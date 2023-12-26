@@ -2,13 +2,14 @@ using StaticArrays
 using Tenkai
 using Plots
 # Submodules
-Eq = Tenkai.EqTenMoment1D
+Eq = Tenkai.EqTenMoment2D
 plotlyjs() # Set backend
 
 xmin, xmax = 0.0, 1.0
-boundary_condition = (periodic, periodic)
+ymin, ymax = 0.0, 1.0
+boundary_condition = (periodic, periodic, periodic, periodic)
 
-function dwave(x, equations::Eq.TenMoment1D)
+function dwave(x, y, equations::Eq.TenMoment2D)
     rho = 2.0 + sinpi(2.0 * x)
     v1 = 1.0
     v2 = 0.0
@@ -22,9 +23,9 @@ dummy_bv(x, t) = 0.0
 
 eq = Eq.get_equation()
 
-dwave(x) = dwave(x, eq)
+dwave(x,y) = dwave(x, y, eq)
 
-exact_dwave(x, t) = dwave(x - t)
+exact_dwave(x, y, t) = dwave(x - t, y)
 
 initial_value, exact_solution, boundary_value = dwave, exact_dwave, dummy_bv
 
@@ -32,12 +33,12 @@ degree = 4
 solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
-numerical_flux = Eq.rusanov
+numerical_flux = Eq.hllc3
 bound_limit = "yes"
 bflux = evaluate
 final_time = 1.0
 
-nx = ceil(Int64, 50)
+nx, ny = 50, 50
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
@@ -47,8 +48,8 @@ animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 1
 
 #------------------------------------------------------------------------------
-grid_size = nx
-domain = [xmin, xmax]
+grid_size = [nx, ny]
+domain = [xmin, xmax, ymin, ymax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
 limiter = setup_limiter_blend(blend_type = fo_blend(eq),

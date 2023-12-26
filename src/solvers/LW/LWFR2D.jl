@@ -45,7 +45,7 @@ function setup_arrays_lwfr(grid, scheme, eq::AbstractEquations{2})
     # Allocate memory
     @unpack degree, bflux = scheme
     @unpack bflux_ind = bflux
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     nd = degree + 1
     nx, ny = grid.size
     u1 = gArray(nvar, nd, nd, nx, ny)
@@ -321,7 +321,7 @@ end
 #-------------------------------------------------------------------------------
 function eval_bflux1!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
                       xg, Vl, Vr, F, G, Fb, aux)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     nd = length(xg)
     refresh!(u) = fill!(u, zero(eltype(u)))
 
@@ -427,7 +427,7 @@ end
 
 function eval_bflux2!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
                       xg, Vl, Vr, F, G, Fb, aux)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     nd = length(xg)
     refresh!(u) = fill!(u, zero(eltype(u)))
 
@@ -553,7 +553,7 @@ end
 
 function eval_bflux3!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
                       xg, Vl, Vr, F, G, Fb, aux)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     nd = length(xg)
     refresh!(u) = fill!(u, zero(eltype(u)))
 
@@ -756,7 +756,7 @@ end
 
 function eval_bflux4!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
                       xg, Vl, Vr, F, G, Fb, aux)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     nd = length(xg)
     refresh!(u) = fill!(u, zero(eltype(u)))
 
@@ -1012,7 +1012,7 @@ end
 
 function extrap_bflux!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
                        xg, Vl, Vr, F, G, Fb, aux)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     nd = length(xg)
     for j in Base.OneTo(nd), i in Base.OneTo(nd)
         F_node = get_node_vars(F, eq, i, j)
@@ -1034,7 +1034,7 @@ end
 #-------------------------------------------------------------------------------
 function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, scheme,
                                   aux, t, dt, u1, res, Fb, Ub, cache)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
     nx, ny = grid.size
@@ -1149,7 +1149,7 @@ end
 #-------------------------------------------------------------------------------
 function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, scheme,
                                   aux, t, dt, u1, res, Fb, Ub, cache)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     @unpack xg, Dm, D1, DmT, D1T, Vl, Vr = op
     nd = length(xg)
     nx, ny = grid.size
@@ -1303,7 +1303,7 @@ end
 #-------------------------------------------------------------------------------
 function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, scheme,
                                   aux, t, dt, u1, res, Fb, Ub, cache)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
     nx, ny = grid.size
@@ -1526,7 +1526,7 @@ end
 #-------------------------------------------------------------------------------
 function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, scheme,
                                   aux, t, dt, u1, res, Fb, Ub, cache)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
     nx, ny = grid.size

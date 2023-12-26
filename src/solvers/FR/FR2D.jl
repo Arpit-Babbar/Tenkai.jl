@@ -721,8 +721,9 @@ function correct_variable!(eq::AbstractEquations{2}, variable, op, aux, grid,
         var_min_avg = min(var_min_avg, variable(eq, ua_))
         if var_min_avg < admissibility_tolerance(eq)
             @show variable
-            println("Positivity limiter failed in element", el_x, " ", el_y,
+            println("Positivity limiter failed in element ", el_x, " ", el_y,
                     "with centre ", xc[el_x], ", ", yc[el_y])
+            println("Value = ", variable(eq, ua_), " tolerance = ", admissibility_tolerance(eq))
             throw(DomainError((var_min_avg)))
         end
     end
@@ -1031,7 +1032,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
     #! format: noindent
     @unpack dx, dy = grid
     nx, ny = grid.size
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     @unpack xg = op
     nd = length(xg)
     @unpack limiter = scheme
@@ -1313,7 +1314,7 @@ function Blend(eq::AbstractEquations{2}, op, grid,
     @assert indicator_model=="gassner" "Other models not implemented"
     # @assert degree > 1 || pure_fv == true
     nd = degree + 1
-    @unpack nvar = eq
+    nvar = nvariables(eq)
 
     E1 = a * 10^(-c * (degree + 3)^0.25)
     E0 = E1 * 1e-2 # E < E0 implies smoothness

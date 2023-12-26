@@ -364,7 +364,8 @@ end
 #-------------------------------------------------------------------------------
 # Correct one variable in bound correction
 
-function correct_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
+function correct_variable_bound_limiter!(variable, eq::AbstractEquations{1},
+                                         grid, op, ua, u1)
     @unpack Vl, Vr = op
     nx = grid.size
     nd = op.degree + 1

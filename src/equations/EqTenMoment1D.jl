@@ -98,6 +98,12 @@ end
     return SVector(f1, f2, f3, f4, f5, f6)
 end
 
+function Tenkai.is_admissible(eq::TenMoment1D, u::AbstractVector)
+    return (density_constraint(eq, u) > 0.0
+            && trace_constraint(eq, u) > 0.0
+            && det_constraint(eq, u) > 0.0)
+end
+
 @inbounds @inline function hll_speeds_min_max(eq::TenMoment1D, ul, ur)
     # Get conservative variables
     rl, v1l, v2l, P11l, P12l, P22l = con2prim(eq, ul)
