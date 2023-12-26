@@ -16,7 +16,7 @@ using LinearAlgebra: lmul!, mul!
 
 import Trixi
 
-using ..FR: refresh!
+using ..FR: refresh!, EmptyZeros
 
 using ..Tenkai: fr_dir, lwfr_dir, rkfr_dir, eq_dir
 
@@ -1175,7 +1175,8 @@ function debug_blend_limiter!(eq::AbstractEquations{2}, grid, problem, scheme,
                               param, aux,
                               op, dt, t, iter, fcount, ua, u1)
     @unpack blend, plot_data = aux
-    if blend.parameters.debug == false
+    @unpack debug, super_debug = blend.parameters
+    if debug == false
         return nothing
     end
     @timeit aux.timer "Debug blending limiter" begin
@@ -1190,9 +1191,13 @@ function debug_blend_limiter!(eq::AbstractEquations{2}, grid, problem, scheme,
     push!(blend.cache.total_activations, total_activations)
     push!(blend.cache.times, t)
 
+    if (super_debug == true && iter % 10 == 0) || final_time - t < 1e-10
+        writedlm("output/alpha_$(t)_$(iter).txt", alpha_)
+    end
+
     # Save energy and alpha data to output
     if save_solution(problem, param, t, iter) == true || t < 1e-12 ||
-       final_time - (t + dt) < 1e-10
+       final_time - t < 1e-10
         ndigits = 3 # KLUDGE - Add option to change
         filename = get_filename("output/alpha", ndigits, fcount)
         vtk_alpha = vtk_grid(filename, grid.xc, grid.yc)
@@ -1202,7 +1207,7 @@ function debug_blend_limiter!(eq::AbstractEquations{2}, grid, problem, scheme,
         vtk_alpha["Total activations"] = total_activations
         out = vtk_save(vtk_alpha)
         println("Wrote file ", out[1])
-        if final_time - (t + dt) < 1e-10
+        if final_time - t < 1e-10
             cp("$filename.vtr", "output/alpha.vtr", force = true)
 
             max_filename = "output/alpha_max"
@@ -1216,6 +1221,8 @@ function debug_blend_limiter!(eq::AbstractEquations{2}, grid, problem, scheme,
             println("Wrote file ", out_max[1])
 
             writedlm("output/time_vs_activations", zip(blend.cache.times, blend.cache.total_activations))
+            writedlm("output/grid_xc.txt", grid.xc)
+            writedlm("output/grid_yc.txt", grid.yc)
         end
     end
     end # timer
@@ -1287,16 +1294,43 @@ function Blend(eq::AbstractEquations{2}, op, grid,
                param::Parameters,
                plot_data)
     @unpack limiter = scheme
+    nx, ny = grid.size
+    nvar = nvariables(eq)
+    @unpack degree, xg = op
+    nd = degree + 1
 
     if limiter.name != "blend"
-        subroutines = (; blend_cell_residual! = trivial_cell_residual,
-                       blend_face_residual_x! = trivial_face_residual,
-                       blend_face_residual_y! = trivial_face_residual,
-                       get_element_alpha = get_element_alpha_other_limiter)
-        cache = (;
-                 dt = MVector(1.0e20))
-        # If limiter is not blend, replace blending with 'do nothing functions'
-        return (; subroutines, cache, uEltype = Float64) # TODO - Load uEltype from aux.cache
+        if limiter.name == "tvb"
+            fn_low = OffsetArray(zeros(nvar,
+                                    nd, # Dofs on each face
+                                    4,  # 4 faces
+                                    nx + 2, ny + 2),
+                                OffsetArrays.Origin(1, 1, 1, 0, 0))
+            subroutines = (; blend_cell_residual! = store_fn_cell_residual!,
+                             blend_face_residual_x! = blend_flux_face_x_residual!,
+                             blend_face_residual_y! = blend_flux_face_y_residual!,
+                             get_element_alpha = get_element_alpha_other_limiter,
+                             bc_x = no_upwinding_x,
+                             numflux = scheme.numerical_flux)
+            cache = (;
+                    dt = MVector(1.0e20), fn_low, alpha =  EmptyZeros(Float64))
+            # If limiter is not blend, replace blending with 'do nothing functions'
+            return (; subroutines, cache, uEltype = Float64) # TODO - Load uEltype from aux.cache
+        else
+            fn_low = OffsetArray(zeros(nvar,
+                                    nd, # Dofs on each face
+                                    4,  # 4 faces
+                                    nx + 2, ny + 2),
+                                OffsetArrays.Origin(1, 1, 1, 0, 0))
+            subroutines = (; blend_cell_residual! = trivial_cell_residual,
+                        blend_face_residual_x! = trivial_face_residual,
+                        blend_face_residual_y! = trivial_face_residual,
+                        get_element_alpha = get_element_alpha_other_limiter)
+            cache = (;
+                    dt = MVector(1.0e20), fn_low)
+            # If limiter is not blend, replace blending with 'do nothing functions'
+            return (; subroutines, cache, uEltype = Float64) # TODO - Load uEltype from aux.cache
+        end
     end
 
     println("Setting up blending limiter...")
@@ -1305,11 +1339,9 @@ function Blend(eq::AbstractEquations{2}, op, grid,
     indicator_model, amax, constant_node_factor,
     smooth_alpha, smooth_factor,
     c, a, amin, tvbM,
-    debug_blend, pure_fv, bc_x, numflux) = limiter
+    super_debug, debug_blend, pure_fv, bc_x, numflux) = limiter
 
     @unpack xc, yc, xf, yf, dx, dy = grid
-    nx, ny = grid.size
-    @unpack degree, xg = op
     # @assert Threads.nthreads() == 1
     @assert indicator_model=="gassner" "Other models not implemented"
     # @assert degree > 1 || pure_fv == true
@@ -1323,7 +1355,7 @@ function Blend(eq::AbstractEquations{2}, op, grid,
     a1 = 1.0 - 2.0 * a0              # smoothing coefficients
     parameters = (; E1, E0, tolE, amax, a0, a1, constant_node_factor,
                   smooth_alpha, smooth_factor,
-                  c, a, amin, tvbM,
+                  c, a, amin, tvbM, super_debug,
                   pure_fv, debug = debug_blend)
 
     # Big arrays
@@ -3326,10 +3358,38 @@ function trivial_cell_residual(i, j, eq::AbstractEquations{2}, scheme, aux,
     return nothing
 end
 
-function trivial_face_residual(i, j, k, x, yf, u1, ua, eq::AbstractEquations{2},
-                               dt, grid, op, scheme, param, Fn, aux, res,
-                               scaling_factor = 1.0)
+@inline function store_fn_cell_residual!(el_x, el_y, eq::AbstractEquations{2}, scheme, aux,
+                                         dt, grid, dx, dy, xf, yf, op, u1, ::Any, f, res,
+                                         scaling_factor = 1.0)
+    @unpack blend = aux
+    @unpack fn_low = blend.cache
+
+    u = @view u1[:, :, :, el_x, el_y]
+
+    store_low_flux!(u, el_x, el_y, xf, yf, dx, dy, op, blend, eq, scaling_factor)
+    return nothing
+end
+
+@inline function trivial_face_residual(i, j, k, x, yf, u1, ua, eq::AbstractEquations{2},
+                                       dt, grid, op, scheme, param, Fn, aux, res,
+                                       scaling_factor = 1.0)
     return Fn, (1.0, 1.0)
+end
+
+@inline function blend_flux_face_x_residual!(el_x, el_y, jy, xf, y, u1, ua,
+                                             eq::AbstractEquations{2}, dt, grid,
+                                             op, scheme, param, Fn, aux, res,
+                                             scaling_factor = 1.0)
+    return blend_face_residual_fo_x!(el_x, el_y, jy, xf, y, u1, ua, eq, dt, grid, op,
+                                     scheme, param, Fn, aux, res, scaling_factor)
+end
+
+@inline function blend_flux_face_y_residual!(el_x, el_y, ix, x, yf, u1, ua,
+                                             eq::AbstractEquations{2}, dt, grid, op,
+                                             scheme, param, Fn, aux, res,
+                                             scaling_factor = 1.0)
+    return blend_face_residual_fo_y!(el_x, el_y, ix, x, yf, u1, ua, eq, dt, grid, op,
+                                     scheme, param, Fn, aux, res, scaling_factor)
 end
 
 function is_admissible(::AbstractEquations{2, <:Any}, ::AbstractVector)

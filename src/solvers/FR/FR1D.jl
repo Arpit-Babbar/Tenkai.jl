@@ -870,7 +870,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
     @unpack E1, E0 = blend # smoothness and discontinuity thresholds
     tolE = blend.tolE      # tolerance for denominator
     E = blend.E            # content in high frequency nodes
-    alpha = blend.alpha    # vector containing smoothness indicator values
+    @unpack alpha, alpha0 = blend    # vector containing smoothness indicator values
     @unpack a0, a1 = blend # smoothing coefficients
 
     # some strings specifying the kind of blending
@@ -951,8 +951,13 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
         alpha[1] = alpha[nx] = 1.0
     end
 
+    # smoothing in time
+    for i in 1:nx
+        alpha[i] = max(0.9 * alpha0[i], 0.5 * alpha0[i-1], 0.5 * alpha0[i+1], alpha[i])
+    end
+
     # Smoothening of alpha
-    alpha0 = copy(alpha)
+    alpha0 .= alpha
     for i in 1:nx
         alpha[i] = max(0.5 * alpha0[i - 1], alpha[i], 0.5 * alpha0[i + 1])
         alpha[i] = min(alpha[i], amax)
@@ -968,6 +973,8 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
         # Force first order on boundary for Shu-Osher
         alpha[1] = alpha[nx] = amax
     end
+
+    alpha0 .= alpha
 
     if dt > 0.0
         blend.dt[1] = dt # hacky fix for compatibility with OrdinaryDiffEq
@@ -1547,7 +1554,7 @@ end
     nd = length(xg)
     alp = 0.5 * (alpha[i - 1] + alpha[i])
     if alp < 1e-12
-        blend_flux_only(i, op, scheme, blend, grid, xf, u1, eq, dt, alp, Fn, lamx,
+        return blend_flux_only(i, op, scheme, blend, grid, xf, u1, eq, dt, alp, Fn, lamx,
                          scaling_factor)
     end
 
@@ -1787,16 +1794,17 @@ end
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead
     #! format: noindent
     @unpack blend = aux
-    if blend.alpha[i] < 1e-12 && blend.alpha[i - 1] < 1e-12
-        return Fn, (1.0, 1.0)
+    @unpack alpha = blend
+    alp = 0.5 * (alpha[i - 1] + alpha[i])
+    if alp < 1e-12
+        return blend_flux_only(i, op, scheme, blend, grid, xf, u1, eq, dt, alp, Fn, lamx,
+                               scaling_factor)
     end
-    alpha = blend.alpha # factor of non-smooth part
     @unpack xg, wg = op
     nd = length(xg)
     num_flux = blend.numflux
     # num_flux = scheme.numerical_flux
     nvar = nvariables(eq)
-    alp = 0.5 * (alpha[i - 1] + alpha[i])
     scaled_dt = scaling_factor * blend.dt[1]
 
     dx = grid.dx
@@ -1949,10 +1957,22 @@ end
     end # limiter
 end
 
-@inline function trivial_cell_residual(i, eq::AbstractEquations{1}, num_flux,
+@inline function trivial_cell_residual(i, eq::AbstractEquations{1}, scheme,
                                        aux, lamx, dt, dx, xf, op, u1, u, ua, f, r,
                                        scaling_factor = 1)
     return nothing
+end
+
+@inline function store_fn_cell_residual!(cell, eq::AbstractEquations{1}, scheme,
+                                        aux, lamx, dt, dx, xf, op, u1, u, ua, f, r,
+                                        scaling_factor = 1)
+    @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead, it's supposed
+    #! format: noindent
+    # to be 0.25 microseconds
+    @unpack blend = aux
+    store_low_flux!(u, cell, xf, dx, op, blend, eq, scaling_factor)
+    return nothing
+    end # timer
 end
 
 function test_alp(i, eq::AbstractEquations{1}, dt, grid,
@@ -2024,10 +2044,21 @@ function get_blended_flux(el_x, eq::AbstractEquations{1}, dt, grid,
     return Fn
 end
 
-@inline function trivial_face_residual(i, x, u1, ua, eq::AbstractEquations{1},
+@inline function trivial_face_residual(i, xf, u1, ua, eq::AbstractEquations{1},
                                        dt, grid, op, scheme, param, Fn, aux,
-                                       lamx, res, scaling_factor = 1)
+                                       lamx, res, scaling_factor = 1.0)
     return Fn, (1.0, 1.0)
+end
+
+@inline function blend_flux_face_residual!(i, xf, u1, ua, eq::AbstractEquations{1},
+                                          dt, grid, op, scheme, param, Fn, aux,
+                                          lamx, res, scaling_factor = 1.0)
+    #! format: noindent
+    @unpack blend = aux
+    alp = 0.0
+    # return Fn, (1.0, 1.0)
+    return blend_flux_only(i, op, scheme, blend, grid, xf, u1, eq, dt, alp, Fn, lamx,
+                            scaling_factor)
 end
 
 function is_admissible(::AbstractEquations{1, <:Any}, ::AbstractVector)
@@ -2048,6 +2079,7 @@ end
 
 struct Blend1D{F1, F2, F3, F4, F5, F6 <: Function, Parameters}
     alpha::OffsetVector{Float64, Vector{Float64}}
+    alpha0::OffsetVector{Float64, Vector{Float64}}
     # alpha_prev::Vector{Float64}
     space_time_alpha::ElasticArray{Float64, 2, 1, Array{Float64, 1}}
     time_levels_anim::ElasticArray{Float64, 1, 0, Array{Float64, 1}}
@@ -2096,14 +2128,26 @@ function Blend(eq::AbstractEquations{1}, op, grid,
                plot_data, bc_x = no_upwinding_x)
     @unpack xc, xf, dx = grid
     nx = grid.size
+    nvar = nvariables(eq)
     @unpack degree, xg = op
     @unpack limiter = scheme
 
     if limiter.name != "blend"
+        if limiter.name == "tvb"
+            fn_low = OffsetArray(zeros(nvar, 2, nx + 2),
+            OffsetArrays.Origin(1, 1, 0))
+            return (
+                ; blend_cell_residual! = store_fn_cell_residual!,
+                blend_face_residual! = blend_flux_face_residual!,
+                dt = [1e20],
+                numflux = scheme.numerical_flux,
+                fn_low = fn_low)
+        else
         return (
                 ; blend_cell_residual! = trivial_cell_residual,
                 blend_face_residual! = trivial_face_residual,
                 dt = [1e20])
+        end
     end
     println("Setting up blending limiter...")
 
@@ -2117,7 +2161,6 @@ function Blend(eq::AbstractEquations{1}, op, grid,
     parameters = (; c, a, amin, smooth_alpha, constant_node_factor,
                   constant_node_factor2)
     nd = degree + 1
-    nvar = nvariables(eq)
     if numflux === nothing
         numflux = scheme.numerical_flux
     end
@@ -2188,6 +2231,7 @@ function Blend(eq::AbstractEquations{1}, op, grid,
     E0 = E1 * 1e-2 # E < E0 implies smoothness
     tolE = 1.0e-6  # If denominator < tolE, do purely high order
     E, alpha = zeros(nx), OffsetArray(zeros(nx + 2), OffsetArrays.Origin(0))
+    alpha0 = copy(alpha)
     a0 = 1.0 / 3.0
     a1 = 1.0 - 2.0 * a0              # smoothing coefficients
     idata = zeros(nx + 1)                          # t, alpha[1:nx]
@@ -2220,7 +2264,7 @@ function Blend(eq::AbstractEquations{1}, op, grid,
     @unpack conservative2recon!, recon2conservative! = reconstruction_variables
 
     beta_muscl = 1e20 # unused dummy
-    Blend1D(alpha, space_time_alpha, time_levels_anim, grid.xc, lamx,
+    Blend1D(alpha, alpha0, space_time_alpha, time_levels_anim, grid.xc, lamx,
             ue, xxf, xe, ufl, ufr, fl, fr, fn, unph, resl, fn_low, amax,
             parameters, E1, E0,
             tolE,

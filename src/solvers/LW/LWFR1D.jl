@@ -61,7 +61,7 @@ function setup_arrays_lwfr(grid, scheme, eq::AbstractEquations{1})
     elseif degree == 3
         cell_data_size = 13
         eval_data_size = 16
-    elseif degree == 4
+    elseif degree in (4, 6)
         cell_data_size = 15
         eval_data_size = 18
     else
