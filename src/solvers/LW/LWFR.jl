@@ -197,7 +197,7 @@ function solve_lwfr(eq, problem, scheme, param, grid, op, aux, cache)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
 
     # Initialize counters
-    iter, t, fcount = 0, 0.0, 0
+    local iter, t, fcount = 0, 0.0, 0
 
     # Save initial solution to file
     fcount = write_soln!("sol", fcount, iter, t, 0.0, eq, grid, problem, param, op,

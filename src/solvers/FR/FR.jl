@@ -239,6 +239,15 @@ function Parameters(grid_size, cfl, bounds, save_iter_interval,
                saveto, time_scheme, cfl_safety_factor, cfl_style, eps)
 end
 
+
+#------------------------------------------------------------------------------
+# A struct which gives zero whenever you try to index it as a zero
+#------------------------------------------------------------------------------
+struct EmptyZeros{RealT <: Real} end
+@inline Base.getindex(::EmptyZeros{RealT}, i...) where RealT = zero(RealT)
+EmptyZeros(RealT) = EmptyZeros{RealT}()
+EmptyZeros() = EmptyZeros{Float64}()
+
 #------------------------------------------------------------------------------
 # Methods which need to be defined in Equation modules
 #------------------------------------------------------------------------------
@@ -694,7 +703,8 @@ function setup_limiter_blend(; blend_type, indicating_variables,
                              amax = 1.0, constant_node_factor = 1.0,
                              constant_node_factor2 = 1.0,
                              a = 0.5, c = 1.8, amin = 0.001,
-                             debug_blend = false, pure_fv = false,
+                             debug_blend = false, super_debug = false,
+                             pure_fv = false,
                              bc_x = no_upwinding_x, tvbM = 0.0,
                              numflux = nothing)
     limiter = (; name = "blend", blend_type, indicating_variables,
@@ -702,7 +712,7 @@ function setup_limiter_blend(; blend_type, indicating_variables,
                amax, smooth_alpha, smooth_factor,
                constant_node_factor, constant_node_factor2,
                a, c, amin,
-               debug_blend, pure_fv, bc_x, tvbM, numflux)
+               super_debug, debug_blend, pure_fv, bc_x, tvbM, numflux)
     return limiter
 end
 
@@ -811,6 +821,7 @@ function pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme,
                                    problem, param, aux, op, u1, ua)
         return nothing
     elseif limiter.name == "tvb"
+        update_ghost_values_u1!(eq, problem, grid, op, u1, aux, t)
         return nothing
     end
     end # timer
