@@ -24,7 +24,7 @@ bound_limit = "yes"
 bflux = evaluate
 final_time = 0.05 # Choose 0.125 for sod, two_shock; 0.15 for two_rare_iv; 0.05 for two_rare_vacuum_iv
 
-nx = ceil(Int64, 300)
+nx = ceil(Int64, 100)
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0

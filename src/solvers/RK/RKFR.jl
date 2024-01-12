@@ -48,8 +48,8 @@ function compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, t,
     compute_cell_residual_rkfr!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb,
                                 ub, cache)
     update_ghost_values_rkfr!(problem, scheme, eq, grid, aux, op, cache, t)
-    compute_face_residual!(eq, grid, op, scheme, param, aux, t, dt, u1, Fb, ub,
-                           ua, res)
+    compute_face_residual!(eq, grid, op, scheme, param, aux, t, dt, u1,
+                           Fb, ub, ua, res)
     return nothing
 end
 

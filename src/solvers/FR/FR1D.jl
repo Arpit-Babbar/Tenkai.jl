@@ -48,7 +48,7 @@ using ..Basis: Vandermonde_lag, weights_and_points, nodal2modal, nodal2modal_kri
              get_first_node_vars, get_second_node_vars,
              add_to_node_vars!, subtract_from_node_vars!,
              multiply_add_to_node_vars!, multiply_add_set_node_vars!,
-             comp_wise_mutiply_node_vars!)
+             comp_wise_mutiply_node_vars!, calc_source)
 
 using UnPack
 using MuladdMacro
@@ -225,8 +225,8 @@ end
 #-------------------------------------------------------------------------------
 # Add numerical flux to residual
 #-------------------------------------------------------------------------------
-function compute_face_residual!(eq::AbstractEquations{1}, grid, op, scheme,
-                                param, aux, t, dt, u1, Fb, Ub, ua, res,
+function compute_face_residual!(eq::AbstractEquations{1}, grid, op,
+                                scheme, param, aux, t, dt, u1, Fb, Ub, ua, res,
                                 scaling_factor = 1.0)
     @timeit aux.timer "Face residual" begin
     #! format: noindent
@@ -244,10 +244,8 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, scheme,
         @views Fn = num_flux(x, ua[:, i - 1], ua[:, i],
                              Fb[:, 2, i - 1], Fb[:, 1, i],
                              Ub[:, 2, i - 1], Ub[:, 1, i], eq, 1)
-        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq,
-                                                   dt, grid, op,
-                                                   scheme, param,
-                                                   Fn, aux, nothing,
+        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, dt, grid, op,
+                                                   problem, scheme, param, Fn, aux, nothing,
                                                    res, scaling_factor)
         for ix in 1:nd
             for n in 1:nvariables(eq)
@@ -1470,13 +1468,14 @@ end
 
 # 1st order FV cell residual
 @inbounds @inline function blend_cell_residual_fo!(cell, eq::AbstractEquations{1},
-                                                   scheme, aux, lamx,
-                                                   dt, dx, xf, op, u1, u, ua, f, r,
+                                                   problem, scheme, aux, lamx,
+                                                   t, dt, dx, xf, op, u1, u, ua, f, r,
                                                    scaling_factor = 1.0)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead, it's supposed
     #! format: noindent
     # to be 0.25 microseconds
     @unpack blend = aux
+    @unpack source_terms = problem
     @unpack Vl, Vr, xg, wg = op
     fn_low = @view blend.fn_low[:, :, cell]
     num_flux = scheme.numerical_flux
@@ -1496,14 +1495,22 @@ end
         xxf[ii] = xxf[ii - 1] + dx * wg[ii]
     end
     fill!(resl, zero(eltype(resl)))
+    # Add first source term contribution
+    u_node = get_node_vars(u, eq, 1)
+    s_node = calc_source(u_node, xxf[0], t, source_terms, eq)
+    for n in eachvariable(eq)
+        resl[n, 1] -= s_node[n] / wg[1]
+    end
     for j in 2:nd
         xx = xxf[j]
-        @views ul, ur = u[:, j - 1], u[:, j]
+        ul, ur = get_node_vars(u, eq, j-1), get_node_vars(u, eq, j)
+        s_node = calc_source(ur, xx, t, source_terms, eq)
         fl, fr = flux(xx, ul, eq), flux(xx, ur, eq)
         fn = scaling_factor * num_flux(xx, ul, ur, fl, fr, ul, ur, eq, 1)
         for n in 1:nvar
             resl[n, j - 1] += fn[n] / wg[j - 1]
             resl[n, j] -= fn[n] / wg[j]
+            resl[n, j] -= s_node[n] / wg[j]
         end
     end
     @views fn_low[:, 1] .= wg[1] * resl[:, 1]
@@ -1531,7 +1538,7 @@ end
 
 @inbounds @inline function blend_face_residual_fo!(i, xf, u1, ua,
                                                    eq::AbstractEquations{1},
-                                                   dt, grid, op, scheme, param,
+                                                   dt, grid, op, problem, scheme, param,
                                                    Fn, aux, lamx, res,
                                                    scaling_factor)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead,
@@ -1630,7 +1637,7 @@ end
 # MUSCL-hancock cell residual
 @inbounds @inline function blend_cell_residual_muscl!(cell,
                                                       eq::AbstractEquations{1},
-                                                      scheme, aux, lamx, dt,
+                                                      problem, scheme, aux, lamx, dt,
                                                       dx, xf, op, u1, u, ua, f, r,
                                                       scaling_factor = 1.0)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead, it's supposed
@@ -1781,7 +1788,7 @@ end
 # Merge this with blend_cell_residual
 @inbounds function blend_face_residual_muscl!(i, xf, u1, ua,
                                               eq::AbstractEquations{1},
-                                              dt, grid, op, scheme,
+                                              dt, grid, op, problem, scheme,
                                               param, Fn, aux, lamx,
                                               res, scaling_factor = 1.0)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead
@@ -1949,8 +1956,8 @@ end
     end # limiter
 end
 
-@inline function trivial_cell_residual(i, eq::AbstractEquations{1}, num_flux,
-                                       aux, lamx, dt, dx, xf, op, u1, u, ua, f, r,
+@inline function trivial_cell_residual(i, eq::AbstractEquations{1}, problem, scheme,
+                                       aux, lamx, t, dt, dx, xf, op, u1, u, ua, f, r,
                                        scaling_factor = 1)
     return nothing
 end
@@ -2025,7 +2032,7 @@ function get_blended_flux(el_x, eq::AbstractEquations{1}, dt, grid,
 end
 
 @inline function trivial_face_residual(i, x, u1, ua, eq::AbstractEquations{1},
-                                       dt, grid, op, scheme, param, Fn, aux,
+                                       dt, grid, op, problem, scheme, param, Fn, aux,
                                        lamx, res, scaling_factor = 1)
     return Fn, (1.0, 1.0)
 end

@@ -6,7 +6,8 @@ using Tenkai: set_initial_condition!,
               write_soln!,
               compute_error,
               post_process_soln,
-              modal_smoothness_indicator # KLUDGE - This shouldn't be here
+              modal_smoothness_indicator, # KLUDGE - This shouldn't be here
+              AbstractEquations
 
 #------------------------------------------------------------------------------
 # Extending methods needed in FR.jl which are defined here
@@ -15,7 +16,7 @@ import ..Tenkai: solve_lwfr
 
 # Dimension independent methods in FR
 (using ..FR: apply_limiter!, compute_time_step, adjust_time_step,
-             pre_process_limiter!, get_cfl, save_solution)
+             pre_process_limiter!, get_cfl, save_solution, calc_source)
 
 using Printf
 using LinearAlgebra: axpy!, dot
@@ -47,6 +48,93 @@ update_ghost_values_lwfr!() = nothing
 # extrap_bflux!() = nothing
 
 #-------------------------------------------------------------------------------
+# Source Terms
+#-------------------------------------------------------------------------------
+
+# If there is no source_term, there is a nothing object in its place.
+# With that information, we can use multiple dispatch to create a source term function which
+# are zero functions when there is no source terms (i.e., it is a Nothing object)
+
+function calc_source_t_N12(up, um, x, t, dt, source_terms::Nothing,
+                           eq::AbstractEquations)
+    return zero(up)
+end
+
+function calc_source_t_N12(up, um, x, t, dt, source_terms, eq::AbstractEquations)
+    s(u_, Δt) = source_terms(u_, x, t + Δt, eq)
+    s_t = 0.5 * (s(up, dt) - s(um, -dt))
+    return s_t
+end
+
+function calc_source_t_N34(u, up, upp, um, umm, x, t, dt, source_terms::Nothing,
+                           eq::AbstractEquations)
+    return zero(u)
+end
+
+function calc_source_t_N34(u, up, upp, um, umm, x, t, dt, source_terms,
+                           eq::AbstractEquations)
+    s(u_, Δt) = source_terms(u_, x, t + Δt, eq)
+    s_t = (1.0 / 12.0) * (-s(upp, 2.0 * dt) + 8.0 * s(up, dt)
+           -
+           8.0 * s(um, -dt) + s(umm, -2.0 * dt))
+    return s_t
+end
+
+function calc_source_tt_N23(u, up, um, x, t, dt, source_terms::Nothing,
+                            eq::AbstractEquations)
+    return zero(u)
+end
+
+function calc_source_tt_N23(u, up, um, x, t, dt, source_terms, eq::AbstractEquations)
+    s(u_, Δt) = source_terms(u_, x, t + Δt, eq)
+    s_tt = s(up, dt) - 2.0 * s(u, 0.0) + s(um, -dt)
+    return s_tt
+end
+
+function calc_source_tt_N4(u, up, upp, um, umm, x, t, dt, source_terms::Nothing,
+                           eq::AbstractEquations)
+    return zero(u)
+end
+
+function calc_source_tt_N4(u, up, upp, um, umm, x, t, dt, source_terms,
+                           eq::AbstractEquations)
+    s(u_, Δt) = source_terms(u_, x, t + Δt, eq)
+    s_tt = (1.0 / 12.0) * (-s(upp, 2.0 * dt) + 16.0 * s(up, dt)
+            -
+            30.0 * s(u, 0.0)
+            +
+            16.0 * s(um, -dt) - s(umm, -2.0 * dt))
+    return s_tt
+end
+
+function calc_source_ttt_N34(u, up, upp, um, umm, x, t, dt, source_terms::Nothing,
+                             eq::AbstractEquations)
+    return zero(u)
+end
+
+function calc_source_ttt_N34(u, up, upp, um, umm, x, t, dt, source_terms,
+                             eq::AbstractEquations)
+    s(u_, Δt) = source_terms(u_, x, t + Δt, eq)
+    s_ttt = 0.5 * (s(upp, 2.0 * dt) - 2.0 * s(up, dt)
+             +
+             2.0 * s(um, -dt) - s(umm, -2.0 * dt))
+    return s_ttt
+end
+
+function calc_source_tttt_N4(u, up, upp, um, umm, x, t, dt, source_terms::Nothing,
+                             eq::AbstractEquations)
+    return zero(u)
+end
+
+function calc_source_tttt_N4(u, up, upp, um, umm, x, t, dt, source_terms,
+                             eq::AbstractEquations)
+    s(u_, Δt) = source_terms(u_, x, t + Δt, eq)
+    s_tttt = s(upp, 2.0 * dt) - 4.0 * s(up, dt) + 6.0 * s(u, 0.0) - 4.0 * s(um, -dt) +
+             s(umm, -2.0 * dt)
+    return s_tttt
+end
+
+#-------------------------------------------------------------------------------
 # Update solution
 #-------------------------------------------------------------------------------
 function update_solution_lwfr!(u1, res, aux)
@@ -60,23 +148,23 @@ end
 #-------------------------------------------------------------------------------
 # Compute cell residual for all real cells
 #-------------------------------------------------------------------------------
-function compute_cell_residual!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb,
-                                Ub, cache)
+function compute_cell_residual!(eq, grid, op, problem, scheme, aux, t, dt, u1,
+                                res, Fb, Ub, cache)
     @timeit aux.timer "Cell Residual" begin
     #! format: noindent
     N = op.degree
     if N == 1
-        compute_cell_residual_1!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb, Ub,
-                                 cache)
+        compute_cell_residual_1!(eq, grid, op, problem, scheme, aux, t, dt, u1,
+                                 res, Fb, Ub, cache)
     elseif N == 2
-        compute_cell_residual_2!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb, Ub,
-                                 cache)
+        compute_cell_residual_2!(eq, grid, op, problem, scheme, aux, t, dt, u1,
+                                 res, Fb, Ub, cache)
     elseif N == 3
-        compute_cell_residual_3!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb, Ub,
-                                 cache)
+        compute_cell_residual_3!(eq, grid, op, problem, scheme, aux, t, dt, u1,
+                                 res, Fb, Ub, cache)
     elseif N == 4
-        compute_cell_residual_4!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb, Ub,
-                                 cache)
+        compute_cell_residual_4!(eq, grid, op, problem, scheme, aux, t, dt, u1,
+                                 res, Fb, Ub, cache)
     else
         println("compute_cell_residual: Not implemented for degree > 1")
         @assert false
@@ -134,8 +222,8 @@ function solve_lwfr(eq, problem, scheme, param, grid, op, aux, cache)
 
         pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme,
                              param, aux, op, u1, ua)
-        compute_cell_residual!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb, Ub,
-                               cache)
+        compute_cell_residual!(eq, grid, op, problem, scheme, aux, t, dt, u1,
+                               res, Fb, Ub, cache)
         update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache, t,
                                   dt)
         compute_face_residual!(eq, grid, op, scheme, param, aux, t, dt, u1,

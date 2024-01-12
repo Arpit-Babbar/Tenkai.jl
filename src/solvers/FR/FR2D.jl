@@ -1653,8 +1653,8 @@ end
     end
 end
 
-function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, scheme,
-                                 aux, dt, grid, dx, dy, xf, yf, op, u1, u_, f, res,
+function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem, scheme,
+                                 aux, t, dt, grid, dx, dy, xf, yf, op, u1, u_, f, res,
                                  scaling_factor = 1.0)
     @timeit_debug aux.timer "Blending limiter" begin
     #! format: noindent
@@ -1738,8 +1738,9 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, scheme,
     end # timer
 end
 
-function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2}, scheme,
-                                    aux, dt, grid, dx, dy, xf, yf, op, u1, ::Any, f,
+function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
+                                    problem, scheme, aux, t, dt, grid, dx, dy,
+                                    xf, yf, op, u1, ::Any, f,
                                     res, scaling_factor = 1.0)
     @timeit_debug aux.timer "Blending limiter" begin
     #! format: noindent
@@ -3320,8 +3321,8 @@ muscl_blend(::AbstractEquations{2, <:Any}) = (;
                                               face_residual_y! = blend_face_residual_muscl_rk_y!,
                                               name = "muscl_rk")
 
-function trivial_cell_residual(i, j, eq::AbstractEquations{2}, scheme, aux,
-                               dt, grid, dx, dy, xf, yf, op, u1, u, f, r,
+function trivial_cell_residual(i, j, eq::AbstractEquations{2}, problem, scheme, aux,
+                               t, dt, grid, dx, dy, xf, yf, op, u1, u, f, r,
                                scaling_factor = 1.0)
     return nothing
 end

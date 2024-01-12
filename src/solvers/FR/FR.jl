@@ -39,15 +39,16 @@ using FastGaussQuadrature
 #-------------------------------------------------------------------------------
 # Create a struct of problem description
 #-------------------------------------------------------------------------------
-struct Problem{F1, F2, F3 <: Function, BoundaryCondition <: Tuple}
+struct Problem{F1, F2, F3, F4 <: Function, BoundaryCondition <: Tuple}
     domain::Vector{Float64}
     initial_value::F1
     boundary_value::F2
     boundary_condition::BoundaryCondition
+    source_terms::F3
     periodic_x::Bool
     periodic_y::Bool
     final_time::Float64
-    exact_solution::F3
+    exact_solution::F4
 end
 
 # Constructor
@@ -56,7 +57,8 @@ function Problem(domain::Vector{Float64},
                  boundary_value::Function,
                  boundary_condition::Tuple,
                  final_time::Float64,
-                 exact_solution::Function)
+                 exact_solution::Function;
+                 source_terms::Union{Nothing, Function} = nothing)
     if length(domain) == 2
         @assert length(boundary_condition)==2 "Invalid Problem"
         left, right = boundary_condition
@@ -68,7 +70,7 @@ function Problem(domain::Vector{Float64},
         else
             periodic_x = false
         end
-        return Problem(domain, initial_value, boundary_value, boundary_condition,
+        return Problem(domain, initial_value, boundary_value, boundary_condition, source_terms,
                        periodic_x,
                        false, # Put dummy place holder for periodic_y
                        final_time, exact_solution)
@@ -95,7 +97,7 @@ function Problem(domain::Vector{Float64},
         else
             periodic_y = false
         end
-        return Problem(domain, initial_value, boundary_value, boundary_condition,
+        return Problem(domain, initial_value, boundary_value, boundary_condition, source_terms,
                        periodic_x, periodic_y, final_time, exact_solution)
     else
         @assert false, "Invalid domain"
@@ -251,6 +253,22 @@ eigmatrix(eq, u) = @assert false "method not defined for equation"
 fo_blend(eq) = @assert false "method not defined for equation"
 mh_blend(eq) = @assert false "method not defined for equation"
 no_upwinding_x() = @assert false "method not defined"
+
+#------------------------------------------------------------------------------
+# First order source term functions needed by blending and (later) RKFR
+#------------------------------------------------------------------------------
+
+# If there is no source_term, there is a nothing object in its place.
+# With that information, we can use multiple dispatch to create a source term function which
+# are zero functions when there is no source terms (i.e., it is a Nothing object)
+
+function calc_source(u, x, t, source_terms, eq::AbstractEquations)
+    return source_terms(u, x, t, eq)
+end
+
+function calc_source(u, x, t, source_terms::Nothing, eq::AbstractEquations)
+    return zero(u)
+end
 
 #-------------------------------------------------------------------------------
 # Apply given command line arguments

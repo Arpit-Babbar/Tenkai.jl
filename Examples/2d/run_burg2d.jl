@@ -8,18 +8,20 @@ ymin, ymax = 0.0, 1.0
 initial_value = Eq.burger_sin_iv
 exact_solution = Eq.burger_sin_exact
 boundary_value = exact_solution # dummy function
+zero_source_terms = (u, x, t, eq) -> zero(u)
+
 boundary_condition = (periodic, periodic, periodic, periodic)
 final_time = 0.1
 
-degree = 3
-solver = "mdrk"
+degree = 4
+solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
 bound_limit = "no"
 bflux = evaluate
 numerical_flux = Eq.rusanov
 
-nx, ny = 50, 50
+nx, ny = 200, 200
 bounds = ([-Inf], [Inf])
 cfl = 0.0
 save_iter_interval = 0
@@ -30,7 +32,7 @@ animate = true
 grid_size = [nx, ny]
 domain = [xmin, xmax, ymin, ymax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
-                  final_time, exact_solution)
+                  final_time, exact_solution, source_terms = zero_source_terms)
 equation = Eq.get_equation()
 limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               indicating_variables = Eq.conservative_indicator!,
