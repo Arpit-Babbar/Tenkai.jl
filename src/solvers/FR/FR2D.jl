@@ -16,7 +16,7 @@ using LinearAlgebra: lmul!, mul!
 
 import Trixi
 
-using ..FR: refresh!, EmptyZeros
+using ..FR: refresh!, EmptyZeros, calc_source
 
 using ..Tenkai: fr_dir, lwfr_dir, rkfr_dir, eq_dir
 
@@ -1692,6 +1692,7 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem, 
     #! format: noindent
     @unpack blend = aux
     @unpack Vl, Vr, xg, wg = op
+    @unpack source_terms = problem
     num_flux = scheme.numerical_flux
     nd = length(xg)
 
@@ -1767,6 +1768,21 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem, 
             end
         end
     end
+
+    for jj in 1:nd
+        for ii in Base.OneTo(nd)
+            xx = xf + dx * xg[ii] # face x coordinate picked same as soln pt
+            yy = yf + dx * xg[jj] # face x coordinate picked same as soln pt
+            X = SVector(xx, yy)
+            u_node = get_node_vars(u, eq, ii, jj)
+            s_node = calc_source(u_node, X, t, source_terms, eq)
+            multiply_add_to_node_vars!(r,
+                                       -alpha * dt, # / (dx * dy * wg[ii] * wg[jj]),
+                                       s_node, eq, ii, jj)
+        end
+    end
+
+
     end # timer
 end
 
