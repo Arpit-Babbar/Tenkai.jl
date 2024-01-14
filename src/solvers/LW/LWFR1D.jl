@@ -214,6 +214,7 @@ end
 #------------------------------------------------------------------------------
 function compute_cell_residual_1!(eq::AbstractEquations{1}, grid, op, problem,
                                   scheme, aux, t, dt, u1, res, Fb, Ub, cache)
+    @unpack source_terms = problem
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     nd = length(xg)
     nx = grid.size
@@ -224,19 +225,19 @@ function compute_cell_residual_1!(eq::AbstractEquations{1}, grid, op, problem,
 
     @unpack cell_data, eval_data = cache
 
-    F, f, U, ut, up, um = cell_data[Threads.threadid()]
+    F, f, U, ut, up, um, S = cell_data[Threads.threadid()]
     refresh!.((res, Ub, Fb)) # Reset previously used variables to zero
 
-    @inbounds for el_x in Base.OneTo(nx) # Loop over cells
-        dx = grid.dx[el_x]
-        xc = grid.xc[el_x]
+    @inbounds for cell in Base.OneTo(nx) # Loop over cells
+        dx = grid.dx[cell]
+        xc = grid.xc[cell]
         lamx = dt / dx
         refresh!(ut)
 
         # Solution points
         for i in Base.OneTo(nd)
             x_ = xc - 0.5 * dx + xg[i] * dx
-            u_node = get_node_vars(u1, eq, i, el_x)
+            u_node = get_node_vars(u1, eq, i, cell)
             # Compute flux at all solution points
             flux1 = flux(x_, u_node, eq)
             set_node_vars!(F, flux1, eq, i)
@@ -248,6 +249,16 @@ function compute_cell_residual_1!(eq::AbstractEquations{1}, grid, op, problem,
             set_node_vars!(up, u_node, eq, i)
             set_node_vars!(U, u_node, eq, i)
         end
+
+        # Add source term contribution to ut and some to S
+        for i in 1:nd
+            x_ = xc - 0.5 * dx + xg[i] * dx
+            u_node = get_node_vars(u1, eq, i, cell)
+            s_node = calc_source(u_node, x_, t, source_terms, eq)
+            set_node_vars!(S, s_node, eq, i)
+            multiply_add_to_node_vars!(ut, dt, s_node, eq, i)
+        end
+
         for i in Base.OneTo(nd)
             ut_node = get_node_vars(ut, eq, i)
             add_to_node_vars!(up, ut_node, eq, i)
@@ -269,32 +280,38 @@ function compute_cell_residual_1!(eq::AbstractEquations{1}, grid, op, problem,
                                        eq, i)
             F_node = get_node_vars(F, eq, i)
             for ix in Base.OneTo(nd)
-                multiply_add_to_node_vars!(res, lamx * D1[ix, i], F_node, eq, ix, el_x)
+                multiply_add_to_node_vars!(res, lamx * D1[ix, i], F_node, eq, ix, cell)
             end
+
+            st = calc_source_t_N12(up_node, um_node, x_, t, dt, source_terms, eq)
+            multiply_add_to_node_vars!(S, 0.5, st, eq, i)
+
+            S_node = get_node_vars(S, eq, i)
+            multiply_add_to_node_vars!(res, -dt, S_node, eq, i, cell)
         end
-        u = @view u1[:, :, el_x]
-        r = @view res[:, :, el_x]
-        blend.blend_cell_residual!(el_x, eq, problem, scheme, aux, lamx, t, dt, dx,
-                                   grid.xf[el_x], op, u1, u, cache.ua, f, r)
+        u = @view u1[:, :, cell]
+        r = @view res[:, :, cell]
+        blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
+                                   grid.xf[cell], op, u1, u, cache.ua, f, r)
         # Interpolate to faces
         for i in Base.OneTo(nd)
             U_node = get_node_vars(U, eq, i)
-            multiply_add_to_node_vars!(Ub, Vl[i], U_node, eq, 1, el_x)
-            multiply_add_to_node_vars!(Ub, Vr[i], U_node, eq, 2, el_x)
+            multiply_add_to_node_vars!(Ub, Vl[i], U_node, eq, 1, cell)
+            multiply_add_to_node_vars!(Ub, Vr[i], U_node, eq, 2, cell)
         end
         if bflux_ind == extrapolate
             for i in Base.OneTo(nd)
                 Fl_node = get_node_vars(F, eq, i)
                 Fr_node = get_node_vars(F, eq, i)
-                multiply_add_to_node_vars!(Fb, Vl[i], Fl_node, eq, 1, el_x)
-                multiply_add_to_node_vars!(Fb, Vr[i], Fr_node, eq, 2, el_x)
+                multiply_add_to_node_vars!(Fb, Vl[i], Fl_node, eq, 1, cell)
+                multiply_add_to_node_vars!(Fb, Vr[i], Fr_node, eq, 2, cell)
             end
         else
             ul, ur, upl, upr, uml, umr = eval_data[Threads.threadid()]
             refresh!.((ul, ur, upl, uml, umr, upr))
-            xl, xr = grid.xf[el_x], grid.xf[el_x + 1]
+            xl, xr = grid.xf[cell], grid.xf[cell + 1]
             for i in Base.OneTo(nd)
-                u_node = get_node_vars(u1, eq, i, el_x)
+                u_node = get_node_vars(u1, eq, i, cell)
                 up_node = get_node_vars(up, eq, i)
                 um_node = get_node_vars(um, eq, i)
                 multiply_add_to_node_vars!(ul, Vl[i], u_node, eq, 1)
@@ -313,19 +330,19 @@ function compute_cell_residual_1!(eq::AbstractEquations{1}, grid, op, problem,
             umr_node = get_node_vars(umr, eq, 1)
             fl, fr = flux(xl, ul_node, eq), flux(xr, ur_node, eq)
 
-            set_node_vars!(Fb, fl, eq, 1, el_x)
-            set_node_vars!(Fb, fr, eq, 2, el_x)
+            set_node_vars!(Fb, fl, eq, 1, cell)
+            set_node_vars!(Fb, fr, eq, 2, cell)
 
             fml, fmr = flux(xl, uml_node, eq), flux(xr, umr_node, eq)
             fpl, fpr = flux(xl, upl_node, eq), flux(xr, upr_node, eq)
             multiply_add_to_node_vars!(Fb,
                                        0.25, fpl,
                                        -0.25, fml,
-                                       eq, 1, el_x)
+                                       eq, 1, cell)
             multiply_add_to_node_vars!(Fb,
                                        0.25, fpr,
                                        -0.25, fmr,
-                                       eq, 2, el_x)
+                                       eq, 2, cell)
         end
     end
     return nothing
@@ -337,6 +354,7 @@ end
 function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, problem, scheme,
                                   aux, t, dt, u1, res, Fb, Ub, cache)
     @unpack xg, wg, Dm, D1, Vl, Vr = op
+    @unpack source_terms = problem
     nd = length(xg)
     nx = grid.size
     @unpack bflux_ind = scheme.bflux
@@ -345,7 +363,7 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, problem, s
 
     @unpack cell_data, eval_data = cache
 
-    F, U, f, ft, ut, utt, up, um = cell_data[Threads.threadid()]
+    F, U, f, ft, ut, utt, up, um, S = cell_data[Threads.threadid()]
 
     @unpack cell_data, eval_data = cache
 
@@ -372,6 +390,15 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, problem, s
             set_node_vars!(um, u_node, eq, i)
             set_node_vars!(up, u_node, eq, i)
             set_node_vars!(U, u_node, eq, i)
+        end
+
+        # Add source term contribution to ut and some to S
+        for i in 1:nd
+            x_ = xc - 0.5 * dx + xg[i] * dx
+            u_node = get_node_vars(u1, eq, i, cell)
+            s_node = calc_source(u_node, x_, t, source_terms, eq)
+            set_node_vars!(S, s_node, eq, i)
+            multiply_add_to_node_vars!(ut, dt, s_node, eq, i)
         end
 
         for i in Base.OneTo(nd)
@@ -402,6 +429,17 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, problem, s
                                            ix)
             end
         end
+
+        for i in Base.OneTo(nd)
+            # Add source term contribution to utt
+            x_ = xc - 0.5 * dx + xg[i] * dx
+            um_node = get_node_vars(um, eq, i)
+            up_node = get_node_vars(up, eq, i)
+            st = calc_source_t_N12(up_node, um_node, x_, t, dt, source_terms, eq)
+            multiply_add_to_node_vars!(S, 0.5, st, eq, i)
+            multiply_add_to_node_vars!(utt, dt, st, eq, i) # has no jacobian factor
+        end
+
         # computes ftt, gtt and puts them in respective place; no need to store
         for i in Base.OneTo(nd) # Loop over solution points
             x_ = xc - 0.5 * dx + xg[i] * dx
@@ -429,6 +467,12 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, problem, s
                 multiply_add_to_node_vars!(res, lamx * D1[ix, i], F_node, eq,
                                            ix, cell)
             end
+            u_node = get_node_vars(u1, eq, i, cell)
+            stt = calc_source_tt_N23(u_node, up_node, um_node, x_, t, dt, source_terms, eq)
+            multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, eq, i)
+
+            S_node = get_node_vars(S, eq, i)
+            multiply_add_to_node_vars!(res, -dt, S_node, eq, i, cell)
         end
         u = @view u1[:, :, cell]
         r = @view res[:, :, cell]
