@@ -1038,7 +1038,7 @@ end
 #-------------------------------------------------------------------------------
 function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, problem,
                                   scheme, aux, t, dt, u1, res, Fb, Ub, cache)
-    nvar = nvariables(eq)
+    @unpack source_terms = problem
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
     nx, ny = grid.size
@@ -1057,7 +1057,7 @@ function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, problem,
         lamx, lamy = dt / dx, dt / dy
 
         id = Threads.threadid()
-        f, g, F, G, ut, U, up, um, ft, gt = cell_arrays[id]
+        f, g, F, G, ut, U, up, um, ft, gt, S = cell_arrays[id]
 
         refresh!(ut)
         refresh!(ft)
@@ -1087,6 +1087,17 @@ function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, problem,
             set_node_vars!(up, u_node, eq, i, j)
             set_node_vars!(U, u_node, eq, i, j)
         end
+
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            x_ = xc - 0.5 * dx + xg[i] * dx
+            y_ = yc - 0.5 * dy + xg[j] * dy
+            x = SVector(x_, y_)
+            u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
+            s_node = calc_source(u_node, x, t, source_terms, eq)
+            set_node_vars!(S, s_node, eq, i, j)
+            multiply_add_to_node_vars!(ut, dt, s_node, eq, i, j)
+        end
+
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
             x = xc - 0.5 * dx + xg[i] * dx
             y = yc - 0.5 * dy + xg[j] * dy
@@ -1123,6 +1134,16 @@ function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, problem,
                 multiply_add_to_node_vars!(r1, lamy * D1[jj, j], G_node, eq, i, jj)
             end
 
+            X = SVector(x, y)
+            st = calc_source_t_N12(up_node, um_node, X, t, dt, source_terms, eq)
+            multiply_add_to_node_vars!(S, 0.5, st, eq, i, j)
+
+            S_node = get_node_vars(S, eq, i, j)
+
+            # TODO - add blend source term function here
+
+            multiply_add_to_node_vars!(res, -dt, S_node, eq, i, j, el_x, el_y)
+
             # KLUDGE - update to v1.8 and call with @inline
             # Give u1_ or U depending on dissipation model
             U_node = get_dissipation_node_vars(u1_, U, eq, i, j)
@@ -1153,7 +1174,7 @@ end
 #-------------------------------------------------------------------------------
 function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
                                   scheme, aux, t, dt, u1, res, Fb, Ub, cache)
-    nvar = nvariables(eq)
+    @unpack source_terms = problem
     @unpack xg, Dm, D1, DmT, D1T, Vl, Vr = op
     nd = length(xg)
     nx, ny = grid.size
@@ -1173,7 +1194,7 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
 
         # Some local variables
         id = Threads.threadid()
-        f, g, ft, gt, F, G, ut, utt, U, up, um = cell_arrays[id]
+        f, g, ft, gt, F, G, ut, utt, U, up, um, S = cell_arrays[id]
 
         refresh!.((ut, utt))
 
@@ -1203,6 +1224,17 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
             set_node_vars!(up, u_node, eq, i, j)
             set_node_vars!(U, u_node, eq, i, j)
         end
+
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            x_ = xc - 0.5 * dx + xg[i] * dx
+            y_ = yc - 0.5 * dy + xg[j] * dy
+            x = SVector(x_, y_)
+            u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
+            s_node = calc_source(u_node, x, t, source_terms, eq)
+            set_node_vars!(S, s_node, eq, i, j)
+            multiply_add_to_node_vars!(ut, dt, s_node, eq, i, j)
+        end
+
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
             x = xc - 0.5 * dx + xg[i] * dx
             y = yc - 0.5 * dy + xg[j] * dy
@@ -1236,6 +1268,18 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
                 # C[i,jj] += -lam*gt[i,j]*Dm[jj,j] (sum over j)
                 multiply_add_to_node_vars!(utt, -lamy * Dm[jj, j], gt_node, eq, i, jj)
             end
+        end
+
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            # Add source term contribution to utt
+            x_ = xc - 0.5 * dx + xg[i] * dx
+            y_ = yc - 0.5 * dy + xg[j] * dy
+            X = SVector(x_, y_)
+            um_node = get_node_vars(um, eq, i, j)
+            up_node = get_node_vars(up, eq, i, j)
+            st = calc_source_t_N12(up_node, um_node, X, t, dt, source_terms, eq)
+            multiply_add_to_node_vars!(S, 0.5, st, eq, i, j)
+            multiply_add_to_node_vars!(utt, dt, st, eq, i, j) # has no jacobian factor
         end
 
         ftt, gtt = ft, gt
@@ -1277,6 +1321,17 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
                 multiply_add_to_node_vars!(r1, lamy * D1[jj, j], G_node, eq, i, jj)
             end
 
+            u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
+            X = SVector(x, y)
+            stt = calc_source_tt_N23(u_node, up_node, um_node, X, t, dt, source_terms, eq)
+            multiply_add_to_node_vars!(S, 1.0/6.0, stt, eq, i, j)
+
+            S_node = get_node_vars(S, eq, i, j)
+
+            # TODO - add blend source term function here
+
+            multiply_add_to_node_vars!(res, -dt, S_node, eq, i, j, el_x, el_y)
+
             # KLUDGE - update to v1.8 and call with @inline
             # Give u1_ or U depending on dissipation model
             U_node = get_dissipation_node_vars(u1_, U, eq, i, j)
@@ -1308,6 +1363,7 @@ end
 function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
                                   scheme, aux, t, dt, u1, res, Fb, Ub, cache)
     nvar = nvariables(eq)
+    @unpack source_terms = problem
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
     nx, ny = grid.size
@@ -1327,7 +1383,7 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
         lamx, lamy = dt / dx, dt / dy
         # Some local variables
         id = Threads.threadid()
-        (f, g, ft, gt, F, G, ut, utt, uttt, U, up, um, upp, umm) = cell_arrays[id]
+        (f, g, ft, gt, F, G, ut, utt, uttt, U, up, um, upp, umm, S) = cell_arrays[id]
 
         refresh!(ut)
         refresh!(utt)
@@ -1360,6 +1416,16 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
             set_node_vars!(umm, u_node, eq, i, j)
             set_node_vars!(upp, u_node, eq, i, j)
             set_node_vars!(U, u_node, eq, i, j)
+        end
+
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            x_ = xc - 0.5 * dx + xg[i] * dx
+            y_ = yc - 0.5 * dy + xg[j] * dy
+            x = SVector(x_, y_)
+            u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
+            s_node = calc_source(u_node, x, t, source_terms, eq)
+            set_node_vars!(S, s_node, eq, i, j)
+            multiply_add_to_node_vars!(ut, dt, s_node, eq, i, j)
         end
 
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
@@ -1411,6 +1477,22 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
             end
         end
 
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            # Add source term contribution to utt
+            x_ = xc - 0.5 * dx + xg[i] * dx
+            y_ = yc - 0.5 * dy + xg[j] * dy
+            X = SVector(x_, y_)
+            u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
+            um_node = get_node_vars(um, eq, i, j)
+            umm_node = get_node_vars(umm, eq, i, j)
+            up_node = get_node_vars(up, eq, i, j)
+            upp_node = get_node_vars(upp, eq, i, j)
+            st = calc_source_t_N34(u_node, up_node, upp_node, um_node, umm_node,
+                                   X, t, dt, source_terms, eq)
+            multiply_add_to_node_vars!(S, 0.5, st, eq, i, j)
+            multiply_add_to_node_vars!(utt, dt, st, eq, i, j) # has no jacobian factor
+        end
+
         ftt, gtt = ft, gt # reusing old
 
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
@@ -1452,6 +1534,20 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
                 # C[i,jj] += -lam*gt[i,j]*Dm[jj,j] (sum over j)
                 multiply_add_to_node_vars!(uttt, -lamy * Dm[jj, j], gtt_node, eq, i, jj)
             end
+        end
+
+        # Add source term contribution to uttt and some to S
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            x_ = xc - 0.5 * dx + xg[i] * dx
+            y_ = yc - 0.5 * dy + xg[j] * dy
+            X = SVector(x_, y_)
+            # Add source term contribution to uttt
+            u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
+            um_node = get_node_vars(um, eq, i, j)
+            up_node = get_node_vars(up, eq, i, j)
+            stt = calc_source_tt_N23(u_node, up_node, um_node, X, t, dt, source_terms, eq)
+            multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, eq, i, j)
+            multiply_add_to_node_vars!(uttt, dt, stt, eq, i, j) # has no jacobian factor
         end
 
         fttt, gttt = ft, gt
@@ -1496,12 +1592,25 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
                 multiply_add_to_node_vars!(res, lamx * D1[ii, i], F_node, eq, ii, j,
                                            el_x, el_y)
             end
+
             for jj in Base.OneTo(nd)
                 # C += -lam*g*Dm' for each variable
                 # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
                 multiply_add_to_node_vars!(res, lamy * D1[jj, j], G_node, eq, i, jj,
                                            el_x, el_y)
             end
+
+            u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
+            X = SVector(x, y)
+            sttt = calc_source_ttt_N34(u_node, up_node, um_node, upp_node, umm_node,
+                                        X, t, dt, source_terms, eq)
+            multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, eq, i, j)
+
+            S_node = get_node_vars(S, eq, i, j)
+
+            # TODO - add blend source term function here
+
+            multiply_add_to_node_vars!(res, -dt, S_node, eq, i, j, el_x, el_y)
 
             U_ = get_dissipation_node_vars(u1_, U, eq, i, j)
 
@@ -1857,6 +1966,9 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
             multiply_add_to_node_vars!(S, 1.0 / 120.0, stttt, eq, i, j)
 
             S_node = get_node_vars(S, eq, i, j)
+
+            # TODO - add blend source term function here
+
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, j, el_x, el_y)
 
             U_node = get_dissipation_node_vars(u, U, eq, i, j)
