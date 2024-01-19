@@ -15,7 +15,7 @@ boundary_value = dummy_bv
 exact_solution_rp(x, t) = initial_value(x)
 exact_solution = exact_solution_rp
 
-degree = 4
+degree = 2
 solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
@@ -24,10 +24,10 @@ bound_limit = "yes"
 bflux = evaluate
 final_time = 0.05 # Choose 0.125 for sod, two_shock; 0.15 for two_rare_iv; 0.05 for two_rare_vacuum_iv
 
-nx = ceil(Int64, 100)
+nx = ceil(Int64, 400)
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
-tvbM = 0.0
+tvbM = 10.0
 save_iter_interval = 0
 save_time_interval = 0.0 * final_time
 animate = true # Factor on save_iter_interval or save_time_interval
@@ -47,11 +47,12 @@ limiter = setup_limiter_blend(blend_type = mh_blend(eq),
                               indicator_model = "gassner"
                               # pure_fv = true
                               )
+limiter = setup_limiter_tvb(eq; tvbM = tvbM, beta = 1.4)
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
                    compute_error_interval, animate = animate,
-                   cfl_safety_factor = 0.6)
+                   cfl_safety_factor = 0.98)
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(eq, problem, scheme, param);
 

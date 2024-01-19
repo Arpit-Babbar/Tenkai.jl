@@ -39,16 +39,16 @@ using FastGaussQuadrature
 #-------------------------------------------------------------------------------
 # Create a struct of problem description
 #-------------------------------------------------------------------------------
-struct Problem{F1, F2, F3, F4 <: Function, BoundaryCondition <: Tuple}
+struct Problem{F1, F2, F3 <: Function, BoundaryCondition <: Tuple, SourceTerms}
     domain::Vector{Float64}
     initial_value::F1
     boundary_value::F2
     boundary_condition::BoundaryCondition
-    source_terms::F3
+    source_terms::SourceTerms
     periodic_x::Bool
     periodic_y::Bool
     final_time::Float64
-    exact_solution::F4
+    exact_solution::F3
 end
 
 # Constructor
@@ -58,7 +58,7 @@ function Problem(domain::Vector{Float64},
                  boundary_condition::Tuple,
                  final_time::Float64,
                  exact_solution::Function;
-                 source_terms::Union{Nothing, Function} = nothing)
+                 source_terms = nothing)
     if length(domain) == 2
         @assert length(boundary_condition)==2 "Invalid Problem"
         left, right = boundary_condition
@@ -805,6 +805,20 @@ function limit_variable_slope(eq, variable, slope, u_star_ll, u_star_rr, ue, xl,
     end
     return slope, u_star_ll, u_star_rr
 end
+
+function implicit_source_update(eq, u, x, t, dt, source_terms) # u, s are SVectors
+    tolE = 1e-8
+    unp1 = u
+    unp1 = u + dt * source_terms(unp1, x, t, eq)
+    local L = unp1 - u - dt * source_terms(unp1, x, t, eq)
+    while norm(L) > tolE
+        unp1 = u + dt * source_terms(unp1, x, t, eq)
+        L = unp1 - u - dt * source_terms(unp1, x, t, eq)
+    end
+
+    return source_terms(unp1, x, t, eq)
+end
+
 
 function pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme,
                               param, aux, op, u1, ua)

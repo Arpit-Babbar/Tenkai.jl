@@ -11,14 +11,6 @@ xmin, xmax = 0.0, 4.0
 ymin, ymax = 0.0, 4.0
 boundary_condition = (neumann, neumann, neumann, neumann)
 
-@inline function f_rare(a, b)
-    if a < b
-        return -2.0 * (a/b)^3 + 3.0 * (a/b)^2
-    else
-        return 1.0
-    end
-end
-
 function uniform_plasma_ic(x, y, equations::Eq.TenMoment2D)
     rho = 0.1
     v1 = v2 = 0.0
@@ -50,7 +42,7 @@ dummy_bv(x, t) = 0.0
 
 eq = Eq.get_equation()
 
-degree = 4
+degree = 2
 solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"

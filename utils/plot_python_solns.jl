@@ -235,7 +235,7 @@ function plot_burg_soln(t, exact_data = my_exact_data(t), exact_label = "Exact")
                       plt_type = "sol", outdir = outdir, exact_label = exact_label)
 end
 
-plot_burg_soln(2.0)
-plot_burg_soln(4.5)
-exact_data_8 = readdlm("mdrk_results/output_burg1d_reference/avg.txt")
-plot_burg_soln(8.0, exact_data_8, "Reference")
+# plot_burg_soln(2.0)
+# plot_burg_soln(4.5)
+# exact_data_8 = readdlm("mdrk_results/output_burg1d_reference/avg.txt")
+# plot_burg_soln(8.0, exact_data_8, "Reference")

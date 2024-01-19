@@ -26,7 +26,7 @@ using Tenkai.LWFR: calc_source, calc_source_t_N12, calc_source_t_N34,
                    calc_source_tt_N23, calc_source_tt_N4, calc_source_ttt_N34,
                    calc_source_tttt_N4
 
-using ..FR: @threaded, alloc_for_threads
+using ..FR: @threaded, alloc_for_threads, implicit_source_update
 using ..Equations: AbstractEquations, nvariables, eachvariable
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -472,6 +472,7 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, problem, s
             multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, eq, i)
 
             S_node = get_node_vars(S, eq, i)
+
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, cell)
         end
         u = @view u1[:, :, cell]
@@ -735,7 +736,7 @@ function compute_cell_residual_3!(eq::AbstractEquations{1}, grid, op, problem, s
                                            ix, cell)
             end
             u_node = get_node_vars(u1, eq, i, cell)
-            sttt = calc_source_ttt_N34(u_node, up_node, um_node, upp_node, umm_node,
+            sttt = calc_source_ttt_N34(u_node, up_node, upp_node, um_node, umm_node,
                                        x_, t, dt, source_terms, eq)
             multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, eq, i)
 
@@ -1116,7 +1117,7 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, problem,
             end
 
             u_node = get_node_vars(u1, eq, i, cell)
-            stttt = calc_source_tttt_N4(u_node, up_node, um_node, upp_node, umm_node,
+            stttt = calc_source_tttt_N4(u_node, up_node, upp_node, um_node, umm_node,
                                         x_, t, dt, source_terms, eq)
             multiply_add_to_node_vars!(S, 1.0 / 120.0, stttt, eq, i)
 

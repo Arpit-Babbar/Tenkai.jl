@@ -12,7 +12,7 @@ using DelimitedFiles
 
 using Tenkai
 using Tenkai.Basis
-using Tenkai.FR1D: correct_variable_bound_limiter!
+using Tenkai.FR1D: correct_variable_bound_limiter!, test_variable_bound_limiter!
 using Tenkai.FR: limit_variable_slope
 
 (import Tenkai: flux, prim2con, con2prim, limit_slope, zhang_shu_flux_fix,
@@ -36,6 +36,26 @@ using MuladdMacro
 struct TenMoment1D <: AbstractEquations{1, 6}
     varnames::Vector{String}
     name::String
+end
+
+@inline tenmom_density(::TenMoment1D, u) = u[1]
+
+@inline energy11(::TenMoment1D, u) = u[4]
+@inline energy12(::TenMoment1D, u) = u[5]
+@inline energy22(::TenMoment1D, u) = u[6]
+
+@inline energy_components(::TenMoment1D, u) = u[4], u[5], u[6]
+
+@inline velocity(::TenMoment1D, u) = u[2]/u[1], u[3]/u[1]
+
+@inline function pressure_components(eq::TenMoment1D, u)
+    ρ = tenmom_density(eq, u)
+    v1, v2 = velocity(eq, u)
+    E11, E12, E22 = energy_components(eq, u)
+    P11 = 2.0*E11 - ρ * v1 * v2
+    P12 = 2.0*E12 - ρ * v1 * v2
+    P22 = 2.0*E22 - ρ * v2 * v2
+    return P11, P12, P22
 end
 
 # The primitive variables are
@@ -210,11 +230,21 @@ function max_abs_eigen_value(eq::TenMoment1D, u)
 end
 
 @inbounds @inline function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::TenMoment1D, dir)
+    # rl, v1l, v2l, P11l, P12l, P22l = con2prim(eq, ual)
+    # rr, v1r, v2r, P11r, P12r, P22r = con2prim(eq, uar)
+
+    # T11l = P11l / rl
+    # T11r = P11r / rr
+    # cl, cr = sqrt(3.0 * T11l), sqrt(3.0 * T11r)
+    # λ = max(abs(v1l), abs(v1r)) + max(cl, cr)
+
     λ = max(max_abs_eigen_value(eq, ual), max_abs_eigen_value(eq, uar)) # local wave speed
+
     return 0.5 * (Fl + Fr - λ * (Ur - Ul))
 end
 
-function compute_time_step(eq::TenMoment1D, grid, aux, op, cfl, u1, ua)
+function compute_time_step(eq::TenMoment1D, problem, grid, aux, op, cfl, u1, ua)
+    @unpack source_terms = problem
     nx = grid.size
     dx = grid.dx
     den = 0.0
@@ -223,15 +253,33 @@ function compute_time_step(eq::TenMoment1D, grid, aux, op, cfl, u1, ua)
         smax = max_abs_eigen_value(eq, u)
         den = max(den, smax / dx[i])
     end
+    dt_source = cfl * compute_source_time_step(eq, source_terms, grid, aux, op, cfl, u1, ua)
     dt = cfl / den
-    return dt
+    return min(dt, dt_source)
 end
+
+compute_source_time_step(eq, source_terms, grid, aux, op, cfl, u1, ua) = 1e20
 
 #-------------------------------------------------------------------------------
 # Limiters
 #-------------------------------------------------------------------------------
 # Admissibility constraints
 @inline @inbounds density_constraint(eq::TenMoment1D, u) = u[1]
+
+@inline @inbounds function P11_constraint(eq::TenMoment1D, u)
+    ρ = u[1]
+    v1 = u[2] / ρ
+    P11 = 2.0 * u[4] - ρ * v1 * v1
+    return P11
+end
+
+@inline @inbounds function P22_constraint(eq::TenMoment1D, u)
+    ρ = u[1]
+    v2 = u[3] / ρ
+    P22 = 2.0 * u[6] - ρ * v2 * v2
+    return P22
+end
+
 @inline @inbounds function trace_constraint(eq::TenMoment1D, u)
     ρ = u[1]
     v1 = u[2] / ρ
@@ -259,6 +307,8 @@ function iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
     remaining_variables = Base.tail(variables)
 
     correct_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
+    correct_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
+    # test_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
     iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
                                      u1, aux, remaining_variables)
     return nothing
@@ -356,6 +406,268 @@ function Tenkai.limit_slope(eq::TenMoment1D, slope, ufl, u_star_ll, ufr, u_star_
     ufr = ue + slope * xr
 
     return ufl, ufr, slope
+end
+
+#-------------------------------------------------------------------------------
+# TVB limiter
+#-------------------------------------------------------------------------------
+
+function eigmatrix(eq::TenMoment1D, u)
+    nvar = nvariables(eq)
+
+    rho = tenmom_density(eq, u)
+    E11, E12, E22 = energy_components(eq, u)
+    v1, v2 = velocity(eq, u)
+    p11 = 2.0 * E11 - rho * v1 * v1
+    p12 = 2.0 * E12 - rho * v1 * v2
+    p22 = 2.0 * E22 - rho * v2 * v2
+    cx = sqrt(3.0 * abs( p11 / rho))
+
+    # Right eigenvectors
+
+    Rx00 = rho * p11
+    Rx10 = rho * v1 * p11 - cx * rho * p11
+    Rx20 = rho * v2 * p11 - cx * rho * p12
+    Rx30 = (rho * v1 * v1 * p11) / 2.0 - cx * rho * v1 * p11 + (3.0 * p11 * p11) / 2.0
+    Rx40 = (rho * v1 * v2 * p11) / 2.0 - (cx * rho * v2 * p11) / 2.0 -
+           (cx * rho * v1 * p12) / 2.0 + (3.0 * p11 * p12) / 2.0
+    Rx50 = (rho * v2 * v2 * p11) / 2.0 - p12 * cx * rho * v2 + (p11 * p22) / 2.0 +
+           p12 * p12
+
+    Rx01 = 0.0
+    Rx11 = 0.0
+    Rx21 = -cx * rho / sqrt(3.0)
+    Rx31 = 0.0
+    Rx41 = (-cx * rho * v1) / (2.0 * sqrt(3.0)) + p11 / 2.0
+    Rx51 = (-cx * rho * v2) / sqrt(3.0) + p12
+
+    Rx02 = 1.0
+    Rx12 = v1
+    Rx22 = v2
+    Rx32 = v1 * v1 / 2.0
+    Rx42 = v1 * v2 / 2.0
+    Rx52 = v2 * v2 / 2.0
+
+    Rx03 = 0.0
+    Rx13 = 0.0
+    Rx23 = 0.0
+    Rx33 = 0.0
+    Rx43 = 0.0
+    Rx53 = 0.5
+
+    Rx04 = 0.0
+    Rx14 = 0.0
+    Rx24 = (cx * rho) / sqrt(3.0)
+    Rx34 = 0.0
+    Rx44 = (cx * rho * v1) / (2.0 * sqrt(3.0)) + p11 / 2.0
+    Rx54 = (cx * rho * v2) / sqrt(3.0) + p12
+
+    Rx05 = rho * p11
+    Rx15 = rho * v1 * p11 + cx * rho * p11
+    Rx25 = rho * v2 * p11 + cx * rho * p12
+    Rx35 = (rho * v1 * v1 * p11) / 2.0 + cx * rho * v1 * p11 + (3.0 * p11 * p11) / 2.0
+    Rx45 = (rho * v1 * v2 * p11) / 2.0 + (cx * rho * v2 * p11) / 2.0 +
+           (cx * rho * v1 * p12) / 2.0 + (3.0 * p11 * p12) / 2.0
+    Rx55 = (rho * v2 * v2 * p11) / 2.0 + p12 * cx * rho * v2 + (p11 * p22) / 2.0 +
+           p12 * p12
+
+    Rx = SMatrix{nvar, nvar}(Rx00, Rx01, Rx02, Rx03, Rx04, Rx05,
+                             Rx10, Rx11, Rx12, Rx13, Rx14, Rx15,
+                             Rx20, Rx21, Rx22, Rx23, Rx24, Rx25,
+                             Rx30, Rx31, Rx32, Rx33, Rx34, Rx35,
+                             Rx40, Rx41, Rx42, Rx43, Rx44, Rx45,
+                             Rx50, Rx51, Rx52, Rx53, Rx54, Rx55)
+
+    # Left eigenvectors
+    Lx00 = (-3.0 * v1 * p11 / rho - cx * v1 * v1) / (-6.0 * cx * p11 * p11)
+    Lx10 = (v1 * p11 * p12 / rho - v2 * p11 * p11 / rho +
+            cx * v1 * v1 * p12 / sqrt(3.0) - cx * v1 * v2 * p11 / sqrt(3.0)) /
+           (-2.0 * cx * p11 * p11 / sqrt(3.0))
+    Lx20 = (3.0 * p11 - rho * v1 * v1) / (3.0 * p11)
+    Lx30 = (4.0 * v1 * v1 * p12 * p12 - v1 * v1 * p11 * p22 -
+            6.0 * v1 * v2 * p11 * p12 + 3.0 * v2 * v2 * p11 * p11) /
+           (3.0 * p11 * p11)
+    Lx40 = (v1 * p11 * p12 / rho - v2 * p11 * p11 / rho -
+            cx * v1 * v1 * p12 / sqrt(3.0) + cx * v1 * v2 * p11 / sqrt(3.0)) /
+           (2.0 * cx * p11 * p11 / sqrt(3.0))
+    Lx50 = (-3.0 * v1 * p11 / rho + cx * v1 * v1) / (6.0 * cx * p11 * p11)
+
+    Lx01 = (3.0 * p11 / rho + 2.0 * cx * v1) / (-6.0 * cx * p11 * p11)
+    Lx11 = (-p11 * p12 / rho - 2.0 * v1 * p12 * cx / sqrt(3.0) +
+            cx * v2 * p11 / sqrt(3.0)) /
+           (-2.0 * cx * p11 * p11 / sqrt(3.0))
+    Lx21 = 2.0 * v1 * rho / (3.0 * p11)
+    Lx31 = (-8.0 * v1 * p12 * p12 + 2.0 * v1 * p11 * p22 + 6.0 * v2 * p11 * p12) /
+           (3.0 * p11 * p11)
+    Lx41 = (-p11 * p12 / rho + 2.0 * v1 * p12 * cx / sqrt(3.0) -
+            cx * v2 * p11 / sqrt(3.0)) /
+           (2.0 * cx * p11 * p11 / sqrt(3.0))
+    Lx51 = (3.0 * p11 / rho - 2.0 * cx * v1) / (6.0 * cx * p11 * p11)
+
+    Lx02 = 0.0
+    Lx12 = (p11 * p11 / rho + v1 * cx * p11 / sqrt(3.0)) /
+           (-2.0 * cx * p11 * p11 / sqrt(3.0))
+    Lx22 = 0.0
+    Lx32 = (6.0 * v1 * p11 * p12 - 6.0 * v2 * p11 * p11) / (3.0 * p11 * p11)
+    Lx42 = (p11 * p11 / rho - v1 * cx * p11 / sqrt(3.0)) /
+           (2.0 * cx * p11 * p11 / sqrt(3.0))
+    Lx52 = 0.0
+
+    Lx03 = -2.0 * cx / (-6.0 * cx * p11 * p11)
+    Lx13 = (2 * cx * p12 / sqrt(3.0)) / (-2.0 * cx * p11 * p11 / sqrt(3.0))
+    Lx23 = -2.0 * rho / (3 * p11)
+    Lx33 = (8.0 * p12 * p12 - 2.0 * p11 * p22) / (3.0 * p11 * p11)
+    Lx43 = (-2 * cx * p12 / sqrt(3.0)) / (2.0 * cx * p11 * p11 / sqrt(3.0))
+    Lx53 = 2.0 * cx / (6.0 * cx * p11 * p11)
+
+    Lx04 = 0.0
+    Lx14 = (-2 * cx * p11 / sqrt(3.0)) / (-2.0 * cx * p11 * p11 / sqrt(3.0))
+    Lx24 = 0.0
+    Lx34 = -12.0 * p11 * p12 / (3.0 * p11 * p11)
+    Lx44 = (2 * cx * p11 / sqrt(3.0)) / (2.0 * cx * p11 * p11 / sqrt(3.0))
+    Lx54 = 0.0
+
+    Lx05 = 0.0
+    Lx15 = 0.0
+    Lx25 = 0.0
+    Lx35 = 2.0
+    Lx45 = 0.0
+    Lx55 = 0.0
+
+    Lx = SMatrix{nvar, nvar}(Lx00, Lx01, Lx02, Lx03, Lx04, Lx05,
+                             Lx10, Lx11, Lx12, Lx13, Lx14, Lx15,
+                             Lx20, Lx21, Lx22, Lx23, Lx24, Lx25,
+                             Lx30, Lx31, Lx32, Lx33, Lx34, Lx35,
+                             Lx40, Lx41, Lx42, Lx43, Lx44, Lx45,
+                             Lx50, Lx51, Lx52, Lx53, Lx54, Lx55)
+
+    return Rx, Lx
+end
+
+function Tenkai.apply_tvb_limiter!(eq::TenMoment1D, problem, scheme, grid, param, op, ua,
+                                   u1, aux)
+    @timeit aux.timer "TVB limiter" begin
+    #! format: noindent
+    nx = grid.size
+    @unpack xg, wg, Vl, Vr = op
+    @unpack limiter = scheme
+    @unpack tvbM, cache = limiter
+    left_bc, right_bc = problem.boundary_condition
+    nd = length(wg)
+    nvar = nvariables(eq)
+    # face values
+    (uimh, uiph, Δul, Δur, Δual, Δuar, char_Δul, char_Δur, char_Δual, char_Δuar,
+    dulm, durm, du) = cache
+
+    # Loop over cells
+    beta = limiter.beta
+    beta_ = beta / 2.0
+    for cell in 1:nx
+        ual, ua_, uar = (get_node_vars(ua, eq, cell - 1),
+                         get_node_vars(ua, eq, cell),
+                         get_node_vars(ua, eq, cell + 1))
+
+        # Needed for characteristic limiting
+        R, L = eigmatrix(eq, ua_)
+        fill!(uimh, zero(eltype(uimh)))
+        fill!(uiph, zero(eltype(uiph)))
+        Mdx2 = tvbM * grid.dx[cell]^2
+        if left_bc == neumann && right_bc == neumann && (cell == 1 || cell == nx)
+            Mdx2 = 0.0 # Force TVD on boundary for Shu-Osher
+        end
+        # end # timer
+        for ii in 1:nd
+            u_ = get_node_vars(u1, eq, ii, cell)
+            multiply_add_to_node_vars!(uimh, Vl[ii], u_, eq, 1)
+            multiply_add_to_node_vars!(uiph, Vr[ii], u_, eq, 1)
+        end
+        # Get views of needed cell averages
+        # slopes b/w centres and faces
+
+        uimh_ = get_node_vars(uimh, eq, 1)
+        uiph_ = get_node_vars(uiph, eq, 1)
+
+        # We will set
+        # Δul[n] = ua_[n] - uimh[n]
+        # Δur[n] = uiph[n] - ua_[n]
+        # Δual[n] = ua_[n] - ual[n]
+        # Δuar[n] = uar[n] - ua_[n]
+
+        set_node_vars!(Δul, ua_, eq, 1)
+        set_node_vars!(Δur, uiph_, eq, 1)
+        set_node_vars!(Δual, ua_, eq, 1)
+        set_node_vars!(Δuar, uar, eq, 1)
+
+        subtract_from_node_vars!(Δul, uimh_, eq)
+        subtract_from_node_vars!(Δur, ua_, eq)
+        subtract_from_node_vars!(Δual, ual, eq)
+        subtract_from_node_vars!(Δuar, ua_, eq)
+
+        Δul_ = get_node_vars(Δul, eq, 1)
+        Δur_ = get_node_vars(Δur, eq, 1)
+        Δual_ = get_node_vars(Δual, eq, 1)
+        Δuar_ = get_node_vars(Δuar, eq, 1)
+
+        # Uncomment this part for characteristic limiting
+        # mul!(char_Δul, L, Δul_)   # char_Δul = L*Δul
+        # mul!(char_Δur, L, Δur_)   # char_Δur = L*Δur
+        # mul!(char_Δual, L, Δual_) # char_Δual = L*Δual
+        # mul!(char_Δuar, L, Δuar_) # char_Δuar = L*Δuar
+
+        # Use primitive variables
+        # set_node_vars!(char_Δul, con2prim(eq, Δul_), eq, 1)
+        # set_node_vars!(char_Δur, con2prim(eq, Δur_), eq, 1)
+        # set_node_vars!(char_Δual, con2prim(eq, Δual_), eq, 1)
+        # set_node_vars!(char_Δuar, con2prim(eq, Δuar_), eq, 1)
+
+        # Keep conservative variables
+        set_node_vars!(char_Δul, Δul_, eq, 1)
+        set_node_vars!(char_Δur, Δur_, eq, 1)
+        set_node_vars!(char_Δual, Δual_, eq, 1)
+        set_node_vars!(char_Δuar, Δuar_, eq, 1)
+
+
+        char_Δul_ = get_node_vars(char_Δul, eq, 1)
+        char_Δur_ = get_node_vars(char_Δur, eq, 1)
+        char_Δual_ = get_node_vars(char_Δual, eq, 1)
+        char_Δuar_ = get_node_vars(char_Δuar, eq, 1)
+        for n in eachvariable(eq)
+            dulm[n] = minmod(char_Δul_[n], beta_ * char_Δual_[n], beta_ * char_Δuar_[n], Mdx2)
+            durm[n] = minmod(char_Δur_[n], beta_ * char_Δual_[n], beta_ * char_Δuar_[n], Mdx2)
+        end
+
+        # limit if jumps are detected
+        dulm_ = get_node_vars(dulm, eq, 1)
+        durm_ = get_node_vars(durm, eq, 1)
+        jump_l = jump_r = 0.0
+        for n in 1:nvar
+            jump_l += abs(char_Δul_[n] - dulm_[n])
+            jump_r += abs(char_Δur_[n] - durm_[n])
+        end
+        jump_l /= nvar
+        jump_r /= nvar
+
+        if jump_l > 1e-06 || jump_r > 1e-06
+            add_to_node_vars!(durm, dulm_, eq, 1) # durm = durm + dulm
+            # We want durm = 0.5 * (dul + dur), we adjust 0.5 later
+
+            # Uncomment this for characteristic variables
+            # mul!(du, R, durm)            # du = R * (dulm+durm)
+
+            # Conservative / primitive variables
+            # durm_ = prim2con(eq, get_node_vars(durm, eq, 1)) # Keep for primitive
+            durm_ = get_node_vars(durm, eq, 1) # Keep for conservative
+            set_node_vars!(du, durm_, eq, 1)
+            for ii in Base.OneTo(nd)
+                du_ = get_node_vars(du, eq, 1)
+                set_node_vars!(u1, ua_ + (xg[ii] - 0.5) * du_, # 2.0 adjusted with 0.5 above
+                               eq, ii,
+                               cell)
+            end
+        end
+    end
+    return nothing
+    end # timer
 end
 
 #-------------------------------------------------------------------------------
@@ -540,7 +852,7 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::TenMoment1D, 
 end
 
 function rp(x, priml, primr, x0)
-    if x < 0.0
+    if x < x0
         return tenmom_prim2con(priml)
     else
         return tenmom_prim2con(primr)
@@ -654,6 +966,65 @@ function post_process_soln(eq::TenMoment1D, aux, problem, param, scheme)
     JSON3.write(timer_file, TimerOutputs.todict(timer))
     close(timer_file)
     return nothing
+end
+
+struct TenMoment1DSourceTerms{WxType}
+    Wx::WxType
+end
+
+function compute_source_time_step(eq, source_terms::TenMoment1DSourceTerms, grid, aux, op, cfl,
+                                  u1, ua)
+    nx = grid.size
+    L = 1e20
+    dx = grid.dx
+    xc = grid.xc
+    @unpack xg = op
+    nd = length(xg)
+    dummy_t = 0.0
+    for cell in 1:nx
+        Wx = source_terms.Wx(xc[cell], dummy_t) + 1e-6
+        ua_node = get_node_vars(ua, eq, cell)
+        rho, v1, v2, P11, P12, P22 = con2prim(eq, ua_node)
+        a = 0.5 * sqrt(P11 / rho) / abs(Wx)
+        b_sqr = det_constraint(eq, ua_node) / (rho * P22)
+        b = 0.5 * sqrt(b_sqr) / abs(Wx)
+        L = min(L,a,b)
+        # if L < 1e-12
+        #     @assert false rho, v1, v2, P11, P12, P22,Wx,a,b
+        # end
+        # @show L, a, b, Wx
+        for i in 1:nd
+            x = xc[cell] - 0.5 * dx[cell] + xg[i] * dx[cell]
+            u_node = get_node_vars(u1, eq, i, cell)
+            Wx = source_terms.Wx(x, dummy_t) + 1e-6
+            a = 0.5 * sqrt(P11 / rho) / abs(Wx)
+            b_sqr = det_constraint(eq, u_node) / (rho * P22)
+            b = 0.5 * sqrt(b_sqr) / abs(Wx)
+            L = min(L,a,b)
+            # @show L
+            # if L < 1e-12
+            #     @assert false rho, v1, v2, P11, P12, P22,Wx,a,b
+            # end
+        end
+    end
+    # @show L
+    return max(L, 1e-10)
+end
+
+function (tem_moment_1d_source::TenMoment1DSourceTerms)(u, x, t, equations::TenMoment1D)
+    rho    = u[1]
+    rho_v1 = u[2]
+    rho_v2 = u[3]
+    Wx = tem_moment_1d_source.Wx(x, t)
+    return SVector(0.0, -0.5 * rho * Wx, 0.0, -0.5 * rho_v1 * Wx, -0.25 * rho_v2 * Wx, 0.0)
+end
+
+function ten_moment_source_x(u, x, t, Wx_, equations::TenMoment1D)
+    rho = u[1]
+    rho_v1 = u[2]
+    rho_v2 = u[3]
+    Wx = Wx_(x,t)
+    return SVector(0.0, -0.5 * rho * Wx, 0.0, -0.5 * rho_v1 * Wx, -0.25 * rho_v2 * Wx, 0.0)
 end
 
 get_equation() = TenMoment1D(["rho", "v1", "v2", "P11", "P12", "P22"],

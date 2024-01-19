@@ -27,7 +27,7 @@ function plot_python_ndofs_vs_y(files::Vector{String}, labels::Vector{String};
 
     data = readdlm(files[1])
     marker = markers[1]
-    add_theo_factors!(ax_error, (degree + 1) * data[:, 1], data, degree, 1,
+    add_theo_factors!(ax_error, (degree + 1) * data[:, 1], data[:, 2], degree, 1,
                       theo_factor_even, theo_factor_odd)
     ax_error.set_xlabel("Degrees of freedom")
     ax_error.set_ylabel(error_label(error_norm))

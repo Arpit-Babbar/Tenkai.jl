@@ -282,7 +282,7 @@ end
     return 0.5 * (Fl + Fr - λ * (Ur - Ul))
 end
 
-function Tenkai.compute_time_step(eq::TenMoment2D, grid, aux, op, cfl, u1, ua)
+function Tenkai.compute_time_step(eq::TenMoment2D, problem, grid, aux, op, cfl, u1, ua)
     @timeit aux.timer "Time Step computation" begin
     #! format: noindent
     @unpack dx, dy = grid
@@ -606,13 +606,6 @@ function eigmatrix(eq::TenMoment2D, u)
                              Ly30, Ly31, Ly32, Ly33, Ly34, Ly35,
                              Ly40, Ly41, Ly42, Ly43, Ly44, Ly45,
                              Ly50, Ly51, Ly52, Ly53, Ly54, Ly55)
-
-    Id = SMatrix{nvar, nvar}(1.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-                             0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-                             0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                             0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
-                             0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
-                             0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
 
     return Lx, Ly, Rx, Ry
     # return Id, Id, Id, Id
@@ -1407,7 +1400,7 @@ function ten_moment_source_x(u, x, y, t, Wx_, equations::TenMoment2D)
     rho_v1 = u[2]
     rho_v2 = u[3]
     Wx = Wx_(x,y,t)
-    return SVector(0.0, -0.5 * rho * Wx, 0.0, -0.5 * rho_v1 * Wx, -0.25 * rho_v2, 0.0)
+    return SVector(0.0, -0.5 * rho * Wx, 0.0, -0.5 * rho_v1 * Wx, -0.25 * rho_v2 * Wx, 0.0)
 end
 
 function ten_moment_source_y(u, x, y, t, Wy_, equations::TenMoment2D)
@@ -1415,11 +1408,11 @@ function ten_moment_source_y(u, x, y, t, Wy_, equations::TenMoment2D)
     rho_v1 = u[2]
     rho_v2 = u[3]
     Wy = Wy_(x,y,t)
-    return SVector(0.0, 0.0, -0.5 * rho * Wy, 0.0, -0.25 * rho_v1 * Wy, -0.5 * rho_v2)
+    return SVector(0.0, 0.0, -0.5 * rho * Wy, 0.0, -0.25 * rho_v1 * Wy, -0.5 * rho_v2 * Wy)
 end
 
 function ten_moment_source(u, x, y, t, Wx, Wy, equations::TenMoment2D)
-    
+
     source_x = ten_moment_source_x(u, x, y, t, Wx, equations)
     source_y = ten_moment_source_y(u, x, y, t, Wy, equations)
 

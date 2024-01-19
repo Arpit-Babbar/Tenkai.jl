@@ -174,7 +174,7 @@ end
 #-------------------------------------------------------------------------------
 # Scheme information
 #-------------------------------------------------------------------------------
-function Tenkai.compute_time_step(eq::Euler2D, grid, aux, op, cfl, u1, ua)
+function Tenkai.compute_time_step(eq::Euler2D, problem, grid, aux, op, cfl, u1, ua)
     @timeit aux.timer "Time Step computation" begin
     #! format: noindent
     @unpack dx, dy = grid

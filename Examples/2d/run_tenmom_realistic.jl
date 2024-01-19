@@ -7,8 +7,8 @@ Eq = Tenkai.EqTenMoment2D
 ten_moment_source = Eq.ten_moment_source
 plotlyjs() # Set backend
 
-xmin, xmax = 0.0, 4.0
-ymin, ymax = 0.0, 4.0
+xmin, xmax = 0.0, 100.0
+ymin, ymax = 0.0, 100.0
 boundary_condition = (neumann, neumann, neumann, neumann)
 
 function uniform_plasma_ic(x, y, equations::Eq.TenMoment2D)
@@ -45,14 +45,14 @@ end
     return SVector(0.0, 0.0, 0.0, E11, 0.0, E22)
 end
 
-source_term = (u, x, t, equations::Eq.TenMoment2D) -> (addition_energy_source(u, x, t, equations::Eq.TenMoment2D) +
+source_term = (u, x, t, equations::Eq.TenMoment2D) -> (addition_energy_source(u, x, t, equations) +
     ten_moment_source(u, x[1], x[2], t, gauss_source_x, gauss_source_y, equations))
 
 dummy_bv(x, t) = 0.0
 
 eq = Eq.get_equation()
 
-degree = 4
+degree = 2
 solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
@@ -69,12 +69,12 @@ exact_uniform_plasma(x, y, t) = uniform_plasma_ic(x, y)
 
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
-tvbM = 0.0
+tvbM = 300.0
 save_iter_interval = 0
 save_time_interval = 0.0 * final_time
 animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
-cfl_safety_factor = 0.98
+cfl_safety_factor = 0.5
 #------------------------------------------------------------------------------
 grid_size = [nx, ny]
 domain = [xmin, xmax, ymin, ymax]
@@ -86,7 +86,7 @@ limiter = setup_limiter_blend(blend_type = fo_blend(eq),
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner")
 
-limiter = setup_limiter_tvbβ(eq; tvbM = tvbM, beta = 1.5)
+# limiter = setup_limiter_tvbβ(eq; tvbM = tvbM, beta = 1.5)
 # limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)

@@ -181,7 +181,7 @@ end
 #-------------------------------------------------------------------------------
 # Compute dt using cell average
 #-------------------------------------------------------------------------------
-function compute_time_step(eq::AbstractEquations{1, 1}, grid, aux, op, cfl, u1,
+function compute_time_step(eq::AbstractEquations{1, 1}, problem, grid, aux, op, cfl, u1,
                            ua)
     @timeit aux.timer "Time step computation" begin
     #! format: noindent
@@ -397,6 +397,33 @@ function correct_variable_bound_limiter!(variable, eq::AbstractEquations{1},
     end
 end
 
+function test_variable_bound_limiter!(variable, eq::AbstractEquations{1},
+                                      grid, op, ua, u1)
+    @unpack Vl, Vr = op
+    nx = grid.size
+    xc = grid.xc
+    nd = op.degree + 1
+    eps = 1e-10 # TODO - Get a better one
+    for element in 1:nx
+        var_ll = var_rr = 0.0
+        var_min = 1e20
+        for i in Base.OneTo(nd)
+            u_node = get_node_vars(u1, eq, i, element)
+            var = variable(eq, u_node)
+            var_ll += var * Vl[i]
+            var_rr += var * Vr[i]
+            var_min = min(var_min, var)
+            @assert var_min>0.0 "Failed at element $element at $(xc[element])", variable, var_min, variable(eq, get_node_vars(ua, eq, element))
+        end
+        @assert var_ll>0.0 "Failed at element $element at $(xc[element])", variable, var_ll, variable(eq, get_node_vars(ua, eq, element))
+        @assert var_rr>0.0 "Failed at element $element at $(xc[element])", variable, var_rr, variable(eq, get_node_vars(ua, eq, element))
+
+
+        var_min = min(var_min, var_ll, var_rr)
+        @assert var_min>0.0 "Failed at element $element at $(xc[element])", variable, var_min, variable(eq, get_node_vars(ua, eq, element))
+    end
+end
+
 # Bounds preserving limiter
 function apply_bound_limiter!(eq::AbstractEquations{1, 1}, grid, scheme, param, op,
                               ua, u1, aux)
@@ -438,11 +465,11 @@ function apply_bound_limiter!(eq::AbstractEquations{1, 1}, grid, scheme, param, 
     end # timer
 end
 
-function setup_limiter_tvb(eq::AbstractEquations{1}; tvbM = 0.0)
+function setup_limiter_tvb(eq::AbstractEquations{1}; tvbM = 0.0, beta = 1.0)
     cache_size = 13
     cache = SVector{cache_size}([MArray{Tuple{nvariables(eq), 1}, Float64}(undef)
                                  for _ in Base.OneTo(cache_size)])
-    limiter = (; name = "tvb", tvbM = tvbM, cache)
+    limiter = (; name = "tvb", tvbM = tvbM, beta, cache)
     return limiter
 end
 
@@ -1503,25 +1530,29 @@ end
     end
     fill!(resl, zero(eltype(resl)))
     # Add first source term contribution
-    u_node = get_node_vars(u, eq, 1)
-    s_node = calc_source(u_node, xxf[0], t, source_terms, eq)
-    for n in eachvariable(eq)
-        resl[n, 1] -= s_node[n] / wg[1]
-    end
+
     for j in 2:nd
         xx = xxf[j]
         ul, ur = get_node_vars(u, eq, j-1), get_node_vars(u, eq, j)
-        s_node = calc_source(ur, xx, t, source_terms, eq)
         fl, fr = flux(xx, ul, eq), flux(xx, ur, eq)
         fn = scaling_factor * num_flux(xx, ul, ur, fl, fr, ul, ur, eq, 1)
         for n in 1:nvar
             resl[n, j - 1] += fn[n] / wg[j - 1]
             resl[n, j] -= fn[n] / wg[j]
-            resl[n, j] -= s_node[n] / wg[j]
         end
     end
     @views fn_low[:, 1] .= wg[1] * resl[:, 1]
     @views fn_low[:, 2] .= -wg[end] * resl[:, end]
+
+    for j in 1:nd
+        u_node = get_node_vars(u, eq, j)
+        x = xf + dx * xg[j]
+        s_node = calc_source(u_node, x, t, source_terms, eq)
+        for n in 1:nvar
+            resl[n, j] -= s_node[n] * dx
+        end
+    end
+
     axpby!(blend.alpha[cell] * dt / dx, resl, 1.0 - blend.alpha[cell], r)
     end # timer
 end
@@ -1644,7 +1675,7 @@ end
 # MUSCL-hancock cell residual
 @inbounds @inline function blend_cell_residual_muscl!(cell,
                                                       eq::AbstractEquations{1},
-                                                      problem, scheme, aux, lamx, dt,
+                                                      problem, scheme, aux, lamx, t, dt,
                                                       dx, xf, op, u1, u, ua, f, r,
                                                       scaling_factor = 1.0)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead, it's supposed
@@ -1970,8 +2001,8 @@ end
     return nothing
 end
 
-@inline function store_fn_cell_residual!(cell, eq::AbstractEquations{1}, scheme,
-                                        aux, lamx, dt, dx, xf, op, u1, u, ua, f, r,
+@inline function store_fn_cell_residual!(cell, eq::AbstractEquations{1}, problem, scheme,
+                                        aux, lamx, t, dt, dx, xf, op, u1, u, ua, f, r,
                                         scaling_factor = 1)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead, it's supposed
     #! format: noindent

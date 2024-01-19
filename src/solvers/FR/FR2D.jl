@@ -346,7 +346,7 @@ end
 #-------------------------------------------------------------------------------
 # Compute dt using cell average
 #-------------------------------------------------------------------------------
-function compute_time_step(eq::AbstractEquations{2, 1}, grid, aux, op, cfl, u1,
+function compute_time_step(eq::AbstractEquations{2, 1}, problem, grid, aux, op, cfl, u1,
                            ua)
     @timeit aux.timer "Time Step computation" begin
     #! format: noindent
@@ -1772,7 +1772,7 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem, 
     for jj in 1:nd
         for ii in Base.OneTo(nd)
             xx = xf + dx * xg[ii] # face x coordinate picked same as soln pt
-            yy = yf + dx * xg[jj] # face x coordinate picked same as soln pt
+            yy = yf + dy * xg[jj] # face x coordinate picked same as soln pt
             X = SVector(xx, yy)
             u_node = get_node_vars(u, eq, ii, jj)
             s_node = calc_source(u_node, X, t, source_terms, eq)
@@ -3375,9 +3375,9 @@ function trivial_cell_residual(i, j, eq::AbstractEquations{2}, problem, scheme, 
     return nothing
 end
 
-@inline function store_fn_cell_residual!(el_x, el_y, eq::AbstractEquations{2}, scheme, aux,
-                                         dt, grid, dx, dy, xf, yf, op, u1, ::Any, f, res,
-                                         scaling_factor = 1.0)
+@inline function store_fn_cell_residual!(el_x, el_y, eq::AbstractEquations{2}, problem,
+                                         scheme, aux, t, dt, grid, dx, dy, xf, yf, op, u1, ::Any,
+                                         f, res, scaling_factor = 1.0)
     @unpack blend = aux
     @unpack fn_low = blend.cache
 

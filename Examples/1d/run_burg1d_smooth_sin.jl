@@ -1,7 +1,8 @@
 using Tenkai
 using StaticArrays
 Eq = Tenkai.EqBurg1D
-
+using Plots
+gr()
 #------------------------------------------------------------------------------
 xmin, xmax = -1.0, 1.0
 burg_smooth_ic = x -> sinpi(2.0 * x)
@@ -20,7 +21,7 @@ bflux = evaluate
 numerical_flux = Eq.rusanov
 bound_limit = "no"
 
-nx = 100
+nx = 1600
 cfl = 0.0
 bounds = ([-0.2], [0.2])
 tvbM = 0.0
