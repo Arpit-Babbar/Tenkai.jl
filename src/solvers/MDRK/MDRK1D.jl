@@ -73,7 +73,7 @@ end
 #-------------------------------------------------------------------------------
 # Compute cell residual for degree=3 case and for all real cells
 #-------------------------------------------------------------------------------
-function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op,
+function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op, problem,
                                        scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
     @unpack xg, wg, Dm, D1, Vl, Vr = op
@@ -157,7 +157,7 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op,
         end
         u = @view u1[:, :, cell]
         r = @view res[:, :, cell]
-        blend.blend_cell_residual!(cell, eq, scheme, aux, lamx, dt, dx,
+        blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
                                    grid.xf[cell], op, u1, u, cache.ua, nothing, r,
                                    0.5)
         # Interpolate to faces
@@ -206,7 +206,7 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op,
     return nothing
 end
 
-function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op,
+function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op, problem,
                                        scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
     @unpack xg, wg, Dm, D1, Vl, Vr = op
@@ -287,7 +287,7 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op,
         end
         u = @view u1[:, :, cell]
         r = @view res[:, :, cell]
-        blend.blend_cell_residual!(cell, eq, scheme, aux, lamx, dt, dx,
+        blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
                                    grid.xf[cell], op, u1, u, cache.ua, nothing, r)
         # Interpolate to faces
         for i in Base.OneTo(nd)

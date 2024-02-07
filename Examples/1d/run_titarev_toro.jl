@@ -11,13 +11,22 @@ xmin, xmax = -5.0, 5.0
 boundary_value = Eq.dummy_zero_boundary_value # dummy function
 boundary_condition = (neumann, neumann)
 γ = 1.4
-final_time = 1.8
+final_time = 5.0
 
-initial_value = Eq.shuosher
+function initial_value_titarev_toro(x)
+    γ = 1.4
+    if -5.0 <= x <= -4.5
+        rho, v, p = 1.515695, 0.523346, 1.805
+    else
+        rho, v, p = 1.0 + 0.1*sinpi(20*x), 0.0, 1.0
+    end
+    return SVector(rho, rho * v, p / (γ - 1.0) + 0.5 * rho * v^2)
+end
+initial_value = initial_value_titarev_toro
 exact_solution = Eq.exact_solution_shuosher # Dummy function
 
 degree = 3
-solver = "lwfr"
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
