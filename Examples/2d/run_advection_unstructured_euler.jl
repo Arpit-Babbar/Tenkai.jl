@@ -1,55 +1,55 @@
-using SSFR
-Eq = SSFR.EqEuler2D
+using Tenkai
+Eq = Tenkai.EqEuler2D
 using StaticArrays
-using SSFR.StructuredMeshes: save_mesh_file
+using Tenkai.StructuredMeshes: save_mesh_file
 import Trixi
 using Trixi2Vtk
 #------------------------------------------------------------------------------
 xmin, xmax = -1.0, 1.0
 ymin, ymax = -1.0, 1.0
-boundary_value_(x,y,t) = 0.0
+boundary_value_(x, y, t) = 0.0
 boundary_condition = (periodic, periodic, periodic, periodic) # dummy
 γ = 1.4
 
 function exact_solution_eq(x, t, equations)
-   c = 2
-   A = 0.1
-   L = 2
-   f = 1/L
-   ω = 2 * pi * f
-   ini = c + A * sin(ω * (x[1] + x[2] - t))
+    c = 2
+    A = 0.1
+    L = 2
+    f = 1 / L
+    ω = 2 * pi * f
+    ini = c + A * sin(ω * (x[1] + x[2] - t))
 
-   rho = ini
-   rho_v1 = ini
-   rho_v2 = ini
-   rho_e = ini^2
+    rho = ini
+    rho_v1 = ini
+    rho_v2 = ini
+    rho_e = ini^2
 
-   return SVector(rho, rho_v1, rho_v2, rho_e)
+    return SVector(rho, rho_v1, rho_v2, rho_e)
 end
 
-exact_solution(x,y,t)=exact_solution_eq((x,y),t,nothing)
+exact_solution(x, y, t) = exact_solution_eq((x, y), t, nothing)
 
 bc = Trixi.BoundaryConditionDirichlet(exact_solution_eq)
-boundary_conditions = Dict( :Slant  => bc,
-                            :Bezier => bc,
-                            :Right  => bc,
-                            :Bottom => bc,
-                            :Top    => bc )
+boundary_conditions = Dict(:Slant => bc,
+                           :Bezier => bc,
+                           :Right => bc,
+                           :Bottom => bc,
+                           :Top => bc)
 
-initial_value_convergence_test(x,y)= exact_solution(x,y,0.0)
+initial_value_convergence_test(x, y) = exact_solution(x, y, 0.0)
 
-degree              = 6
-solver              = "rkfr"
-solution_points     = "gll"
+degree = 6
+solver = "rkfr"
+solution_points = "gll"
 correction_function = "g2"
-numerical_flux      = SSFR.flux_lax_friedrichs
-bound_limit         = "no"
-bflux               = extrapolate
-final_time          = 1.0 # 20 * sqrt(2.0) / 0.5
+numerical_flux = Tenkai.flux_lax_friedrichs
+bound_limit = "no"
+bflux = extrapolate
+final_time = 1.0 # 20 * sqrt(2.0) / 0.5
 
 nx, ny = 32, 32
 cfl = 0.1
-bounds = ([-Inf],[Inf]) # Not used in Euler
+bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
 save_iter_interval = 1
 save_time_interval = 0.0 # final_time / 5.0
@@ -74,8 +74,9 @@ param = Parameters([grid_size[1], grid_size[2]], cfl, bounds, save_iter_interval
                    animate = animate, cfl_safety_factor = cfl_safety_factor,
                    time_scheme = "RK11")
 default_mesh_file = joinpath(@__DIR__, "mesh_trixi_unstructured_mesh_docs.mesh")
-isfile(default_mesh_file) || download("https://gist.githubusercontent.com/andrewwinters5000/52056f1487853fab63b7f4ed7f171c80/raw/9d573387dfdbb8bce2a55db7246f4207663ac07f/mesh_trixi_unstructured_mesh_docs.mesh",
-                                       default_mesh_file)
+isfile(default_mesh_file) ||
+    download("https://gist.githubusercontent.com/andrewwinters5000/52056f1487853fab63b7f4ed7f171c80/raw/9d573387dfdbb8bce2a55db7246f4207663ac07f/mesh_trixi_unstructured_mesh_docs.mesh",
+             default_mesh_file)
 mesh_file = default_mesh_file
 
 grid = UnstructuredMesh2D(mesh_file)
@@ -85,9 +86,9 @@ grid = UnstructuredMesh2D(mesh_file)
 #                                           grid, ARGS)
 #------------------------------------------------------------------------------
 rm("output", force = true, recursive = true)
-sol = SSFR.solve(equation, grid, problem, scheme, param);
+sol = Tenkai.solve(equation, grid, problem, scheme, param);
 Trixi.save_mesh_file(grid, "output")
-trixi2vtk("output/sol*.h5", output_directory="output")
+trixi2vtk("output/sol*.h5", output_directory = "output")
 println(sol["errors"])
 
 return sol;

@@ -1,7 +1,7 @@
 using StaticArrays
-using SSFR
+using Tenkai
 using Plots
-Eq = SSFR.EqLinAdv1D
+Eq = Tenkai.EqLinAdv1D
 plotlyjs() # Set backend
 
 #------------------------------------------------------------------------------
@@ -36,7 +36,7 @@ cfl_safety_factor = 0.95
 grid_size = nx
 domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
-                     final_time, exact_solution)
+                  final_time, exact_solution)
 equation = Eq.get_equation(velocity)
 # limiter = FR.setup_limiter_blend(
 #                                  blend_type = FR.mh_blend,
@@ -48,14 +48,14 @@ equation = Eq.get_equation(velocity)
 limiter = setup_limiter_tvb(eq = equation, tvbM = tvbM)
 # limiter = FR.setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
-                   numerical_flux, bound_limit, limiter, bflux)
+                numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
-                      save_time_interval, compute_error_interval,
-                      animate = animate, cfl_safety_factor = cfl_safety_factor)
+                   save_time_interval, compute_error_interval,
+                   animate = animate, cfl_safety_factor = cfl_safety_factor)
 #------------------------------------------------------------------------------
 problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
-                                             ARGS)
+                                          ARGS)
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 return errors, plot_data

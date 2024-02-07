@@ -1,10 +1,10 @@
 using StaticArrays
-using SSFR
-Eq = SSFR.EqLinAdv2D
+using Tenkai
+Eq = Tenkai.EqLinAdv2D
 #------------------------------------------------------------------------------
 xmin, xmax = 0.0, 1.0
 ymin, ymax = 0.0, 1.0
-final_time = 0.1*pi # Kept small for unit tests. Correct in run_rotate_linadv2d.jl
+final_time = 0.1 * pi # Kept small for unit tests. Correct in run_rotate_linadv2d.jl
 boundary_condition = (neumann, dirichlet, dirichlet, neumann)
 initial_value, velocity, exact_solution = Eq.rotate_exp_data
 boundary_value = exact_solution
@@ -18,7 +18,7 @@ bflux = evaluate
 numerical_flux = Eq.rusanov
 
 nx, ny = 10, 10
-bounds = ([-Inf],[Inf])
+bounds = ([-Inf], [Inf])
 cfl = 0.0
 tvbM = 0.0
 save_iter_interval = 0
@@ -49,7 +49,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
                                           ARGS)
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 println(sol["errors"])
 

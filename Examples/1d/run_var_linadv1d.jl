@@ -1,6 +1,6 @@
 using StaticArrays
-using SSFR
-Eq = SSFR.EqLinAdv1D
+using Tenkai
+Eq = Tenkai.EqLinAdv1D
 # Submodules
 using Plots
 plotlyjs() # Set backend
@@ -34,18 +34,18 @@ animate = true
 grid_size = nx
 domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
-                     final_time, exact_solution)
+                  final_time, exact_solution)
 eq = Eq.get_equation(velocity_)
 limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
-                   numerical_flux, bound_limit, limiter, bflux)
+                numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
                    animate = animate)
 #------------------------------------------------------------------------------
 problem, scheme, param = ParseCommandLine(problem, param, scheme, eq,
-                                             ARGS)
+                                          ARGS)
 #------------------------------------------------------------------------------
-errors, plot_data = SSFR.solve(eq, problem, scheme, param)
+errors, plot_data = Tenkai.solve(eq, problem, scheme, param)
 
 return errors, plot_data

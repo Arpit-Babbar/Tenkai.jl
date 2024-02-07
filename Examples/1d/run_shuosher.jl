@@ -1,8 +1,8 @@
 using StaticArrays
-using SSFR
+using Tenkai
 using Plots
 # Submodules
-Eq = SSFR.EqEuler1D
+Eq = Tenkai.EqEuler1D
 plotlyjs() # Set backend
 
 #------------------------------------------------------------------------------
@@ -16,17 +16,17 @@ final_time = 1.8
 initial_value = Eq.shuosher
 exact_solution = Eq.exact_solution_shuosher # Dummy function
 
-degree = 4
-solver = "lwfr"
+degree = 3
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
 
-nx = ceil(Int64, 2000/(degree + 1))
+nx = 400
 cfl = 0.0
-bounds = ([-Inf],[Inf]) # Not used in Euler
+bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 300.0
 save_iter_interval = 0
 save_time_interval = 0.0
@@ -45,35 +45,27 @@ domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value,
                   boundary_condition, final_time, exact_solution)
 equation = Eq.get_equation(γ)
-limiter = setup_limiter_blend(
-                              blend_type = mh_blend(equation),
+limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               # indicating_variables = Eq.rho_p_indicator!,
                               indicating_variables = Eq.rho_p_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = indicator_model,
                               constant_node_factor = 1.0,
-                              # a = 0.26085411638212247, c = 1.657759170623426,
                               amax = 1.0,
                               debug_blend = debug_blend,
-                              pure_fv = pure_fv
-                            )
+                              pure_fv = pure_fv)
 # limiter = setup_limiter_tvb(equation; tvbM = tvbM)
 # limiter = setup_limiter_hierarchical(alpha = 1.0,
 #                                      reconstruction = characteristic_reconstruction)
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
-param = Parameters(
-                    grid_size, cfl, bounds, save_iter_interval,
-                    save_time_interval, compute_error_interval;
-                    animate = animate,
-                    cfl_safety_factor = cfl_safety_factor,
-                    time_scheme = "SSPRK54"
-                  )
+param = Parameters(grid_size, cfl, bounds, save_iter_interval,
+                   save_time_interval, compute_error_interval;
+                   animate = animate,
+                   cfl_safety_factor = cfl_safety_factor,
+                   time_scheme = "SSPRK54")
 #------------------------------------------------------------------------------
-problem, scheme, param = ParseCommandLine(problem, param, scheme,
-                                          equation, ARGS)
-#------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 println(sol["errors"])
 

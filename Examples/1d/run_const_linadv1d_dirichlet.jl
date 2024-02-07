@@ -1,6 +1,6 @@
 using StaticArrays
-using SSFR
-Eq = SSFR.EqLinAdv1D
+using Tenkai
+Eq = Tenkai.EqLinAdv1D
 # Submodules
 using Plots
 gr() # Set backend
@@ -10,7 +10,7 @@ xmin, xmax = -1.0, 1.0
 
 boundary_condition = (dirichlet, neumann)
 final_time = 1.0
-velocity, initial_value, exact_solution =  Eq.smooth_sin1d_data
+velocity, initial_value, exact_solution = Eq.smooth_sin1d_data
 boundary_value = exact_solution
 
 degree = 3
@@ -47,7 +47,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
                                           ARGS)
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 show(sol["errors"])
 

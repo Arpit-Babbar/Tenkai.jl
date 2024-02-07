@@ -1,6 +1,6 @@
 using StaticArrays
-using SSFR
-Eq = SSFR.EqLinAdv1D
+using Tenkai
+Eq = Tenkai.EqLinAdv1D
 # Submodules
 using Plots
 plotlyjs()
@@ -9,18 +9,18 @@ xmin, xmax = -1.0, 1.0
 
 boundary_condition = (periodic, periodic)
 final_time = 0.8
-velocity, initial_value, exact_solution =  Eq.smooth_sin1d_data
+velocity, initial_value, exact_solution = Eq.smooth_sin1d_data
 boundary_value = exact_solution
 
 degree = 4
-solver = "lwfr"
-solution_points = "gl"
-correction_function = "radau"
+solver = "mdrk"
+solution_points = "gll"
+correction_function = "g2"
 numerical_flux = Eq.rusanov
 bound_limit = "no"
 bflux = evaluate
 
-nx = 10
+nx = 40
 bounds = ([-Inf], [Inf])
 cfl = 0.0
 save_iter_interval = 0
@@ -46,7 +46,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
                                           ARGS)
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 show(sol["errors"])
 

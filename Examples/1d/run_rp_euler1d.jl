@@ -1,26 +1,26 @@
 # For Riemann problems in domain [0.0,1.0]
 using StaticArrays
-using SSFR
+using Tenkai
 using Plots
 # Submodules
-Eq = SSFR.EqEuler1D
+Eq = Tenkai.EqEuler1D
 plotlyjs() # Set backend
 
 #------------------------------------------------------------------------------
 xmin, xmax = 0.0, 1.0
 
-zero_function(x,t) = 0.0
+zero_function(x, t) = 0.0
 boundary_value = zero_function # dummy function
 boundary_condition = (neumann, neumann)
 γ = 1.4
 function riemann_problem(ul, ur, xs, x)
-   if x < xs
-      prim = ul
-   else
-      prim = ur
-   end
-   U = [prim[1], prim[1]*prim[2], prim[3]/(γ-1.0) + 0.5*prim[1]*prim[2]^2]
-   return U
+    if x < xs
+        prim = ul
+    else
+        prim = ur
+    end
+    U = [prim[1], prim[1] * prim[2], prim[3] / (γ - 1.0) + 0.5 * prim[1] * prim[2]^2]
+    return U
 end
 
 initial_value, exact_solution, final_time, ic_name = Eq.sod_data
@@ -35,7 +35,7 @@ bflux = evaluate
 
 nx = 50
 cfl = 0.0
-bounds = ([-Inf],[Inf]) # Not used in Euler
+bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
 save_iter_interval = 0
 save_time_interval = 0.0
@@ -57,18 +57,16 @@ equation = Eq.get_equation(γ)
 #                                 )
 limiter = setup_limiter_tvb(equation; tvbM = tvbM)
 scheme = Scheme(solver, degree, solution_points, correction_function,
-                   numerical_flux, bound_limit, limiter, bflux)
-param = Parameters(
-                      grid_size, cfl, bounds, save_iter_interval,
-                      save_time_interval, compute_error_interval;
-                      animate = animate,
-                      cfl_safety_factor = cfl_safety_factor,
-                      time_scheme = "SSPRK54"
-                     )
+                numerical_flux, bound_limit, limiter, bflux)
+param = Parameters(grid_size, cfl, bounds, save_iter_interval,
+                   save_time_interval, compute_error_interval;
+                   animate = animate,
+                   cfl_safety_factor = cfl_safety_factor,
+                   time_scheme = "SSPRK54")
 #------------------------------------------------------------------------------
 problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
                                           ARGS)
 #------------------------------------------------------------------------------
-sol = SSFR.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param);
 
 return errors, plot_data

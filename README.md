@@ -1,15 +1,15 @@
 # Tenkai.jl
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://Arpit-Babbar.github.io/SSFR/stable/)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://Arpit-Babbar.github.io/SSFR/dev/)
-[![Build Status](https://github.com/Arpit-Babbar/SSFR/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Arpit-Babbar/SSFR/actions/workflows/CI.yml?query=branch%3Amain)
-[![Coverage](https://codecov.io/gh/Arpit-Babbar/SSFR/branch/main/graph/badge.svg)](https://codecov.io/gh/Arpit-Babbar/SSFR)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://Arpit-Babbar.github.io/Tenkai/stable/)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://Arpit-Babbar.github.io/Tenkai/dev/)
+[![Build Status](https://github.com/Arpit-Babbar/Tenkai/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Arpit-Babbar/Tenkai/actions/workflows/CI.yml?query=branch%3Amain)
+[![Coverage](https://codecov.io/gh/Arpit-Babbar/Tenkai/branch/main/graph/badge.svg)](https://codecov.io/gh/Arpit-Babbar/Tenkai)
 
 # 1d/2d FR solver
 
 ## Setup (5-10 minutes)
 
-Set parameters in any of the `run` files, for example `run_const_linadv1d.jl`. Some of the options we have are
+Set parameters in any of the `run` files in `Examples` directly, like `run_const_linadv1d.jl` in `Examples/1d`. Some of the options we have are
 
 Scheme: RKFR, LWFR
 
@@ -30,12 +30,12 @@ julia> import Pkg; Pkg.instantiate()
 For the first time, to precompile parts of code to local drive, it is also recommended that you run
 
 ```julia
-julia> using SSFR
+julia> using Tenkai
 ```
 
 At this point, in principle you can exit the REPL and always run your code directly through the shell as
 ```shell
-julia --project=. run_const_linadv1d.jl
+julia --project=. Examples/1d/run_const_linadv1d.jl
 ```
 
 However, since Julia uses a Just-In-Time (JIT) compiler, this is not recommended. If you wish to run this file again or run a different file, Julia will have to compile most of the code again. The recommended way to use Julia is within the Julia REPL where, within each session, the compiled code is stored in memory.
