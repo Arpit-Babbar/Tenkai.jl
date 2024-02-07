@@ -1,10 +1,5 @@
 # Tenkai.jl
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://Arpit-Babbar.github.io/Tenkai/stable/)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://Arpit-Babbar.github.io/Tenkai/dev/)
-[![Build Status](https://github.com/Arpit-Babbar/Tenkai/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Arpit-Babbar/Tenkai/actions/workflows/CI.yml?query=branch%3Amain)
-[![Coverage](https://codecov.io/gh/Arpit-Babbar/Tenkai/branch/main/graph/badge.svg)](https://codecov.io/gh/Arpit-Babbar/Tenkai)
-
 # 1d/2d FR solver
 
 ## Setup (5-10 minutes)
@@ -57,12 +52,12 @@ For 2-D, plot the solution using visit as
 visit -o output/sol*.vtr
 ```
 
-Printing to screen is slow, you can redirect the output to a `string` as
+If you wish to suppress on-screen printing during the simulation, you can redirect the printing to a `string`
 
 ```julia
 julia> using Suppressor
-julia> out = @capture_out julia run.jl > log.txt # Capture output in variable out
-julia> println(out)                              # Print output if needed
+julia> out = @capture_out include("Examples/1d/run_const_linadv1d.jl") # Capture output in variable out
+julia> println(out)                         # Print at the end if needed
 ```
 
 If you have a 4 core CPU, you can use 4 threads by starting REPL as
