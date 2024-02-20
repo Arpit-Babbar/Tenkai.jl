@@ -9,8 +9,8 @@ boundary_value = exact_solution # dummy function
 boundary_condition = (periodic, periodic, periodic, periodic)
 final_time = 1.0
 
-degree = 4
-solver = "lwfr"
+degree = 3
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov

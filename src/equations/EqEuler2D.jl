@@ -19,6 +19,9 @@ module EqEuler2D
                multiply_add_to_node_vars!, multiply_add_set_node_vars!,
                comp_wise_mutiply_node_vars!, AbstractEquations)
 
+
+using Tenkai.FR: hllc_bc
+
 using Tenkai.CartesianGrids: CartesianGrid2D, save_mesh_file
 using Tenkai.FR: limit_variable_slope
 
@@ -1733,6 +1736,44 @@ function Tenkai.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
                 fb_node = get_node_vars(fb, eq, 1)
                 set_node_vars!(Ub, ub_node, eq, k, 4, i, 0)
                 set_node_vars!(Fb, fb_node, eq, k, 4, i, 0)
+
+                # Purely upwind
+
+                # set_node_vars!(Ub, ub, eq, k, 3, i, 1)
+                # set_node_vars!(Fb, fb, eq, k, 3, i, 1)
+            end
+        end
+    elseif bottom == hllc_bc
+        y3 = yf[1]
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                x3 = xf[i] + xg[k] * dx[i]
+                ub, fb = pre_allocated[Threads.threadid()]
+                refresh!.((ub, fb))
+                for l in Base.OneTo(nd)
+                    tq = t + xg[l] * dt_scaled
+                    ubvalue = boundary_value(x3, y3, tq)
+                    fbvalue = flux(x3, y3, ubvalue, eq, 2)
+                    multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
+                    multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
+                end
+
+                ub_node = get_node_vars(ub, eq, 1)
+                fb_node = get_node_vars(fb, eq, 1)
+                set_node_vars!(Ub, ub_node, eq, k, 4, i, 0)
+                set_node_vars!(Fb, fb_node, eq, k, 4, i, 0)
+
+                Uu_node = get_node_vars(Ub, eq, k, 3, i, 1)
+                Fu_node = get_node_vars(Fb, eq, k, 3, i, 1)
+                Ud_node = get_node_vars(Ub, eq, k, 4, i, 0)
+                Fd_node = get_node_vars(Fb, eq, k, 4, i, 0)
+                uad, uau = get_node_vars(ua, eq, i, 0), get_node_vars(ua, eq, i, 1)
+
+                X = SVector{2}(x3, y3)
+                Fn = hllc(X, uad, uau, Fd_node, Fu_node, Ud_node, Uu_node, eq, 2)
+                set_node_vars!(Ub, ub_node, eq, k, 3, i, 1)
+                set_node_vars!(Fb, Fn     , eq, k, 3, i, 1)
+                set_node_vars!(Fb, Fn     , eq, k, 4, i, 0)
 
                 # Purely upwind
 

@@ -23,15 +23,15 @@ source_terms = burg_smooth_source
 boundary_condition = (periodic, periodic, periodic, periodic)
 final_time = 0.1
 
-degree = 1
-solver = "lwfr"
+degree = 3
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
 bound_limit = "no"
 bflux = evaluate
 numerical_flux = Eq.rusanov
 
-nx, ny = 50, 50
+nx, ny = 100, 100
 bounds = ([-Inf], [Inf])
 cfl = 0.0
 save_iter_interval = 0

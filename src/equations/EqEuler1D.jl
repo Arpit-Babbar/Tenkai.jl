@@ -322,6 +322,16 @@ dwave_data = (dwave, (x, t) -> dwave(x - t), 1.0, "dwave")
 
 dummy_zero_boundary_value(x, t) = 0.0
 
+function initial_value_titarev_toro(x)
+    γ = 1.4
+    if -5.0 <= x <= -4.5
+        rho, v, p = 1.515695, 0.523346, 1.805
+    else
+        rho, v, p = 1.0 + 0.1*sinpi(20*x), 0.0, 1.0
+    end
+    return SVector(rho, rho * v, p / (γ - 1.0) + 0.5 * rho * v^2)
+end
+
 initial_values = Dict{String, Function}()
 for data in [lax_data, sod_data, toro5_data, dwave_data]
     initial_value, exact_solution, final_time, name = data
@@ -331,6 +341,7 @@ initial_values["sedov1d"] = sedov1d
 initial_values["blast"], initial_values["shuosher"] = blast, shuosher
 initial_values["double_rarefaction"] = double_rarefaction_iv
 initial_values["leblanc"] = leblanc_iv
+initial_values["titarev_toro"] = initial_value_titarev_toro
 #-------------------------------------------------------------------------------
 # Numerical Fluxes
 #-------------------------------------------------------------------------------
@@ -1132,6 +1143,8 @@ function exact_solution_data(test_case)
             exact_data[i, 2] = 1.0 + 0.5 * sinpi(2.0 * exact_data[i, 1])
             exact_data[i, 3:4] .= 1.0
         end
+    elseif test_case == "titarev_toro"
+        exact_data = readdlm("$data_dir/$test_case.txt", skipstart = 0)
     else
         @warn "Exact solution does not set!"
         return nothing

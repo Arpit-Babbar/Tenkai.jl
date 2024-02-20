@@ -32,7 +32,7 @@ using JSON3
 # Temporary hack
 using FastGaussQuadrature
 
-@enum BCType periodic dirichlet neumann reflect
+@enum BCType periodic dirichlet neumann reflect hllc_bc
 @enum BFluxType extrapolate evaluate
 @enum SolverType rkfr lwfr mdrk # TODO - Is this only needed for D2 / D1?
 

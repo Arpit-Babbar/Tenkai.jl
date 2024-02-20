@@ -13,6 +13,10 @@ using OffsetArrays
 using StaticArrays
 using LoopVectorization
 
+using Tenkai.LWFR: calc_source, calc_source_t_N12, calc_source_t_N34,
+                   calc_source_tt_N23, calc_source_tt_N4, calc_source_ttt_N34,
+                   calc_source_tttt_N4
+
 using ..FR: @threaded
 using ..FR2D: update_ghost_values_periodic!, update_ghost_values_fn_blend!
 import Tenkai.LWFR2D: extrap_bflux!
@@ -45,6 +49,7 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
     F2 = zeros(nvar, nd, nd, nx, ny)
     G2 = zeros(nvar, nd, nd, nx, ny)
     U2 = zeros(nvar, nd, nd, nx, ny)
+    S2 = zeros(nvar, nd, nd, nx, ny)
     ua = gArray(nvar, nx, ny)
     res = gArray(nvar, nd, nd, nx, ny)
     Fb = gArray(nvar, nd, 4, nx, ny)
@@ -71,7 +76,7 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
     end
 
     MArr = MArray{Tuple{nvariables(eq), nd, nd}, Float64}
-    cell_arrays = alloc_for_threads(MArr, 7)
+    cell_arrays = alloc_for_threads(MArr, 8)
 
     MEval = MArray{Tuple{nvariables(eq), nd}, Float64}
     eval_data_big = alloc_for_threads(MEval, 20)
@@ -85,7 +90,7 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
     ghost_cache = alloc_for_threads(Marr, 2)
 
     # KLUDGE - Rename this to LWFR cache
-    cache = (; u1, us, U2, F2, G2, ua, res, Fb, Fb2, Ub, Ub2, eval_data,
+    cache = (; u1, us, U2, F2, G2, S2, ua, res, Fb, Fb2, Ub, Ub2, eval_data,
              cell_arrays, ghost_cache)
     return cache
 end
@@ -285,18 +290,20 @@ end
 end
 
 function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
-                                       scheme, aux, t, dt, u1, res, Fb, Ub,
+                                       problem, scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
     @unpack nvar = eq
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
     nx, ny = grid.size
 
+    @unpack source_terms = problem
+
     # Select boundary flux
     @unpack blend_cell_residual! = aux.blend.subroutines
     @unpack compute_bflux! = scheme.bflux
     get_dissipation_node_vars = scheme.dissipation
-    @unpack F2, G2, U2, Fb2, Ub2, cell_arrays, eval_data = cache
+    @unpack F2, G2, U2, S2, Fb2, Ub2, cell_arrays, eval_data = cache
     refresh!.((res, Fb, Fb2, Ub, Ub2)) # Reset previously used variables to zero
 
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
@@ -306,7 +313,7 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
         lamx, lamy = dt / dx, dt / dy
         # Some local variables
         id = Threads.threadid()
-        (F, G, F2_loc, G2_loc, ut, U, U2_loc) = cell_arrays[id]
+        (F, G, F2_loc, G2_loc, ut, U, U2_loc, S) = cell_arrays[id]
 
         eval_data_big = eval_data.eval_data_big[id]
         refresh!.(eval_data_big)
@@ -339,8 +346,20 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
         end
 
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            x_ = xc - 0.5 * dx + xg[i] * dx
+            y_ = yc - 0.5 * dy + xg[j] * dy
+            x = SVector(x_, y_)
+            u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
+            s_node = calc_source(u_node, x, t, source_terms, eq)
+            set_node_vars!(S,  0.5 * s_node, eq, i, j)
+            set_node_vars!(S2, s_node, eq, i, j, el_x, el_y)
+            multiply_add_to_node_vars!(ut, dt, s_node, eq, i, j)
+        end
+
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
             x = xc - 0.5 * dx + xg[i] * dx
             y = yc - 0.5 * dy + xg[j] * dy
+            X = SVector(x, y)
             u_node = get_node_vars(u1_, eq, i, j)
             ut_node = get_node_vars(ut, eq, i, j)
 
@@ -401,6 +420,16 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
             # Ub[i] += ∑_j U[i,j]*V[j]
             multiply_add_to_node_vars!(Ub, Vl[j], U_, eq, i, 3, el_x, el_y)
             multiply_add_to_node_vars!(Ub, Vr[j], U_, eq, i, 4, el_x, el_y)
+
+            st = calc_source_t_N12(up, um,
+                                   X, t, dt, source_terms, eq)
+            multiply_add_to_node_vars!(S, 0.125, st, eq, i, j)
+
+            multiply_add_to_node_vars!(S2, 1.0/6.0, st, eq, i, j, el_x, el_y)
+
+            S_node = get_node_vars(S, eq, i, j)
+
+            multiply_add_to_node_vars!(res, -dt, S_node, eq, i, j, el_x, el_y)
         end
 
         @turbo F2[:, :, :, el_x, el_y] .= F2_loc
@@ -408,7 +437,7 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
         @turbo U2[:, :, :, el_x, el_y] .= U2_loc
 
         u = @view u1[:, :, :, el_x, el_y]
-        blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, grid, dx, dy,
+        blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
                              grid.xf[el_x], grid.yf[el_y], op, u1, u, nothing, res,
                              0.5)
         @views cell_data = (u1_, el_x, el_y)
@@ -421,7 +450,7 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
     return nothing
 end
 
-function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op,
+function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, problem,
                                        scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
     @unpack nvar = eq
@@ -429,11 +458,13 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op,
     nd = length(xg)
     nx, ny = grid.size
 
+    @unpack source_terms = problem
+
     # Select boundary flux
     @unpack blend_cell_residual! = aux.blend.subroutines
     @unpack compute_bflux! = scheme.bflux
     get_dissipation_node_vars = scheme.dissipation
-    @unpack us, F2, G2, U2, Fb2, cell_arrays, eval_data = cache
+    @unpack us, F2, G2, U2, Fb2, S2, cell_arrays, eval_data = cache
     refresh!.((res, Fb, Ub)) # Reset previously used variables to zero
 
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
@@ -478,9 +509,19 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op,
             end
         end
 
+        for j in 1:nd, i in 1:nd
+            x = xc - 0.5 * dx + xg[i] * dx
+            y = yc - 0.5 * dy + xg[j] * dy
+            X = SVector(x, y)
+            u_node = get_node_vars(us, eq, i, j, el_x, el_y)
+            s_node = calc_source(u_node, X, t + 0.5 * dt, source_terms, eq)
+            multiply_add_to_node_vars!(ust, dt, s_node, eq, i, j)
+        end
+
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
             x = xc - 0.5 * dx + xg[i] * dx
             y = yc - 0.5 * dy + xg[j] * dy
+            X = SVector(x, y)
             us_node = get_node_vars(us_, eq, i, j)
             ust_node = get_node_vars(ust, eq, i, j)
 
@@ -520,6 +561,14 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op,
             multiply_add_to_node_vars!(F, 1.0 / 3.0, ft, eq, i, j)
             multiply_add_to_node_vars!(G, 1.0 / 3.0, gt, eq, i, j)
             multiply_add_to_node_vars!(U, 1.0 / 3.0, ust_node, eq, i, j)
+
+            st = calc_source_t_N34(us_node, up, upp, um, umm, X, t+0.5*dt, dt, source_terms, eq)
+
+            multiply_add_to_node_vars!(S2, 1.0/3.0, st, eq, i, j, el_x, el_y)
+
+            S_node = get_node_vars(S2, eq, i, j, el_x, el_y)
+            multiply_add_to_node_vars!(res, -dt, S_node, eq, i, j, el_x, el_y)
+
             F_node = get_node_vars(F, eq, i, j)
             for ii in Base.OneTo(nd)
                 multiply_add_to_node_vars!(res, lamx * D1[ii, i], F_node, eq,
@@ -545,7 +594,7 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op,
         end
 
         u = @view u1[:, :, :, el_x, el_y]
-        blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, grid, dx, dy,
+        blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
                              grid.xf[el_x], grid.yf[el_y], op, u1, u, nothing, res)
         cell_data = (el_x, el_y)
         @views compute_bflux!(eq, grid, cell_data, eval_data_big, xg, Vl, Vr,

@@ -13,7 +13,7 @@ boundary_value = Eq.zero_boundary_value # dummy function
 boundary_condition = (periodic, periodic)
 final_time = 2.0
 
-degree = 4
+degree = 3
 solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
@@ -21,7 +21,7 @@ bflux = evaluate
 numerical_flux = Eq.rusanov
 bound_limit = "no"
 
-nx = 1600
+nx = 200
 cfl = 0.0
 bounds = ([-0.2], [0.2])
 tvbM = 0.0
