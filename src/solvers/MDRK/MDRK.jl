@@ -67,7 +67,7 @@ end
 # N = degree of solution space
 #-------------------------------------------------------------------------------
 function solve_mdrk(eq, problem, scheme, param, grid, op, aux, cache)
-    println("Solving ", eq.name, " using LWFR")
+    println("Solving ", eq.name, " using MDRK")
 
     @unpack final_time = problem
     @unpack grid_size, cfl, compute_error_interval = param
