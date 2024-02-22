@@ -11,7 +11,7 @@ boundary_condition = (neumann, neumann, neumann, neumann)
 γ = 1.4
 equation = Eq.get_equation(γ)
 function riemann_problem_pan_1(x, y)
-    p0 = 1.0
+    p0 = 0.3
     Eq.riemann_problem(x, y, equation,
                        (1.0,  0.75, -0.5, p0),
                        (2.0,  0.75,  0.5, p0),
@@ -24,12 +24,12 @@ rieman_problem_(x, y, t) = riemann_problem(x, y)
 initial_value = riemann_problem
 
 exact_solution = rieman_problem_
-degree = 4
-solver = "lwfr"
+degree = 3
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
-bound_limit = "no"
+bound_limit = "yes"
 bflux = evaluate
 final_time = 0.25
 
@@ -60,7 +60,8 @@ scheme = Scheme(solver, degree, solution_points, correction_function,
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
                    animate = animate,
-                   cfl_safety_factor = cfl_safety_factor)
+                   cfl_safety_factor = cfl_safety_factor,
+                   saveto = "mdrk_results/output_hurricane_rp2d_2p0_03")
 #------------------------------------------------------------------------------
 problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
                                           ARGS)

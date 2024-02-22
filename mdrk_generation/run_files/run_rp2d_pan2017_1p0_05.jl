@@ -11,7 +11,7 @@ boundary_condition = (neumann, neumann, neumann, neumann)
 γ = 1.4
 equation = Eq.get_equation(γ)
 function riemann_problem_pan_1(x, y)
-    p0 = 1.0
+    p0 = 0.5
     Eq.riemann_problem(x, y, equation,
                        (1.0, -0.75, -0.5, p0),
                        (2.0, -0.75,  0.5, p0),
@@ -61,7 +61,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
                    animate = animate,
                    cfl_safety_factor = cfl_safety_factor,
-                   saveto = "mdrk_results/output_hurricane_rp2d_1")
+                   saveto = "mdrk_results/output_hurricane_rp2d_1p0_05")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 
