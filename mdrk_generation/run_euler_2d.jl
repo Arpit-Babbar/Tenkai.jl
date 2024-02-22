@@ -47,3 +47,4 @@ for test in (
         my_trixi_include(test, "mdrk", blend_type, cfl_safety_factor = cfl_safety_factor)
     end
 end
+
