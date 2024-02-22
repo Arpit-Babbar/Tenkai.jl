@@ -22,7 +22,7 @@ function initial_value_high_density(x)
     end
     return SVector(rho, rho * v, p / (γ - 1.0) + 0.5 * rho * v^2)
 end
-initial_value = initial_value_high_density
+initial_value = Eq.initial_value_larger_density
 exact_solution = Eq.exact_solution_shuosher # Dummy function
 
 degree = 3
@@ -54,9 +54,11 @@ domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value,
                   boundary_condition, final_time, exact_solution)
 equation = Eq.get_equation(γ)
-limiter = setup_limiter_blend(blend_type = mh_blend(equation),
-                              # indicating_variables = Eq.rho_p_indicator!,
+FO = fo_blend(equation)
+MH = mh_blend(equation)
+limiter = setup_limiter_blend(blend_type = FO,
                               indicating_variables = Eq.rho_p_indicator!,
+                            #   indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = indicator_model,
                               constant_node_factor = 1.0,
@@ -72,7 +74,8 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval;
                    animate = animate,
                    cfl_safety_factor = cfl_safety_factor,
-                   time_scheme = "SSPRK54")
+                   time_scheme = "SSPRK54",
+                   saveto = "none")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 

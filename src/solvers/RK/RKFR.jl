@@ -45,8 +45,8 @@ function compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, t,
                                 dt, iter, fcount, cache, u1, Fb, ub, ua, res)
     pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme, param,
                          aux, op, u1, ua)
-    compute_cell_residual_rkfr!(eq, grid, op, scheme, aux, t, dt, u1, res, Fb,
-                                ub, cache)
+    compute_cell_residual_rkfr!(eq, grid, op, problem, scheme, aux, t, dt, u1,
+                                res, Fb, ub, cache)
     update_ghost_values_rkfr!(problem, scheme, eq, grid, aux, op, cache, t)
     compute_face_residual!(eq, grid, op, scheme, param, aux, t, dt, u1,
                            Fb, ub, ua, res)

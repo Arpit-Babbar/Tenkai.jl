@@ -233,7 +233,7 @@ end
 # res = D1*F_δ + gL'*Fn_L + gR'*Fn_R + G_δ*D1T + gL'*Fn_D + gR'*Fn_U.
 # The D1 part is the cell residual, which we compute here.
 
-function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, scheme,
+function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem, scheme,
                                      aux, t, dt, u1, res, Fb, ub, cache)
     @unpack timer = aux
     @timeit aux.timer "Cell residual" begin
@@ -285,7 +285,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, scheme,
             multiply_add_to_node_vars!(ub_, Vl[j], u_node, eq, i, 3)
             multiply_add_to_node_vars!(ub_, Vr[j], u_node, eq, i, 4)
         end
-        blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, grid, dx, dy,
+        blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
                              grid.xf[el_x], grid.yf[el_y], op, u1, u,
                              nothing, res)
 

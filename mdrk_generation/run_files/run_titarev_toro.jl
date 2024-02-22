@@ -3,27 +3,18 @@ using Tenkai
 using Plots
 # Submodules
 Eq = Tenkai.EqEuler1D
-plotlyjs() # Set backend
+gr() # Set backend
 
 #------------------------------------------------------------------------------
-xmin, xmax = 0.0, 1.0
+xmin, xmax = -5.0, 5.0
 
 boundary_value = Eq.dummy_zero_boundary_value # dummy function
 boundary_condition = (neumann, neumann)
 γ = 1.4
-final_time = 0.15
+final_time = 5.0
 
-function initial_value_high_density(x)
-    γ = 1.4
-    if x < 0.3
-        rho, v, p = 1000.0, 0.0, 1000.0
-    else
-        rho, v, p = 1.0, 0.0, 1.0
-    end
-    return SVector(rho, rho * v, p / (γ - 1.0) + 0.5 * rho * v^2)
-end
-initial_value = initial_value_high_density
-exact_solution = Eq.exact_solution_shuosher # Dummy function
+initial_value = Eq.initial_value_titarev_toro
+exact_solution = Eq.dummy_zero_boundary_value # Dummy function
 
 degree = 3
 solver = "mdrk"
@@ -33,12 +24,12 @@ numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
 
-nx = 500
+nx = 800
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 300.0
 save_iter_interval = 0
-save_time_interval = 0.0 * final_time
+save_time_interval = 0.0
 animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
 
@@ -54,9 +45,11 @@ domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value,
                   boundary_condition, final_time, exact_solution)
 equation = Eq.get_equation(γ)
-limiter = setup_limiter_blend(blend_type = mh_blend(equation),
-                              # indicating_variables = Eq.rho_p_indicator!,
+FO = fo_blend(equation)
+MH = mh_blend(equation)
+limiter = setup_limiter_blend(blend_type = MH,
                               indicating_variables = Eq.rho_p_indicator!,
+                            #   indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = indicator_model,
                               constant_node_factor = 1.0,
@@ -72,7 +65,8 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval;
                    animate = animate,
                    cfl_safety_factor = cfl_safety_factor,
-                   time_scheme = "SSPRK54")
+                   time_scheme = "SSPRK54",
+                   saveto = "none")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 

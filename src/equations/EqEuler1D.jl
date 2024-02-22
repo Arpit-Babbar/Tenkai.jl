@@ -332,6 +332,16 @@ function initial_value_titarev_toro(x)
     return SVector(rho, rho * v, p / (γ - 1.0) + 0.5 * rho * v^2)
 end
 
+function initial_value_larger_density(x)
+    γ = 1.4
+    if x < 0.3
+        rho, v, p = 1000.0, 0.0, 1000.0
+    else
+        rho, v, p = 1.0, 0.0, 1.0
+    end
+    return SVector(rho, rho * v, p / (γ - 1.0) + 0.5 * rho * v^2)
+end
+
 initial_values = Dict{String, Function}()
 for data in [lax_data, sod_data, toro5_data, dwave_data]
     initial_value, exact_solution, final_time, name = data
@@ -342,6 +352,7 @@ initial_values["blast"], initial_values["shuosher"] = blast, shuosher
 initial_values["double_rarefaction"] = double_rarefaction_iv
 initial_values["leblanc"] = leblanc_iv
 initial_values["titarev_toro"] = initial_value_titarev_toro
+initial_values["larger_density"] = initial_value_larger_density
 #-------------------------------------------------------------------------------
 # Numerical Fluxes
 #-------------------------------------------------------------------------------
@@ -1144,6 +1155,8 @@ function exact_solution_data(test_case)
             exact_data[i, 3:4] .= 1.0
         end
     elseif test_case == "titarev_toro"
+        exact_data = readdlm("$data_dir/$test_case.txt", skipstart = 0)
+    elseif test_case == "larger_density"
         exact_data = readdlm("$data_dir/$test_case.txt", skipstart = 0)
     else
         @warn "Exact solution does not set!"

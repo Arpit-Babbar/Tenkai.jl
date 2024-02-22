@@ -24,8 +24,8 @@ rieman_problem_(x, y, t) = riemann_problem(x, y)
 initial_value = riemann_problem
 
 exact_solution = rieman_problem_
-degree = 4
-solver = "lwfr"
+degree = 3
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
@@ -61,9 +61,6 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
                    animate = animate,
                    cfl_safety_factor = cfl_safety_factor)
-#------------------------------------------------------------------------------
-problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
-                                          ARGS)
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 
