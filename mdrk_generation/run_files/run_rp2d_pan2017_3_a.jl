@@ -12,10 +12,10 @@ boundary_condition = (neumann, neumann, neumann, neumann)
 equation = Eq.get_equation(γ)
 function riemann_problem_pan_1(x, y)
     Eq.riemann_problem(x, y, equation,
-                       (1.0,  0.0312, 0.0312, 0.5),
-                       (0.927,  -0.0312,  0.0312, 0.45),
-                       (1.0, -0.0312,  -0.0312, 0.5),
-                       (0.927, 0.0312, -0.0312, 0.45))
+                       (1.0,  0.6233, 0.6233, 1.5),
+                       (0.389,  -0.6233,  0.6233, 0.4),
+                       (1.0, -0.6233,  -0.6233, 1.5),
+                       (0.389, 0.6233, -0.6233, 0.4))
 end
 
 riemann_problem(x, y) = riemann_problem_pan_1(x, y)
@@ -32,7 +32,7 @@ bound_limit = "yes"
 bflux = evaluate
 final_time = 0.35
 
-nx, ny = 250, 250 # 50, 50
+nx, ny = 200, 200 # 50, 50
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 300.0
@@ -60,7 +60,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
                    animate = animate,
                    cfl_safety_factor = cfl_safety_factor,
-                   saveto = "mdrk_results/output_hurricane_rp2d_3b")
+                   saveto = "mdrk_results/output_rp2d_3a")
 
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);

@@ -63,6 +63,6 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    saveto = "mdrk_results/output_hurricane_rp2d_4")
 
 #------------------------------------------------------------------------------
-sol = Tenkai.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param)
 
 return sol["errors"]
