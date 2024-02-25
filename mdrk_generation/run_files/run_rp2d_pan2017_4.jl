@@ -60,7 +60,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
                    animate = animate,
                    cfl_safety_factor = cfl_safety_factor,
-                   saveto = "mdrk_results/output_hurricane_rp2d_4")
+                   saveto = "mdrk_results/output_rp2d_4")
 
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param)
