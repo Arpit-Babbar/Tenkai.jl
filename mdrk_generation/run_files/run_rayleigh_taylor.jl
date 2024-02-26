@@ -2,52 +2,71 @@
 using Tenkai
 using StaticArrays
 Eq = Tenkai.EqEuler2D
+using Tenkai.EqEuler2D: hllc_bc
 #------------------------------------------------------------------------------
-xmin, xmax = -2.0, 2.0
-ymin, ymax = -2.0, 2.0
+xmin, xmax = 0.0, 0.25
+ymin, ymax = 0.0,  1.0
 
-boundary_value = (x, t) -> 0.0 # dummy function
-boundary_condition = (neumann, neumann, neumann, neumann)
-γ = 2.0
+boundary_condition = (reflect, reflect, hllc_bc, dirichlet)
+γ = 5.0/3.0
 equation = Eq.get_equation(γ)
-
-function hurricane_initial_solution(x, y)
-    A = 25.0
-    gamma = 2.0
-    gamma_minus_1 = gamma - 1.0
-    theta = atan(y, x)
-    r = sqrt(x^2 + y^2)
-    rho = 1.0
-    v0 = 7.5 # Choices - (10, 12.5, 7.5) which give M0 as (√2, >√2, <√2)
-    p = A * rho ^ gamma
-
-    v1 =  v0 * sin(theta)
-    v2 = -v0 * cos(theta)
-
+function initial_condition_rayleigh_taylor(x, y)
+    gamma = 5.0/3.0
+    if y <= 0.5
+        rho = 2.0
+        p = 2.0 * y + 1.0
+        c  = sqrt(gamma * p / rho)
+        v1 = 0.0
+        v2 = -0.025 * c * cospi(8.0*x)
+    else
+        rho = 1.0
+        p = 1.5 + y
+        c  = sqrt(gamma * p / rho)
+        v1 = 0.0
+        v2 = -0.025 * c * cospi(8.0*x)
+    end
     rho_v1 = rho * v1
     rho_v2 = rho * v2
+    gamma_minus_1 = gamma - 1.0
     rho_e = p / gamma_minus_1 + 0.5 * (rho_v1 * v1 + rho_v2 * v2)
     return SVector(rho, rho_v1, rho_v2, rho_e)
 end
 
-initial_value = hurricane_initial_solution
+# Used to set the top and bottom boundary conditions
+function boundary_condition_rayleigh_taylor(x, y, t)
+    gamma = 5.0/3.0
+    if y <= 0.5
+        rho, v1, v2, p = (2.0, 0.0, 0.0, 1.0)
+    else
+        rho, v1, v2, p = (1.0, 0.0, 0.0, 2.5)
+    end
+    rho_v1 = rho * v1
+    rho_v2 = rho * v2
+    gamma_minus_1 = gamma - 1.0
+    rho_e = p / gamma_minus_1 + 0.5 * (rho_v1 * v1 + rho_v2 * v2)
+    return SVector(rho, rho_v1, rho_v2, rho_e)
+end
 
-exact_solution = (x,y,t) -> hurricane_initial_solution(x,y) # Dummy
-degree = 4
-solver = "lwfr"
+initial_value = initial_condition_rayleigh_taylor
+
+source_terms_rayleigh_taylor(u, x, t, eq) = SVector(0.0, 0.0, u[1], u[3])
+
+exact_solution = boundary_condition_rayleigh_taylor
+degree = 3
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
-final_time = 0.045
+final_time = 2.5
 
-nx, ny = 400, 400 # 50, 50
+nx, ny = 100, 400 # 50, 50
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 300.0
 save_iter_interval = 0
-save_time_interval = final_time / 30.0
+save_time_interval = final_time / 100.0
 animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 1
 
@@ -56,8 +75,8 @@ cfl_safety_factor = 0.98
 #------------------------------------------------------------------------------
 grid_size = [nx, ny]
 domain = [xmin, xmax, ymin, ymax]
-problem = Problem(domain, initial_value, boundary_value, boundary_condition,
-                  final_time, exact_solution)
+problem = Problem(domain, initial_value, boundary_condition_rayleigh_taylor, boundary_condition,
+                  final_time, exact_solution, source_terms = source_terms_rayleigh_taylor)
 limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               indicating_variables = Eq.rho_p_indicator!,
                               reconstruction_variables = conservative_reconstruction,
@@ -70,7 +89,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
                    animate = animate,
                    cfl_safety_factor = cfl_safety_factor,
-                   saveto = "mdrk_results/output_hurricane_v0low")
+                   saveto = "mdrk_results/output_rayleigh_taylor")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 
