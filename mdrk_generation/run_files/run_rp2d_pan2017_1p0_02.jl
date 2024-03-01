@@ -33,7 +33,7 @@ bound_limit = "no"
 bflux = evaluate
 final_time = 0.35
 
-nx, ny = 800, 800 # 50, 50
+nx, ny = 1024, 1024 # 50, 50
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 300.0

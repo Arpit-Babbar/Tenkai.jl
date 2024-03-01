@@ -3,7 +3,6 @@ using Tenkai: base_dir
 using Trixi: trixi_include
 using DelimitedFiles
 
-
 function bf2str(bflux)
     if bflux == evaluate
         return "EA"
@@ -56,6 +55,10 @@ trixi_convergence("burg1d", "mdrk", nx_array, bflux = extrapolate)
 trixi_convergence("burg1d", "lwfr", nx_array, bflux = evaluate)
 trixi_convergence("burg1d", "lwfr", nx_array, bflux = extrapolate)
 
+# rkfr
+
+trixi_convergence("burg1d", "rkfr", nx_array, bflux = evaluate)
+
 ## gll, g2
 # Diss = 1
 trixi_convergence("burg1d", "mdrk", nx_array, bflux = evaluate,
@@ -73,6 +76,9 @@ trixi_convergence("burg1d", "mdrk", nx_array, bflux = extrapolate, points = "gll
 trixi_convergence("burg1d", "lwfr", nx_array, bflux = evaluate, points = "gll", corr = "g2")
 trixi_convergence("burg1d", "lwfr", nx_array, bflux = extrapolate, points = "gll", corr = "g2")
 
+# RKFR
+trixi_convergence("burg1d", "rkfr", nx_array, bflux = evaluate, points = "gll", corr = "g2")
+
 ## gl, radau
 # Diss = 1
 trixi_convergence("linadv1d", "mdrk", nx_array, bflux = extrapolate, diss = "1")
@@ -81,6 +87,9 @@ trixi_convergence("linadv1d", "lwfr", nx_array, bflux = extrapolate, diss = "1")
 # Diss = 2
 trixi_convergence("linadv1d", "mdrk", nx_array, bflux = extrapolate)
 trixi_convergence("linadv1d", "lwfr", nx_array, bflux = extrapolate)
+
+# RKFR
+trixi_convergence("linadv1d", "rkfr", nx_array, bflux = evaluate)
 
 ## gll, g2
 # Diss = 1
@@ -94,6 +103,9 @@ trixi_convergence("linadv1d", "lwfr", nx_array, bflux = extrapolate,
 trixi_convergence("linadv1d", "mdrk", nx_array, bflux = extrapolate, points = "gll", corr = "g2")
 trixi_convergence("linadv1d", "lwfr", nx_array, bflux = extrapolate, points = "gll", corr = "g2")
 
+# rkfr
+
+trixi_convergence("linadv1d", "rkfr", nx_array, points = "gll", corr = "g2")
 
 ### Variable Advection
 # Diss = 1
@@ -107,3 +119,7 @@ trixi_convergence("or2", "mdrk", nx_array, bflux = evaluate)
 trixi_convergence("or2", "mdrk", nx_array, bflux = extrapolate)
 trixi_convergence("or2", "lwfr", nx_array, bflux = evaluate)
 trixi_convergence("or2", "lwfr", nx_array, bflux = extrapolate)
+
+# RKFR
+trixi_convergence("or2", "rkfr", nx_array, bflux = evaluate)
+

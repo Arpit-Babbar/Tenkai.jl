@@ -45,7 +45,10 @@ domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value,
                   boundary_condition, final_time, exact_solution)
 equation = Eq.get_equation(γ)
-limiter = setup_limiter_blend(blend_type = mh_blend(equation),
+tvb = setup_limiter_tvb(equation; tvbM = tvbM)
+MH = mh_blend(equation)
+FO = fo_blend(equation)
+blend = setup_limiter_blend(blend_type = MH,
                               # indicating_variables = Eq.rho_p_indicator!,
                               indicating_variables = Eq.rho_p_indicator!,
                               reconstruction_variables = conservative_reconstruction,
@@ -53,9 +56,7 @@ limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               debug_blend = debug_blend,
                               pure_fv = pure_fv,
                               numflux = Eq.rusanov)
-# limiter = setup_limiter_tvb(equation; tvbM = tvbM)
-# limiter = setup_limiter_hierarchical(alpha = 1.0,
-#                                      reconstruction = characteristic_reconstruction)
+limiter = blend # To enable using trixi_include
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux, diss)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,

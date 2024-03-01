@@ -50,7 +50,8 @@ scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux, diss)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
-                   animate = animate, saveto = "none")
+                   animate = animate, saveto = "none",
+                   time_scheme = "SSPRK54")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 
