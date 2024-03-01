@@ -7,7 +7,7 @@ xmin, xmax = -0.5, 1.5
 ymin, ymax = -0.5, 1.5
 
 boundary_value = (x, t) -> 0.0 # dummy function
-boundary_condition = (neumann, neumann, neumann, neumann)
+boundary_condition = (periodic, periodic, periodic, periodic)
 γ = 1.4
 equation = Eq.get_equation(γ)
 function riemann_problem_pan_1(x, y)
@@ -32,14 +32,14 @@ bound_limit = "yes"
 bflux = evaluate
 final_time = 0.35
 
-nx, ny = 800, 800 # 50, 50
+nx, ny = 1024, 1024 # 50, 50
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 300.0
 save_iter_interval = 0
 save_time_interval = final_time / 30.0
 animate = true # Factor on save_iter_interval or save_time_interval
-compute_error_interval = 1
+compute_error_interval = 0
 
 cfl_safety_factor = 0.9
 
@@ -48,10 +48,11 @@ grid_size = [nx, ny]
 domain = [xmin, xmax, ymin, ymax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
-limiter = setup_limiter_blend(blend_type = mh_blend(equation),
+limiter = setup_limiter_blend(blend_type = fo_blend(equation),
                               indicating_variables = Eq.rho_p_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner",
+			      amax = 1.0,
                               debug_blend = false)
 # limiter = setup_limiter_tvb(equation; tvbM = tvbM)
 scheme = Scheme(solver, degree, solution_points, correction_function,
@@ -66,3 +67,4 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 sol = Tenkai.solve(equation, problem, scheme, param)
 
 return sol["errors"]
+
