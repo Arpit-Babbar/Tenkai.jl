@@ -65,3 +65,24 @@ If you have a 4 core CPU, you can use 4 threads by starting REPL as
 ```shell
 julia --project=. --threads=4
 ```
+
+
+# Refer us!
+
+If you use these codes for your research work, please cite us as
+
+```bibtex
+@article{Babbar2024,
+  title = {Admissibility Preserving Subcell Limiter for Lax–Wendroff Flux Reconstruction},
+  volume = {99},
+  ISSN = {1573-7691},
+  url = {http://dx.doi.org/10.1007/s10915-024-02482-9},
+  DOI = {10.1007/s10915-024-02482-9},
+  number = {2},
+  journal = {Journal of Scientific Computing},
+  publisher = {Springer Science and Business Media LLC},
+  author = {Babbar,  Arpit and Kenettinkara,  Sudarshan Kumar and Chandrashekar,  Praveen},
+  year = {2024},
+  month = mar 
+}
+```
