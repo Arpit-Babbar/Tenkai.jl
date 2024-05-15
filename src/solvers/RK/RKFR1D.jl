@@ -141,7 +141,7 @@ function update_ghost_values_rkfr!(problem, scheme, eq::AbstractEquations{1},
 end
 
 #------------------------------------------------------------------------------
-function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op,
+function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem,
                                      scheme, aux, t, dt, u1, res, Fb, ub, cache)
     @timeit aux.timer "Cell residual" begin
     #! format: noindent
@@ -189,7 +189,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op,
         end
         u = @view u1[:, :, cell]
         r = @view res[:, :, cell]
-        blend.blend_cell_residual!(cell, eq, scheme, aux, lamx, dt, dx,
+        blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
                                    grid.xf[cell], op, u1, u, cache.ua, f, r)
     end
     end # timer

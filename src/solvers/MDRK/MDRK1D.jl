@@ -15,6 +15,10 @@ using StaticArrays
 
 import Tenkai.FR: setup_arrays_mdrk
 
+using Tenkai.LWFR: calc_source, calc_source_t_N12, calc_source_t_N34,
+                   calc_source_tt_N23, calc_source_tt_N4, calc_source_ttt_N34,
+                   calc_source_tttt_N4
+
 using ..FR: @threaded, alloc_for_threads
 using ..Equations: AbstractEquations, nvariables, eachvariable
 
@@ -36,6 +40,7 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{1})
     u1 = gArray(nvar, nd, nx)
     F2 = zeros(nvar, nd, nx)
     U2 = zeros(nvar, nd, nx)
+    S2 = zeros(nvar, nd, nx)
     us = gArray(nvar, nd, nx)
     ua = gArray(nvar, nx)
     res = gArray(nvar, nd, nx)
@@ -66,14 +71,14 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{1})
     MArr = MArray{Tuple{nvariables(eq), 1}, Float64}
     eval_data = alloc_for_threads(MArr, eval_data_size)
 
-    cache = (; u1, U2, F2, ua, us, res, Fb, Fb2, Ub, Ub2, cell_data, eval_data)
+    cache = (; u1, U2, F2, S2, ua, us, res, Fb, Fb2, Ub, Ub2, cell_data, eval_data)
     return cache
 end
 
 #-------------------------------------------------------------------------------
 # Compute cell residual for degree=3 case and for all real cells
 #-------------------------------------------------------------------------------
-function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op,
+function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op, problem,
                                        scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
     @unpack xg, wg, Dm, D1, Vl, Vr = op
@@ -83,9 +88,11 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op,
     @unpack blend = aux
     refresh!(u) = fill!(u, 0.0)
 
-    @unpack F2, U2, Fb2, Ub2, cell_data, eval_data = cache
+    @unpack source_terms = problem
 
-    F, U, F2_loc, U2_loc, ut = cell_data[Threads.threadid()]
+    @unpack F2, U2, S2, Fb2, Ub2, cell_data, eval_data = cache
+
+    F, U, F2_loc, U2_loc, S, ut = cell_data[Threads.threadid()]
 
     refresh!.((res, Fb, Fb2, Ub, Ub2))
 
@@ -110,6 +117,16 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op,
             end
             set_node_vars!(U, 0.5 * u_node, eq, i)
             set_node_vars!(U2_loc, u_node, eq, i)
+        end
+
+        # Add source term contribution to ut and some to S
+        for i in 1:nd
+            x_ = xc - 0.5 * dx + xg[i] * dx
+            u_node = get_node_vars(u1, eq, i, cell)
+            s_node = calc_source(u_node, x_, t, source_terms, eq)
+            set_node_vars!(S,  0.5 * s_node, eq, i)
+            set_node_vars!(S2, s_node, eq, i, cell)
+            multiply_add_to_node_vars!(ut, dt, s_node, eq, i)
         end
 
         # computes and stores ft, gt and puts them in respective place
@@ -147,7 +164,17 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op,
             multiply_add_to_node_vars!(U, 0.125, ut_node, eq, i) # U += 0.125*dt*ut
             multiply_add_to_node_vars!(F2_loc, 1.0 / 6.0, ft, eq, i) # F2 += 1/6 * dt*ft
             multiply_add_to_node_vars!(U2_loc, 1.0 / 6.0, ut_node, eq, i) # U2 += 1/6 * dt*ut
+
+            st = calc_source_t_N34(u_node, up, upp, um, umm, x_, t, dt, source_terms, eq)
+            multiply_add_to_node_vars!(S, 0.125, st, eq, i)
+
+            S_node = get_node_vars(S, eq, i)
+            multiply_add_to_node_vars!(res, -dt, S_node, eq, i, cell)
+
+            multiply_add_to_node_vars!(S2, 1.0/6.0, st, eq, i, cell)
         end
+
+
         for i in 1:nd # Loop over solution points
             F_node = get_node_vars(F, eq, i)
             for ix in 1:nd # utt[n] = -lamx * Dm * ft[n] for each n=1:nvar
@@ -157,7 +184,7 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op,
         end
         u = @view u1[:, :, cell]
         r = @view res[:, :, cell]
-        blend.blend_cell_residual!(cell, eq, scheme, aux, lamx, dt, dx,
+        blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
                                    grid.xf[cell], op, u1, u, cache.ua, nothing, r,
                                    0.5)
         # Interpolate to faces
@@ -206,7 +233,7 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op,
     return nothing
 end
 
-function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op,
+function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op, problem,
                                        scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
     @unpack xg, wg, Dm, D1, Vl, Vr = op
@@ -217,7 +244,9 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op,
     @unpack blend = aux
     refresh!(u) = fill!(u, 0.0)
 
-    @unpack U2, F2, Fb2, cell_data, eval_data = cache
+    @unpack source_terms = problem
+
+    @unpack U2, F2, S2, Fb2, cell_data, eval_data = cache
 
     F, U, ust = cell_data[Threads.threadid()]
 
@@ -244,17 +273,25 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op,
             end
         end
 
+        # Add source term contribution to ust
+        for i in 1:nd
+            x_ = xc - 0.5 * dx + xg[i] * dx
+            u_node = get_node_vars(us, eq, i, cell)
+            s_node = calc_source(u_node, x_, t + 0.5 * dt, source_terms, eq)
+            multiply_add_to_node_vars!(ust, dt, s_node, eq, i)
+        end
+
         # computes and stores ft, gt and puts them in respective place
         for i in Base.OneTo(nd) # Loop over solution points
             x_ = xc - 0.5 * dx + xg[i] * dx
 
-            us_node = get_node_vars(us, eq, i, cell)
+            us_node = get_node_vars(us, eq, i, cell) # u(t+0.5*dt)
             ust_node = get_node_vars(ust, eq, i)
 
-            um = us_node - ust_node
-            up = us_node + ust_node
-            umm = us_node - 2.0 * ust_node
-            upp = us_node + 2.0 * ust_node
+            um = us_node - ust_node # u(t - 0.5*dt)
+            up = us_node + ust_node # u(t + 1.5*dt)
+            umm = us_node - 2.0 * ust_node # u(t - 2.0*dt)
+            upp = us_node + 2.0 * ust_node # u(t + 3.5*dt)
             fm = flux(x_, um, eq)
             fp = flux(x_, up, eq)
             fmm = flux(x_, umm, eq)
@@ -277,6 +314,13 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op,
             multiply_add_to_node_vars!(F, 1.0 / 3.0, ft_s, eq, i)    # F += 1/3 *dt*ft
 
             multiply_add_to_node_vars!(U, 1.0 / 3.0, ust_node, eq, i)    # U += 1/6 * dt * ut
+
+            st = calc_source_t_N34(us_node, up, upp, um, umm, x_, t+0.5*dt, dt, source_terms, eq)
+
+            multiply_add_to_node_vars!(S2, 1.0/3.0, st, eq, i, cell)
+
+            S_node = get_node_vars(S2, eq, i, cell)
+            multiply_add_to_node_vars!(res, -dt, S_node, eq, i, cell)
         end
         for i in 1:nd # Loop over solution points
             F_node = get_node_vars(F, eq, i)
@@ -287,7 +331,7 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op,
         end
         u = @view u1[:, :, cell]
         r = @view res[:, :, cell]
-        blend.blend_cell_residual!(cell, eq, scheme, aux, lamx, dt, dx,
+        blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
                                    grid.xf[cell], op, u1, u, cache.ua, nothing, r)
         # Interpolate to faces
         for i in Base.OneTo(nd)

@@ -12,7 +12,7 @@ burg_trixi_include(solver, t) = trixi_include(
     degree = 3, final_time = t, limiter = :blend_limiter)
 
 for final_time in (2.0, 4.5, 8.0)
-    for solver in ("mdrk", "lwfr")
+    for solver in ("mdrk", "lwfr", "rkfr")
         burg_trixi_include(solver, final_time)
     end
 end

@@ -54,22 +54,26 @@ burg_figures_dir = joinpath(figures_dir, "burg1d", "convergence")
 burg_dir = joinpath(mdrk_data_dir, "burg1d")
 mkpath(burg_figures_dir)
 files_burg_bflux(corr, points) = [ # Comparing bfluxes
-joinpath(burg_dir, "lwfr3_EA_D2_$(corr)_$(points).txt"),
+joinpath(burg_dir, "rkfr3_EA_D2_$(corr)_$(points).txt"),
 joinpath(burg_dir, "mdrk3_EA_D2_$(corr)_$(points).txt"),
-joinpath(burg_dir, "lwfr3_AE_D2_$(corr)_$(points).txt"),
+# joinpath(burg_dir, "rkfr3_AE_D2_$(corr)_$(points).txt"),
 joinpath(burg_dir, "mdrk3_AE_D2_$(corr)_$(points).txt")]
 
 files_burg_diss(corr, points) = [ # Comparing dissipation
-joinpath(burg_dir, "lwfr3_EA_D2_$(corr)_$(points).txt"),
+joinpath(burg_dir, "rkfr3_EA_D2_$(corr)_$(points).txt"),
 joinpath(burg_dir, "mdrk3_EA_D2_$(corr)_$(points).txt"),
-joinpath(burg_dir, "lwfr3_EA_D1_$(corr)_$(points).txt"),
+# joinpath(burg_dir, "rkfr3_EA_D1_$(corr)_$(points).txt"),
 joinpath(burg_dir, "mdrk3_EA_D1_$(corr)_$(points).txt")]
 files_gl_bflux_compared = files_burg_bflux("radau", "gl")
 files_gll_bflux_compared = files_burg_bflux("g2", "gll")
 files_gl_diss_compared = files_burg_diss("radau", "gl")
 files_gll_diss_compared = files_burg_diss("g2", "gll")
-labels_bflux_compared = ["LW-EA", "MDRK-EA", "LW-AE", "MDRK-AE"]
-labels_diss_compared = ["LW-D2", "MDRK-D2", "LW-D1", "MDRK-D1"]
+labels_bflux_compared = ["RK", "MDRK-EA",
+                        #  "RK",
+                         "MDRK-AE"]
+labels_diss_compared = ["RK", "MDRK-D2",
+                        # "RK-D1",
+                        "MDRK-D1"]
 plot_python_ndofs_vs_y(files_gl_bflux_compared, labels_bflux_compared, title = "GL, Radau",
                        saveto = joinpath(burg_figures_dir, "bflux_compared_gl"))
 plot_python_ndofs_vs_y(files_gll_bflux_compared, labels_bflux_compared, title = "GLL, \$ g_2 \$",
@@ -82,15 +86,17 @@ plot_python_ndofs_vs_y(files_gll_diss_compared, labels_diss_compared, title = "G
 linadv_dir = joinpath(mdrk_data_dir, "linadv1d")
 linadv1d_figures_dir = joinpath(figures_dir, "linadv1d", "convergence")
 mkpath(linadv1d_figures_dir)
-files_linadv_diss(corr, points) = [joinpath(linadv_dir, "lwfr3_AE_D2_$(corr)_$(points).txt"),
+files_linadv_diss(corr, points) = [joinpath(linadv_dir, "rkfr3_EA_D2_$(corr)_$(points).txt"),
                                    joinpath(linadv_dir, "mdrk3_AE_D2_$(corr)_$(points).txt"),
-                                   joinpath(linadv_dir, "lwfr3_AE_D1_$(corr)_$(points).txt"),
+                                #    joinpath(linadv_dir, "lwfr3_AE_D1_$(corr)_$(points).txt"),
                                    joinpath(linadv_dir, "mdrk3_AE_D1_$(corr)_$(points).txt")]
 files_gl = files_linadv_diss("radau", "gl")
 files_gll = files_linadv_diss("g2", "gll")
 files_gl_gll = vcat(files_gl, files_gll)
 
-labels = ["LW-D2", "MDRK-D2", "LW-D1", "MDRK-D1"]
+labels = ["RK", "MDRK-D2",
+        #   "LW-D1",
+          "MDRK-D1"]
 plot_python_ndofs_vs_y(files_gl, labels, title = "GL, Radau",
                        saveto = joinpath(linadv1d_figures_dir, "lw_mdrk_gl"),
                        theo_factor_even = 0.6)
@@ -103,16 +109,17 @@ plot_python_ndofs_vs_y(files_gll, labels, title = "GLL, \$g_2\$",
 or2_dir = joinpath(mdrk_data_dir, "or2")
 or2_figures_dir = joinpath(figures_dir, "or2", "convergence")
 mkpath(or2_figures_dir)
-files_varadv_diss(bflux) = [joinpath(or2_dir, "lwfr3_$(bflux)_D2_radau_gl.txt"),
-                                   joinpath(or2_dir, "mdrk3_$(bflux)_D2_radau_gl.txt"),
-                                   joinpath(or2_dir, "lwfr3_$(bflux)_D1_radau_gl.txt"),
-                                   joinpath(or2_dir, "mdrk3_$(bflux)_D1_radau_gl.txt")]
+files_varadv_diss(bflux) = [joinpath(or2_dir, "rkfr3_EA_D2_radau_gl.txt"),
+                            joinpath(or2_dir, "mdrk3_$(bflux)_D2_radau_gl.txt"),
+                            # joinpath(or2_dir, "lwfr3_$(bflux)_D1_radau_gl.txt"),
+                            joinpath(or2_dir, "mdrk3_$(bflux)_D1_radau_gl.txt")
+                            ]
 files_AE = files_varadv_diss("AE")
 
-labels_AE = ["LW-D2-AE", "MDRK-D2-AE", "LW-D1-AE", "MDRK-D1-AE"]
+labels_AE = ["RK", "MDRK-D2-AE", "MDRK-D1-AE"]
 
 files_EA = files_varadv_diss("EA")
-labels_EA = ["LW-D2-EA", "MDRK-D2-EA", "LW-D1-EA", "MDRK-D1-EA"]
+labels_EA = ["RK", "MDRK-D2-EA", "MDRK-D1-EA"]
 plot_python_ndofs_vs_y(files_AE, labels_AE, title = "GL, Radau",
                        saveto = joinpath(or2_figures_dir, "lw_mdrk_AE"),
                        theo_factor_even = 0.6)

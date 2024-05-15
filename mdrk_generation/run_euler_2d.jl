@@ -14,16 +14,11 @@ function my_trixi_include(test, solver, blend_type = :MH; kwargs...)
     kwargs...)
 end
 
-for test in ("blast", "sedov1d")
-    # TVB limiter
-    my_trixi_include(test, "mdrk"; limiter = :tvb,
-                     saveto = joinpath(mdrk_data_dir, "output_$(test)_$(solver)_tvb"))
-    # Blending limiter
-    for blend_type in (:MH, :FO)
-        my_trixi_include(test, "mdrk"; limiter = :blend, blend_type = blend_type,
-                         saveto = joinpath(mdrk_data_dir, "output_$(test)_$(solver)_blend_$(blend_type)"))
-    end
-end
+# for test in ("blast", "double_rarefaction", "leblanc", "sedov1d", "shuosher")
+#     for solver in ("mdrk", "lwfr")
+#         my_trixi_include(test, solver)
+#     end
+# end
 
 # New results
 
@@ -52,3 +47,4 @@ for test in (
         my_trixi_include(test, "mdrk", blend_type, cfl_safety_factor = cfl_safety_factor)
     end
 end
+

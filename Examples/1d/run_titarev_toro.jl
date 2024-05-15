@@ -3,7 +3,7 @@ using Tenkai
 using Plots
 # Submodules
 Eq = Tenkai.EqEuler1D
-plotlyjs() # Set backend
+gr() # Set backend
 
 #------------------------------------------------------------------------------
 xmin, xmax = -5.0, 5.0
@@ -11,20 +11,20 @@ xmin, xmax = -5.0, 5.0
 boundary_value = Eq.dummy_zero_boundary_value # dummy function
 boundary_condition = (neumann, neumann)
 γ = 1.4
-final_time = 1.8
+final_time = 5.0
 
-initial_value = Eq.shuosher
-exact_solution = Eq.exact_solution_shuosher # Dummy function
+initial_value = Eq.initial_value_titarev_toro
+exact_solution = Eq.dummy_zero_boundary_value # Dummy function
 
 degree = 3
-solver = "lwfr"
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
 
-nx = 400
+nx = 800
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 300.0
@@ -36,7 +36,7 @@ compute_error_interval = 0
 # blend parameters
 indicator_model = "gassner"
 debug_blend = false
-cfl_safety_factor = 0.95
+cfl_safety_factor = 0.9
 pure_fv = false
 
 #------------------------------------------------------------------------------
@@ -46,8 +46,8 @@ problem = Problem(domain, initial_value, boundary_value,
                   boundary_condition, final_time, exact_solution)
 equation = Eq.get_equation(γ)
 limiter = setup_limiter_blend(blend_type = mh_blend(equation),
-                              # indicating_variables = Eq.rho_p_indicator!,
                               indicating_variables = Eq.rho_p_indicator!,
+                            #   indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = indicator_model,
                               constant_node_factor = 1.0,

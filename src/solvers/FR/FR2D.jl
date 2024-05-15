@@ -16,7 +16,7 @@ using LinearAlgebra: lmul!, mul!
 
 import Trixi
 
-using ..FR: refresh!, EmptyZeros, calc_source
+using ..FR: refresh!, EmptyZeros, calc_source, hllc_bc
 
 using ..Tenkai: fr_dir, lwfr_dir, rkfr_dir, eq_dir
 
@@ -229,8 +229,8 @@ function compute_cell_average!(ua, u1, t, eq::AbstractEquations{2}, grid,
             set_node_vars!(ua, ua_node, eq, el_x, ny + 1)
         end
     else
-        if bottom in (reflect, neumann, dirichlet)
-            if bottom == dirichlet
+        if bottom in (reflect, neumann, dirichlet, hllc_bc)
+            if bottom in (dirichlet, hllc_bc)
                 @threaded for el_x in 1:nx
                     y = grid.yf[1]
                     for i in Base.OneTo(nd)
@@ -1542,7 +1542,7 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid, op, u1
         @assert false
     end
 
-    if bottom == dirichlet
+    if bottom in (dirichlet, hllc_bc)
         y = yf[1]
         for i in 1:nx
             for k in 1:nd
@@ -1788,7 +1788,7 @@ end
 
 function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
                                     problem, scheme, aux, t, dt, grid, dx, dy,
-                                    xf, yf, op, u1, ::Any, f,
+                                    xf, yf, op, u1, dummy_u::Any, f,
                                     res, scaling_factor = 1.0)
     @timeit_debug aux.timer "Blending limiter" begin
     #! format: noindent

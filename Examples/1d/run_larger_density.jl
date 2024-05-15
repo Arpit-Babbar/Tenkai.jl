@@ -6,30 +6,39 @@ Eq = Tenkai.EqEuler1D
 plotlyjs() # Set backend
 
 #------------------------------------------------------------------------------
-xmin, xmax = -5.0, 5.0
+xmin, xmax = 0.0, 1.0
 
 boundary_value = Eq.dummy_zero_boundary_value # dummy function
 boundary_condition = (neumann, neumann)
 γ = 1.4
-final_time = 1.8
+final_time = 0.15
 
-initial_value = Eq.shuosher
+function initial_value_high_density(x)
+    γ = 1.4
+    if x < 0.3
+        rho, v, p = 1000.0, 0.0, 1000.0
+    else
+        rho, v, p = 1.0, 0.0, 1.0
+    end
+    return SVector(rho, rho * v, p / (γ - 1.0) + 0.5 * rho * v^2)
+end
+initial_value = initial_value_high_density
 exact_solution = Eq.exact_solution_shuosher # Dummy function
 
 degree = 3
-solver = "lwfr"
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
 
-nx = 400
+nx = 500
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 300.0
 save_iter_interval = 0
-save_time_interval = 0.0
+save_time_interval = 0.0 * final_time
 animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
 
