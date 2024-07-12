@@ -296,8 +296,4 @@ include("$eq_dir/EqLinAdv2D.jl")
 include("$eq_dir/EqEuler2D.jl")
 include("$eq_dir/EqTenMoment2D.jl")
 
-# Utils
-
-include("$utils_dir/Utils.jl")
-
 end # module

@@ -6,7 +6,6 @@ using ..Equations: AbstractEquations, nvariables, eachvariable
 
 import Tenkai
 
-using ArgParse
 using OffsetArrays # OffsetArray, OffsetMatrix, OffsetVector
 using LinearAlgebra
 using Printf

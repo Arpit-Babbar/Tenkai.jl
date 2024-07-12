@@ -1,6 +1,8 @@
 using Plots
 using Setfield
-using Tenkai: Utils
+using Tenkai: utils_dir
+
+include("$utils_dir/Utils.jl")
 
 ARGS = ["--grid_size", "60"]
 include("../Examples/1d/run_blast.jl")
@@ -31,7 +33,6 @@ scheme = setproperties(scheme,
                        (degree = degree, limiter = limiter_mh,
                         numerical_flux = Eq.roe))
 
-using .Utils: join_plots, join_plots_scalar
 sol1 = Tenkai.solve(equation, problem, scheme, param);
 p1 = sol1["plot_data"].p_ua
 
