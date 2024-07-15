@@ -1,5 +1,5 @@
 using Tenkai
-using Trixi: trixi_include
+using TrixiBase: trixi_include
 
 include("reproduce_base.jl") # defines rep_dir, out_dir, etc.
 starting_dir = pwd()

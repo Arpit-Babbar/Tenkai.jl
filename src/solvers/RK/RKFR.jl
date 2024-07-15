@@ -11,7 +11,8 @@ module RKFR
 using MuladdMacro
 using LoopVectorization
 using UnPack
-using DifferentialEquations
+using OrdinaryDiffEq
+using DiffEqCallbacks: StepsizeLimiter
 using Printf
 using LinearAlgebra: axpy!, axpby!
 
@@ -405,7 +406,7 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
         callback_dt = StepsizeLimiter(dtFE, safety_factor = 1.0, max_step = true)
         callback = (callback_dt)
         # Try adding another function layer?
-        sol = DifferentialEquations.solve(odeprob,
+        sol = OrdinaryDiffEq.solve(odeprob,
                                           update_solution_rkfr!(stage_limiter!,
                                                                 step_limiter!),
                                           dt = dt, adaptive = false,

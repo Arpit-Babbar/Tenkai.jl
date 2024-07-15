@@ -1,6 +1,6 @@
 using Tenkai
 using Tenkai: base_dir
-using Trixi: trixi_include
+using TrixiBase: trixi_include
 using Tenkai: fo_blend
 Eq = Tenkai.EqBurg1D
 equation = Eq.get_equation()

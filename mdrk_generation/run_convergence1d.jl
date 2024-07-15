@@ -1,6 +1,6 @@
 using Tenkai
 using Tenkai: base_dir
-using Trixi: trixi_include
+using TrixiBase: trixi_include
 using DelimitedFiles
 
 function bf2str(bflux)

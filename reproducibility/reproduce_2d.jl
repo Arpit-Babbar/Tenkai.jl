@@ -1,5 +1,5 @@
 using Tenkai
-using Trixi: trixi_include
+using TrixiBase: trixi_include
 using Plots
 # gr()
 

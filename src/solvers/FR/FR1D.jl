@@ -62,7 +62,6 @@ using LinearAlgebra: dot, mul!, BLAS, axpby!, I
 using WriteVTK
 using JSON3
 using LoopVectorization
-import Trixi
 
 # TOTHINK - Consider using named tuples in place of all structs on which dispatch
 # isn't done
@@ -545,7 +544,7 @@ function apply_hierarchical_limiter!(eq::AbstractEquations{1}, # 1D equations
 
     # Get all the coefficients stored in modes
     for i in 1:nx
-        @views Trixi.multiply_dimensionwise!(modes[:, :, i], Pn2m, u1[:, :, i])
+        @views multiply_dimensionwise!(modes[:, :, i], Pn2m, u1[:, :, i])
         # for n in eachvariable(eq)
         #    @views modes[n,:,i] .= Pn2m * u1[n,:,i]
         # end
@@ -619,7 +618,7 @@ function apply_hierarchical_limiter!(eq::AbstractEquations{1}, # 1D equations
 
     # Legendre basis to Lagrange
     for i in 1:nx
-        @views Trixi.multiply_dimensionwise!(u1[:, :, i], M2Pn, modes_new[:, :, i])
+        @views multiply_dimensionwise!(u1[:, :, i], M2Pn, modes_new[:, :, i])
         # for n in eachvariable(eq)
         #    @views u1[n,:,i] .= M2Pn * modes[n,:,i]
         # end

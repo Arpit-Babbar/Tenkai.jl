@@ -14,8 +14,6 @@ using LoopVectorization
 using DelimitedFiles
 using LinearAlgebra: lmul!, mul!
 
-import Trixi
-
 using ..FR: refresh!, EmptyZeros, calc_source, hllc_bc
 
 using ..Tenkai: fr_dir, lwfr_dir, rkfr_dir, eq_dir
@@ -995,6 +993,8 @@ function modal_smoothness_indicator(eq::AbstractEquations{2}, t, iter, fcount,
     return nothing
 end
 
+# TODO - Better to take from Trixi, but I do not want to load the whole Trixi.jl
+# Maybe Trixi folks should move it to TrixiBase.jl?
 function multiply_dimensionwise!(data_out::AbstractArray{<:Any, 3},
                                  matrix::AbstractMatrix,
                                  data_in::AbstractArray{<:Any, 3},

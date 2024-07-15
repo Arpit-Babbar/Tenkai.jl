@@ -1,6 +1,6 @@
 using Tenkai
 using Tenkai: base_dir
-using Trixi: trixi_include
+using TrixiBase: trixi_include
 
 mdrk_data_dir = joinpath(base_dir, "mdrk_results")
 # Keywords technique from
