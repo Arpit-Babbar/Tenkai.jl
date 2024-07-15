@@ -76,6 +76,8 @@ end
     return SVector(f1, f2, f3)
 end
 
+@inbounds @inline flux(U, eq::Euler1D) = flux(1.0, U, eq)
+
 # The matrix fprime(U)
 function fprime(eq::Euler1D, x, U)
     @unpack γ = eq

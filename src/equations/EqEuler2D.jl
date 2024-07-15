@@ -81,6 +81,8 @@ end
     end
 end
 
+@inline @inbounds Tenkai.flux(U, eq::Euler2D, orientation::Integer) = Tenkai.flux(1.0, 1.0, U, eq, orientation)
+
 # Extending the flux function
 @inline @inbounds function Tenkai.flux(x, y, U, eq::Euler2D)
     @unpack γ_minus_1 = eq
@@ -103,6 +105,8 @@ end
 
     return F, G
 end
+
+@inline @inbounds Tenkai.flux(U, eq::Euler2D) = Tenkai.flux(1.0, 1.0, U, eq)
 
 # function converting primitive variables to PDE variables
 function Tenkai.prim2con(eq::Euler2D, prim) # primitive, gas constant
