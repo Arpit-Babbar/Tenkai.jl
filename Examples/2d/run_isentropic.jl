@@ -12,11 +12,11 @@ boundary_condition = (periodic, periodic, periodic, periodic)
 initial_value = Eq.isentropic_iv
 exact_solution = Eq.isentropic_exact
 
-degree = 1
-solver = "lwfr"
+degree = 3
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
-numerical_flux = Eq.hllc
+numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
 final_time = 1.0 # 20 * sqrt(2.0) / 0.5
