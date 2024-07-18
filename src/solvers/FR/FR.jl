@@ -104,8 +104,9 @@ end
 #-------------------------------------------------------------------------------
 # Create a struct of scheme description
 #-------------------------------------------------------------------------------
-struct Scheme{NumericalFlux, Limiter, BFlux <: NamedTuple{<:Any, <:Any}, Dissipation}
-    solver::String
+struct Scheme{Solver, NumericalFlux, Limiter, BFlux <: NamedTuple{<:Any, <:Any},
+              Dissipation}
+    solver::Solver
     solver_enum::SolverType
     degree::Int64
     solution_points::String
