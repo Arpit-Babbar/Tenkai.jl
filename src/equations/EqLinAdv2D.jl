@@ -5,7 +5,7 @@ using MuladdMacro
 
 using Tenkai
 using TimerOutputs
-using Tenkai.FR2D: correct_variable!
+using Tenkai: correct_variable!
 using UnPack
 
 # methods to be extended in this module

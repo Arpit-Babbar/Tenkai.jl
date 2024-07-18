@@ -887,7 +887,9 @@ end
     return nothing
 end
 
-refresh!(arr) = fill!(arr, eltype(arr))
+@inline @inbounds function refresh!(u)
+    @turbo u .= zero(eltype(u))
+end
 
 #-------------------------------------------------------------------------------
 # Return string of the form base_name00c with total number of digits = ndigits

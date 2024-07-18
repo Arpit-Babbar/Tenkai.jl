@@ -1,5 +1,3 @@
-module FR2D
-
 using UnPack
 using MuladdMacro
 using TimerOutputs
@@ -3642,5 +3640,3 @@ end
 
 export update_ghost_values_periodic!
 end # @muladd
-
-end

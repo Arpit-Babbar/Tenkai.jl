@@ -151,41 +151,6 @@ include("$fr_dir/FR1D.jl")
 
 include("$fr_dir/FR2D.jl")
 
-(import .FR2D: update_ghost_values_periodic!,
-               update_ghost_values_u1!,
-               update_ghost_values_fn_blend!,
-               modal_smoothness_indicator,
- # modal_smoothness_indicator_gassner, # yet to be implemented
-               set_initial_condition!,
-               compute_cell_average!,
-               get_cfl,
-               compute_time_step,
-               compute_face_residual!,
-               apply_bound_limiter!,
-               apply_tvb_limiter!,
-               apply_tvb_limiterβ!,
-               setup_limiter_tvb,
-               setup_limiter_tvbβ,
-               Blend,
-               set_blend_dt!,
-               fo_blend,
-               mh_blend,
-               muscl_blend,
-               blending_flux_factors,
-               zhang_shu_flux_fix,
-               limit_slope,
-               no_upwinding_x,
-               is_admissible,
-               apply_hierarchical_limiter!,
-               Hierarchical, # not yet implemented
-               compute_error,
-               initialize_plot,
-               write_soln!,
-               create_aux_cache,
-               write_poly,
-               write_soln!,
-               post_process_soln)
-
 # 1D methods t
 
 # Pack blending methods into containers for user API

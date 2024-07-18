@@ -3,7 +3,8 @@ using ..Tenkai: periodic, dirichlet, neumann, reflect,
                 get_node_vars, set_node_vars!,
                 add_to_node_vars!, subtract_from_node_vars!,
                 multiply_add_to_node_vars!, multiply_add_set_node_vars!,
-                comp_wise_mutiply_node_vars!
+                comp_wise_mutiply_node_vars!,
+                update_ghost_values_periodic!, update_ghost_values_fn_blend!
 
 using UnPack
 using TimerOutputs
@@ -14,16 +15,11 @@ using StaticArrays
 using LoopVectorization
 
 using ..FR: @threaded
-using ..FR2D: update_ghost_values_periodic!, update_ghost_values_fn_blend!
 import Tenkai: extrap_bflux!
 
 using ..Equations: AbstractEquations, nvariables, eachvariable
 @muladd begin
 #! format: noindent
-
-@inline @inbounds function refresh!(u)
-    @turbo u .= zero(eltype(u))
-end
 
 function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
     function gArray(nvar, nx, ny)

@@ -13,7 +13,7 @@ using WriteVTK
 
 using Tenkai
 using Tenkai.Basis
-using Tenkai.FR2D: correct_variable!
+using Tenkai: correct_variable!
 using Tenkai.FR: limit_variable_slope
 
 using Tenkai.CartesianGrids: CartesianGrid2D, save_mesh_file

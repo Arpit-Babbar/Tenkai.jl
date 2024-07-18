@@ -38,7 +38,7 @@ using EllipsisNotation
 using HDF5: h5open, attributes
 using Tenkai
 
-using Tenkai.FR2D: correct_variable!
+using Tenkai: correct_variable!
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,

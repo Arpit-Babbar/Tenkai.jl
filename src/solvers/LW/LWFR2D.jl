@@ -3,7 +3,8 @@ using ..Tenkai: periodic, dirichlet, neumann, reflect,
                 get_node_vars, set_node_vars!,
                 add_to_node_vars!, subtract_from_node_vars!,
                 multiply_add_to_node_vars!, multiply_add_set_node_vars!,
-                comp_wise_mutiply_node_vars!, flux
+                comp_wise_mutiply_node_vars!, flux,
+                update_ghost_values_periodic!, update_ghost_values_fn_blend!
 
 using UnPack
 using TimerOutputs
@@ -13,7 +14,6 @@ using OffsetArrays
 using StaticArrays
 
 using ..FR: @threaded
-using ..FR2D: update_ghost_values_periodic!, update_ghost_values_fn_blend!
 
 using ..Equations: AbstractEquations, nvariables, eachvariable
 
