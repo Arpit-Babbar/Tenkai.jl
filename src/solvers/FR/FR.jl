@@ -1047,11 +1047,10 @@ function solve(equation, problem, scheme, param)
         out = solve_mdrk(equation, problem, scheme, param, grid, op, aux,
                          cache)
     else
-        # Allow user to dispatch over other SSFR types
+        @assert !(solver isa String) "Solver not implemented"
+        println("About to use a solver written by user...")
         out = solve_ssfr(equation, problem, scheme, param, grid, op, aux,
                          cache)
-        println("Solver not implemented")
-        @assert false
     end
     return out
 end
