@@ -245,30 +245,8 @@ include("$rkfr_dir/RKFR2D.jl")
 
 include("$lwfr_dir/LWFR.jl")
 
-(import .LWFR: setup_arrays_lwfr,
-               compute_cell_residual_1!, compute_cell_residual_2!,
-               compute_cell_residual_3!, compute_cell_residual_4!,
-               update_ghost_values_lwfr!,
-               eval_bflux1!, eval_bflux2!, eval_bflux3!, eval_bflux4!,
-               extrap_bflux!)
-
 include("$lwfr_dir/LWFR1D.jl")
-
-(import .LWFR1D: setup_arrays_lwfr,
-                 compute_cell_residual_1!, compute_cell_residual_2!,
-                 compute_cell_residual_3!, compute_cell_residual_4!,
-                 update_ghost_values_lwfr!,
-                 eval_bflux1!, eval_bflux2!, eval_bflux3!, eval_bflux4!,
-                 extrap_bflux!, flux)
-
 include("$lwfr_dir/LWFR2D.jl")
-
-(import .LWFR2D: setup_arrays_lwfr,
-                 compute_cell_residual_1!, compute_cell_residual_2!,
-                 compute_cell_residual_3!, compute_cell_residual_4!,
-                 update_ghost_values_lwfr!,
-                 eval_bflux1!, eval_bflux2!, eval_bflux3!, eval_bflux4!,
-                 extrap_bflux!, flux)
 
 # ( # LWFR API exported
 # export setup_arrays_lwfr,
@@ -279,7 +257,6 @@ include("$lwfr_dir/LWFR2D.jl")
 #        extrap_bflux!
 # )
 
-## Example equation files
 
 include("$mdrk_dir/MDRK.jl")
 

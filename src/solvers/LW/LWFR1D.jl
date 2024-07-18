@@ -1,19 +1,10 @@
-module LWFR1D
-
-(import ..Tenkai: setup_arrays_lwfr,
-                  compute_cell_residual_1!, compute_cell_residual_2!,
-                  compute_cell_residual_3!, compute_cell_residual_4!,
-                  update_ghost_values_lwfr!,
-                  eval_bflux1!, eval_bflux2!, eval_bflux3!, eval_bflux4!,
-                  extrap_bflux!, flux)
-
-(using ..Tenkai: periodic, dirichlet, neumann, reflect, extrapolate, evaluate,
-                 update_ghost_values_periodic!,
-                 update_ghost_values_fn_blend!,
-                 get_node_vars, set_node_vars!,
-                 add_to_node_vars!, subtract_from_node_vars!,
-                 multiply_add_to_node_vars!, multiply_add_set_node_vars!,
-                 comp_wise_mutiply_node_vars!)
+using ..Tenkai: periodic, dirichlet, neumann, reflect, extrapolate, evaluate,
+                update_ghost_values_periodic!,
+                update_ghost_values_fn_blend!,
+                get_node_vars, set_node_vars!,
+                add_to_node_vars!, subtract_from_node_vars!,
+                multiply_add_to_node_vars!, multiply_add_set_node_vars!,
+                comp_wise_mutiply_node_vars!, flux
 
 using UnPack
 using TimerOutputs
@@ -21,10 +12,6 @@ using Polyester
 using MuladdMacro
 using OffsetArrays
 using StaticArrays
-
-using Tenkai.LWFR: calc_source, calc_source_t_N12, calc_source_t_N34,
-                   calc_source_tt_N23, calc_source_tt_N4, calc_source_ttt_N34,
-                   calc_source_tttt_N4
 
 using ..FR: @threaded, alloc_for_threads, implicit_source_update
 using ..Equations: AbstractEquations, nvariables, eachvariable
@@ -1253,5 +1240,3 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, problem,
     return nothing
 end
 end # @muladd
-
-end # module

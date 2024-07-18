@@ -1,13 +1,10 @@
-module MDRK
+using Tenkai: set_initial_condition!,
+              compute_cell_average!,
+              compute_face_residual!,
+              write_soln!,
+              compute_error,
+              post_process_soln
 
-(using Tenkai: set_initial_condition!,
-               compute_cell_average!,
-               compute_face_residual!,
-               write_soln!,
-               compute_error,
-               post_process_soln)
-
-using Tenkai.LWFR: update_ghost_values_lwfr!, update_solution_lwfr!
 using LoopVectorization
 using Tenkai
 
@@ -136,5 +133,3 @@ function solve_mdrk(eq, problem, scheme, param, grid, op, aux, cache)
                 "op" => op)
 end
 end # @muladd
-
-end # module

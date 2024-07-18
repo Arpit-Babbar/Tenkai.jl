@@ -1,9 +1,7 @@
 using StaticArrays
 using Tenkai
-using Plots
 # Submodules
 Eq = Tenkai.EqTenMoment1D
-plotlyjs() # Set backend
 
 xmin, xmax = -0.5, 0.5
 boundary_condition = (neumann, neumann)

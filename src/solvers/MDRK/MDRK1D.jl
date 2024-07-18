@@ -15,10 +15,6 @@ using StaticArrays
 
 import Tenkai.FR: setup_arrays_mdrk
 
-using Tenkai.LWFR: calc_source, calc_source_t_N12, calc_source_t_N34,
-                   calc_source_tt_N23, calc_source_tt_N4, calc_source_ttt_N34,
-                   calc_source_tttt_N4
-
 using ..FR: @threaded, alloc_for_threads
 using ..Equations: AbstractEquations, nvariables, eachvariable
 

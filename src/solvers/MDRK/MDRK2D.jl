@@ -13,13 +13,9 @@ using OffsetArrays
 using StaticArrays
 using LoopVectorization
 
-using Tenkai.LWFR: calc_source, calc_source_t_N12, calc_source_t_N34,
-                   calc_source_tt_N23, calc_source_tt_N4, calc_source_ttt_N34,
-                   calc_source_tttt_N4
-
 using ..FR: @threaded
 using ..FR2D: update_ghost_values_periodic!, update_ghost_values_fn_blend!
-import Tenkai.LWFR2D: extrap_bflux!
+import Tenkai: extrap_bflux!
 
 using ..Equations: AbstractEquations, nvariables, eachvariable
 @muladd begin

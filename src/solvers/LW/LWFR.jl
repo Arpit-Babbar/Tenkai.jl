@@ -1,5 +1,3 @@
-module LWFR
-
 using Tenkai: set_initial_condition!,
               compute_cell_average!,
               compute_face_residual!,
@@ -256,5 +254,3 @@ function solve_lwfr(eq, problem, scheme, param, grid, op, aux, cache)
                 "op" => op, "scheme" => scheme)
 end
 end # @muladd
-
-end # module

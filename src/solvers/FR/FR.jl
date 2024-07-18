@@ -178,7 +178,7 @@ function get_bflux_function(solver, degree, bflux)
         if bflux == extrapolate
             return extrap_bflux!
         else
-            eval_bflux! = Tenkai.MDRK.eval_bflux_mdrk!
+            eval_bflux! = Tenkai.eval_bflux_mdrk!
             return eval_bflux!
         end
     else
