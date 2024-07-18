@@ -31,7 +31,7 @@ using FastGaussQuadrature
 
 @enum BCType periodic dirichlet neumann reflect hllc_bc
 @enum BFluxType extrapolate evaluate
-@enum SolverType rkfr lwfr mdrk # TODO - Is this only needed for D2 / D1?
+@enum SolverType rkfr lwfr mdrk ssfr # TODO - Is this only needed for D2 / D1?
 
 #-------------------------------------------------------------------------------
 # Create a struct of problem description
