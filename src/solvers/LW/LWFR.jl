@@ -10,7 +10,6 @@ using Tenkai: set_initial_condition!,
 #------------------------------------------------------------------------------
 # Extending methods needed in FR.jl which are defined here
 #------------------------------------------------------------------------------
-import ..Tenkai: solve_lwfr
 
 # Dimension independent methods in FR
 (using Tenkai: apply_limiter!, compute_time_step, adjust_time_step,
@@ -173,10 +172,11 @@ function compute_cell_residual!(eq, grid, op, problem, scheme, aux, t, dt, u1,
 end
 
 #-------------------------------------------------------------------------------
-# Apply LWFR scheme and solve the problem
+# The default solver_ssfr function which is the LWFR scheme to solve the problem
+# The user can dispatch over these types to write their own solve_ssfr function
 # N = degree of solution space
 #-------------------------------------------------------------------------------
-function solve_lwfr(eq, problem, scheme, param, grid, op, aux, cache)
+function solve_ssfr(eq, problem, scheme, param, grid, op, aux, cache)
     println("Solving ", eq.name, " using LWFR")
 
     @unpack final_time = problem

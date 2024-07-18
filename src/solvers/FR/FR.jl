@@ -1007,9 +1007,6 @@ Blend() = nothing
 setup_arrays_lwfr() = nothing
 setup_arrays_rkfr() = nothing
 setup_arrays_mdrk() = nothing
-solve_lwfr() = nothing
-solve_rkfr() = nothing
-solve_mdrk() = nothing
 
 # These methods are primarily for LWFR.jl, but are also needed here for
 # get_bflux_function()
@@ -1040,7 +1037,8 @@ function solve(equation, problem, scheme, param)
 
     @unpack solver = scheme
     if solver == "lwfr"
-        out = solve_lwfr(equation, problem, scheme, param, grid, op, aux,
+        # SSFR = Single Stage Flux Reconstruction. It defaults to LWFR
+        out = solve_ssfr(equation, problem, scheme, param, grid, op, aux,
                          cache)
     elseif solver == "rkfr"
         out = solve_rkfr(equation, problem, scheme, param, grid, op, aux,
@@ -1049,6 +1047,9 @@ function solve(equation, problem, scheme, param)
         out = solve_mdrk(equation, problem, scheme, param, grid, op, aux,
                          cache)
     else
+        # Allow user to dispatch over other SSFR types
+        out = solve_ssfr(equation, problem, scheme, param, grid, op, aux,
+                         cache)
         println("Solver not implemented")
         @assert false
     end
