@@ -4,7 +4,8 @@ using ..Tenkai: periodic, dirichlet, neumann, reflect,
                 add_to_node_vars!, subtract_from_node_vars!,
                 multiply_add_to_node_vars!, multiply_add_set_node_vars!,
                 comp_wise_mutiply_node_vars!,
-                update_ghost_values_periodic!, update_ghost_values_fn_blend!
+                update_ghost_values_periodic!, update_ghost_values_fn_blend!,
+                @threaded
 
 using UnPack
 using TimerOutputs
@@ -14,7 +15,6 @@ using OffsetArrays
 using StaticArrays
 using LoopVectorization
 
-using ..FR: @threaded
 import Tenkai: extrap_bflux!
 
 using ..Equations: AbstractEquations, nvariables, eachvariable

@@ -10,16 +10,15 @@ using Polyester
 using MuladdMacro
 using OffsetArrays
 
-using ..FR: @threaded
+using Tenkai: @threaded, periodic, dirichlet, neumann, reflect, extrapolate, evaluate,
+              get_node_vars, set_node_vars!,
+              add_to_node_vars!, subtract_from_node_vars!,
+              multiply_add_to_node_vars!, multiply_add_set_node_vars!,
+              comp_wise_mutiply_node_vars!
+
 using ..Equations: AbstractEquations, nvariables, eachvariable
 
 using ..Tenkai: update_ghost_values_periodic!
-
-using ..FR: periodic, dirichlet, neumann, reflect, extrapolate, evaluate,
-            get_node_vars, set_node_vars!,
-            add_to_node_vars!, subtract_from_node_vars!,
-            multiply_add_to_node_vars!, multiply_add_set_node_vars!,
-            comp_wise_mutiply_node_vars!
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,

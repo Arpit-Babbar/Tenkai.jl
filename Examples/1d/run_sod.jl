@@ -44,9 +44,9 @@ problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
 equation = Eq.get_equation(γ)
 # limiter = setup_limiter_blend(
-#                                  blend_type = FR.mh_blend,
-#                                  indicating_variables = FR.rho_p_indicator!,
-#                                  reconstruction_variables = FR.conservative_reconstruction,
+#                                  blend_type = Tenkai.mh_blend,
+#                                  indicating_variables = Tenkai.rho_p_indicator!,
+#                                  reconstruction_variables = Tenkai.conservative_reconstruction,
 #                                  indicator_model = indicator_model,
 #                                  debug_blend = debug_blend
 #                                 )

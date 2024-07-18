@@ -1,5 +1,3 @@
-module FR
-
 using ..Basis
 using ..CartesianGrids
 using ..Equations: AbstractEquations, nvariables, eachvariable
@@ -1058,5 +1056,3 @@ end
 
 solve(equation, grid, problem, scheme, param) = solve(equation, problem, scheme, param)
 end # @muladd
-
-end # module

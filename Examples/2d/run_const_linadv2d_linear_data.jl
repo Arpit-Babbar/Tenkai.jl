@@ -33,7 +33,7 @@ problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
 equation = Eq.get_equation(velocity)
 limiter = setup_limiter_tvbβ(equation; tvbM = tvbM, beta = 1.0)
-# limiter = FR.setup_limiter_none()
+# limiter = Tenkai.setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux, 2)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,

@@ -20,10 +20,10 @@ module EqEuler2D
                comp_wise_mutiply_node_vars!, AbstractEquations)
 
 
-using Tenkai.FR: hllc_bc
+using Tenkai: hllc_bc
 
 using Tenkai.CartesianGrids: CartesianGrid2D, save_mesh_file
-using Tenkai.FR: limit_variable_slope
+using Tenkai: limit_variable_slope
 
 using Polyester
 using StaticArrays

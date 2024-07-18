@@ -12,8 +12,8 @@ using DelimitedFiles
 
 using Tenkai
 using Tenkai.Basis
-using Tenkai.FR1D: correct_variable_bound_limiter!, test_variable_bound_limiter!
-using Tenkai.FR: limit_variable_slope
+using Tenkai: correct_variable_bound_limiter!, test_variable_bound_limiter!
+using Tenkai: limit_variable_slope
 
 (import Tenkai: flux, prim2con, con2prim, limit_slope, zhang_shu_flux_fix,
                 apply_bound_limiter!, initialize_plot,

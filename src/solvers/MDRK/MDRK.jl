@@ -12,13 +12,13 @@ include("$(Tenkai.mdrk_dir)/MDRK1D.jl")
 include("$(Tenkai.mdrk_dir)/MDRK2D.jl")
 
 #------------------------------------------------------------------------------
-# Extending methods needed in FR.jl which are defined here
+# Extending methods needed in Tenkai.jl which are defined here
 #------------------------------------------------------------------------------
-# Dimension independent methods in FR
-(using ..FR: apply_limiter!, compute_time_step, adjust_time_step,
-             pre_process_limiter!, get_cfl, save_solution)
+# Dimension independent methods in Tenkai
+using Tenkai: apply_limiter!, compute_time_step, adjust_time_step,
+              pre_process_limiter!, get_cfl, save_solution
 
-import Tenkai.FR: solve_mdrk
+import Tenkai: solve_mdrk
 
 using Printf
 using LinearAlgebra: axpy!, dot

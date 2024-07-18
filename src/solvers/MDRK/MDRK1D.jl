@@ -1,10 +1,11 @@
-(using ..Tenkai: periodic, dirichlet, neumann, reflect, extrapolate, evaluate,
-                 update_ghost_values_periodic!,
-                 update_ghost_values_fn_blend!,
-                 get_node_vars, set_node_vars!,
-                 add_to_node_vars!, subtract_from_node_vars!,
-                 multiply_add_to_node_vars!, multiply_add_set_node_vars!,
-                 comp_wise_mutiply_node_vars!, flux)
+using ..Tenkai: periodic, dirichlet, neumann, reflect, extrapolate, evaluate,
+                update_ghost_values_periodic!,
+                update_ghost_values_fn_blend!,
+                get_node_vars, set_node_vars!,
+                add_to_node_vars!, subtract_from_node_vars!,
+                multiply_add_to_node_vars!, multiply_add_set_node_vars!,
+                comp_wise_mutiply_node_vars!, flux,
+                @threaded, alloc_for_threads
 
 using UnPack
 using TimerOutputs
@@ -13,9 +14,8 @@ using MuladdMacro
 using OffsetArrays
 using StaticArrays
 
-import Tenkai.FR: setup_arrays_mdrk
+import Tenkai: setup_arrays_mdrk
 
-using ..FR: @threaded, alloc_for_threads
 using ..Equations: AbstractEquations, nvariables, eachvariable
 
 #-------------------------------------------------------------------------------

@@ -12,15 +12,15 @@ using LoopVectorization
 using DelimitedFiles
 using LinearAlgebra: lmul!, mul!
 
-using ..FR: refresh!, EmptyZeros, calc_source, hllc_bc
+using Tenkai: refresh!, EmptyZeros, calc_source, hllc_bc
 
 using ..Tenkai: fr_dir, lwfr_dir, rkfr_dir, eq_dir
 
-using Tenkai.FR: admissibility_tolerance
+using Tenkai: admissibility_tolerance
 
 using ..Basis
 
-using ..FR: periodic, dirichlet, neumann, reflect,
+using Tenkai: periodic, dirichlet, neumann, reflect,
             lwfr, rkfr,
             minmod, finite_differences,
             @threaded, Problem, Scheme, Parameters,

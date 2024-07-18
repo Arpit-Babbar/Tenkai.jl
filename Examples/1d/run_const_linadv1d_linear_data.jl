@@ -8,7 +8,7 @@ plotlyjs() # Set backend
 xmin, xmax = -1.0, 1.0
 velocity(x) = 1.0
 
-boundary_condition = (FR.dirichlet, FR.neumann)
+boundary_condition = (dirichlet, neumann)
 final_time = 1.0
 initial_value, exact_solution = Eq.linear1d_data
 boundary_value = exact_solution
@@ -38,15 +38,15 @@ domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
 equation = Eq.get_equation(velocity)
-# limiter = FR.setup_limiter_blend(
-#                                  blend_type = FR.mh_blend,
-#                                  indicating_variables = FR.conservative_indicator!,
-#                                  reconstruction_variables = FR.conservative_reconstruction,
+# limiter = Tenkai.setup_limiter_blend(
+#                                  blend_type = Tenkai.mh_blend,
+#                                  indicating_variables = Tenkai.conservative_indicator!,
+#                                  reconstruction_variables = Tenkai.conservative_reconstruction,
 #                                  indicator_model = "gassner",
 #                                  debug_blend = false
 #                                 )
 limiter = setup_limiter_tvb(eq = equation, tvbM = tvbM)
-# limiter = FR.setup_limiter_none()
+# limiter = Tenkai.setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,

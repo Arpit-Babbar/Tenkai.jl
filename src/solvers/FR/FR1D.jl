@@ -1,10 +1,8 @@
-module FR1D
-
 using StaticArrays
 
 using ..Tenkai: fr_dir, lwfr_dir, rkfr_dir, eq_dir, src_dir
 using ..Tenkai: update_ghost_values_periodic!, flux, con2prim
-(using ..FR: Scheme, Problem, Parameters, @threaded, PlotData,
+(using Tenkai: Scheme, Problem, Parameters, @threaded, PlotData,
              get_filename, minmod, prim2con!, con2prim!, save_solution,
              finite_differences, zhang_shu_flux_fix)
 using ..Equations: AbstractEquations, nvariables, eachvariable
@@ -43,7 +41,7 @@ using ..Basis: Vandermonde_lag, weights_and_points, nodal2modal, nodal2modal_kri
                   write_soln!,
                   post_process_soln)
 
-(using ..FR: periodic, dirichlet, neumann, reflect,
+(using Tenkai: periodic, dirichlet, neumann, reflect,
              get_node_vars, set_node_vars!,
              get_first_node_vars, get_second_node_vars,
              add_to_node_vars!, subtract_from_node_vars!,
@@ -2599,5 +2597,3 @@ function post_process_soln(eq::AbstractEquations{1, 1}, aux, problem, param, sch
     return nothing
 end
 end # @muladd
-
-end # module

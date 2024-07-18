@@ -10,7 +10,7 @@ using UnPack
 
 # methods to be extended in this module
 import Tenkai: flux
-import Tenkai.FR: admissibility_tolerance
+import Tenkai: admissibility_tolerance
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,

@@ -50,6 +50,6 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
                                           ARGS)
 #------------------------------------------------------------------------------
-errors, plot_data = FR.solve(equation, problem, scheme, param);
+errors, plot_data = Tenkai.solve(equation, problem, scheme, param);
 
 return errors, plot_data

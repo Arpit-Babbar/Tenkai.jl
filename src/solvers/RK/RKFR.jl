@@ -29,13 +29,13 @@ import ..Tenkai: solve_rkfr
 #------------------------------------------------------------------------------
 # Dimension independent methods in FR used here
 #------------------------------------------------------------------------------
-(using ..FR: apply_limiter!, compute_time_step, adjust_time_step,
+(using Tenkai: apply_limiter!, compute_time_step, adjust_time_step,
              pre_process_limiter!, get_cfl, save_solution)
 
 #------------------------------------------------------------------------------
 # Methods to be defined in RKFR1D, RKFR2D
 #------------------------------------------------------------------------------
-(import ..FR: setup_arrays_rkfr)
+(import Tenkai: setup_arrays_rkfr)
 compute_cell_residual_rkfr!() = nothing
 update_ghost_values_rkfr!() = nothing
 

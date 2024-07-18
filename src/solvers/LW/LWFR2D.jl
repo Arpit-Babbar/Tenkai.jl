@@ -13,7 +13,7 @@ using MuladdMacro
 using OffsetArrays
 using StaticArrays
 
-using ..FR: @threaded
+using Tenkai: @threaded
 
 using ..Equations: AbstractEquations, nvariables, eachvariable
 

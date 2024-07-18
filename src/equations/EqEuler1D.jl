@@ -15,7 +15,7 @@ using JSON3
 using Tenkai
 using Tenkai.Basis
 
-import Tenkai.FR: admissibility_tolerance
+import Tenkai: admissibility_tolerance
 
 (import Tenkai: flux, prim2con, prim2con!, con2prim, con2prim!,
                 eigmatrix,

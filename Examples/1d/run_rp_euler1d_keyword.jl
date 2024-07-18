@@ -55,9 +55,9 @@ problem = Problem(domain, initial_value_ref, boundary_value, boundary_condition,
                   final_time, exact_solution)
 equation = Eq.get_equation(γ)
 # limiter = setup_limiter_blend(
-#                                  blend_type = FR.fo_blend,
-#                                  indicating_variables = FR.conservative_indicator!,
-#                                  reconstruction_variables = FR.conservative_reconstruction,
+#                                  blend_type = Tenkai.fo_blend,
+#                                  indicating_variables = Tenkai.conservative_indicator!,
+#                                  reconstruction_variables = Tenkai.conservative_reconstruction,
 #                                  indicator_model = "gassner",
 #                                  debug_blend = false
 #                                 )

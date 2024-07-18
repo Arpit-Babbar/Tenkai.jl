@@ -36,24 +36,6 @@ using .Basis: Vandermonde_lag
 
 include("$fr_dir/FR.jl")
 
-(using .FR: Problem, Scheme, Parameters, ParseCommandLine, solve, PlotData,
-            get_filename, minmod, @threaded, periodic, dirichlet, neumann,
-            conservative2conservative_reconstruction!,
-            conservative2primitive_reconstruction!,
-            primitive2conservative_reconstruction!,
-            conservative2characteristic_reconstruction!,
-            characteristic2conservative_reconstruction!,
-            setup_limiter_none,
-            reflect, extrapolate, evaluate,
-            get_node_vars, set_node_vars!,
-            add_to_node_vars!, subtract_from_node_vars!,
-            multiply_add_to_node_vars!, multiply_add_set_node_vars!,
-            get_first_node_vars, get_second_node_vars,
-            comp_wise_mutiply_node_vars!,
-            setup_limiter_blend,
-            setup_limiter_hierarchical,
-            ParseCommandLine)
-
 (export
         get_filename, minmod, @threaded, Vandermonde_lag,
         Problem, Scheme, Parameters,
@@ -70,85 +52,7 @@ include("$fr_dir/FR.jl")
         multiply_add_to_node_vars!, multiply_add_set_node_vars!,
         comp_wise_mutiply_node_vars!)
 
-(import .FR: flux, prim2con, prim2con!, con2prim, con2prim!, eigmatrix)
-
-(import .FR: update_ghost_values_periodic!,
-             update_ghost_values_u1!,
-             update_ghost_values_fn_blend!,
-             modal_smoothness_indicator,
-             modal_smoothness_indicator_gassner,
-             set_initial_condition!,
-             compute_cell_average!,
-             get_cfl,
-             compute_time_step,
-             compute_face_residual!,
-             apply_bound_limiter!,
-             apply_tvb_limiter!,
-             apply_tvb_limiterβ!,
-             setup_limiter_tvb,
-             setup_limiter_tvbβ,
-             Blend,
-             set_blend_dt!,
-             fo_blend,
-             mh_blend,
-             zhang_shu_flux_fix,
-             limit_slope,
-             no_upwinding_x,
-             is_admissible,
-             conservative_indicator!,
-             apply_hierarchical_limiter!,
-             Hierarchical,
-             setup_arrays_lwfr,
-             setup_arrays_rkfr,
-             solve_lwfr,
-             solve_rkfr,
-             solve_mdrk,
-             compute_error,
-             initialize_plot,
-             write_soln!,
-             create_aux_cache,
-             write_poly,
-             write_soln!,
-             post_process_soln)
-
-# TODO - This situation disallows us from doing an allmodules.jl thing
-
 include("$fr_dir/FR1D.jl")
-
-(import .FR1D: update_ghost_values_periodic!,
-               update_ghost_values_u1!,
-               update_ghost_values_fn_blend!,
-               modal_smoothness_indicator,
-               modal_smoothness_indicator_gassner,
-               set_initial_condition!,
-               compute_cell_average!,
-               get_cfl,
-               compute_time_step,
-               compute_face_residual!,
-               apply_bound_limiter!,
-               apply_tvb_limiter!,
-               apply_tvb_limiterβ!,
-               setup_limiter_tvb,
-               setup_limiter_tvbβ,
- # blending limiter methods
-               Blend,
-               set_blend_dt!,
-               fo_blend,
-               mh_blend,
-               zhang_shu_flux_fix,
-               limit_slope,
-               no_upwinding_x,
-               is_admissible,
-               apply_hierarchical_limiter!,
-               Hierarchical,
-               compute_error,
-               initialize_plot,
-               write_soln!,
-               create_aux_cache,
-               write_poly,
-               write_soln!,
-               post_process_soln)
-
 include("$fr_dir/FR2D.jl")
 
 # 1D methods t

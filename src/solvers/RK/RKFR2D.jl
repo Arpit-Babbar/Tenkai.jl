@@ -19,7 +19,7 @@ using MuladdMacro
 using OffsetArrays
 using StaticArrays
 
-using ..FR: @threaded
+using Tenkai: @threaded
 using ..Equations: AbstractEquations, nvariables, eachvariable
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).

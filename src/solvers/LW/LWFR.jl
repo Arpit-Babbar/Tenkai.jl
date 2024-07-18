@@ -13,7 +13,7 @@ using Tenkai: set_initial_condition!,
 import ..Tenkai: solve_lwfr
 
 # Dimension independent methods in FR
-(using ..FR: apply_limiter!, compute_time_step, adjust_time_step,
+(using Tenkai: apply_limiter!, compute_time_step, adjust_time_step,
              pre_process_limiter!, get_cfl, save_solution, calc_source)
 
 using Printf
@@ -37,7 +37,7 @@ compute_cell_residual_2!() = nothing
 compute_cell_residual_3!() = nothing
 compute_cell_residual_4!() = nothing
 update_ghost_values_lwfr!() = nothing
-(import ..FR: eval_bflux1!, eval_bflux2!, eval_bflux3!, eval_bflux4!,
+(import Tenkai: eval_bflux1!, eval_bflux2!, eval_bflux3!, eval_bflux4!,
               extrap_bflux!, setup_arrays_lwfr)
 # eval_bflux1!() = nothing
 # eval_bflux2!() = nothing
