@@ -1,12 +1,10 @@
-module RKFR
-
-(using Tenkai: set_initial_condition!,
-               compute_cell_average!,
-               compute_face_residual!,
-               set_blend_dt!,
-               write_soln!,
-               compute_error,
-               post_process_soln)
+using Tenkai: set_initial_condition!,
+              compute_cell_average!,
+              compute_face_residual!,
+              set_blend_dt!,
+              write_soln!,
+              compute_error,
+              post_process_soln
 
 using MuladdMacro
 using LoopVectorization
@@ -454,5 +452,3 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
                 "plot_data" => aux.plot_data)
 end
 end # muladd
-
-end # module

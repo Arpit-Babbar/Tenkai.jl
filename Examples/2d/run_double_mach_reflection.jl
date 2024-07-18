@@ -15,7 +15,7 @@ initial_value = Eq.double_mach_reflection_iv
 exact_solution = boundary_value
 
 degree = 3
-solver = "mdrk"
+solver = "rkfr"
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov

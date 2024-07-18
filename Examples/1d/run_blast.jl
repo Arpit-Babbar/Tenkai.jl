@@ -1,9 +1,7 @@
 using StaticArrays
 using Tenkai
-using Plots
 # Submodules
 Eq = Tenkai.EqEuler1D
-plotlyjs() # Set backend
 
 #------------------------------------------------------------------------------
 xmin, xmax = 0.0, 1.0
@@ -68,6 +66,3 @@ print(sol["errors"])
 
 return sol
 sol
-
-correct_sol_with_mh # contains correct solution with mh blending.
-print(correct_sol_with_mh["errors"])

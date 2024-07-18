@@ -1,18 +1,16 @@
-module RKFR2D
+import ..Tenkai: setup_arrays_rkfr,
+                 compute_cell_residual_rkfr!,
+                 update_ghost_values_rkfr!,
+                 flux
 
-(import ..Tenkai: setup_arrays_rkfr,
-                  compute_cell_residual_rkfr!,
-                  update_ghost_values_rkfr!,
-                  flux)
-
-(using ..Tenkai: periodic, dirichlet, neumann, reflect,
-                 evaluate, extrapolate,
-                 update_ghost_values_periodic!,
-                 update_ghost_values_fn_blend!,
-                 get_node_vars, set_node_vars!,
-                 add_to_node_vars!, subtract_from_node_vars!,
-                 multiply_add_to_node_vars!, multiply_add_set_node_vars!,
-                 comp_wise_mutiply_node_vars!)
+using ..Tenkai: periodic, dirichlet, neumann, reflect,
+                evaluate, extrapolate,
+                update_ghost_values_periodic!,
+                update_ghost_values_fn_blend!,
+                get_node_vars, set_node_vars!,
+                add_to_node_vars!, subtract_from_node_vars!,
+                multiply_add_to_node_vars!, multiply_add_set_node_vars!,
+                comp_wise_mutiply_node_vars!
 
 using UnPack
 using TimerOutputs
@@ -331,5 +329,3 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
     end # timer
 end
 end # muladd
-
-end # module

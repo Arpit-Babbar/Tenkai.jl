@@ -1,10 +1,8 @@
-module RKFR1D
-
-(import ..Tenkai: setup_arrays_rkfr,
-                  compute_cell_residual_rkfr!,
-                  update_ghost_values_rkfr!,
-                  update_ghost_values_fn_blend!,
-                  flux)
+import ..Tenkai: setup_arrays_rkfr,
+                 compute_cell_residual_rkfr!,
+                 update_ghost_values_rkfr!,
+                 update_ghost_values_fn_blend!,
+                 flux
 
 using UnPack
 using TimerOutputs
@@ -15,13 +13,13 @@ using OffsetArrays
 using ..FR: @threaded
 using ..Equations: AbstractEquations, nvariables, eachvariable
 
-(using ..Tenkai: update_ghost_values_periodic!)
+using ..Tenkai: update_ghost_values_periodic!
 
-(using ..FR: periodic, dirichlet, neumann, reflect, extrapolate, evaluate,
-             get_node_vars, set_node_vars!,
-             add_to_node_vars!, subtract_from_node_vars!,
-             multiply_add_to_node_vars!, multiply_add_set_node_vars!,
-             comp_wise_mutiply_node_vars!)
+using ..FR: periodic, dirichlet, neumann, reflect, extrapolate, evaluate,
+            get_node_vars, set_node_vars!,
+            add_to_node_vars!, subtract_from_node_vars!,
+            multiply_add_to_node_vars!, multiply_add_set_node_vars!,
+            comp_wise_mutiply_node_vars!
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -197,5 +195,3 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
     end # timer
 end
 end # muladd
-
-end # module

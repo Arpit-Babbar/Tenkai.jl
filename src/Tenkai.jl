@@ -213,29 +213,12 @@ characteristic_reconstruction = (;
 
 (export
         setup_limiter_tvb,
-        setup_limiter_tvbβ,
-        ParseCommandLine)
+        setup_limiter_tvbβ)
 
 include("$rkfr_dir/RKFR.jl")
-
-(import .RKFR: setup_arrays_rkfr,
-               solve_rkfr,
-               compute_cell_residual_rkfr!,
-               update_ghost_values_rkfr!)
-
 include("$rkfr_dir/RKFR1D.jl")
-
-(import .RKFR1D: setup_arrays_rkfr,
-                 compute_cell_residual_rkfr!,
-                 update_ghost_values_rkfr!,
-                 flux)
-
 include("$rkfr_dir/RKFR2D.jl")
 
-(import .RKFR2D: setup_arrays_rkfr,
-                 compute_cell_residual_rkfr!,
-                 update_ghost_values_rkfr!,
-                 flux)
 
 # ( # RKFR API exported
 # export setup_arrays_rkfr,
