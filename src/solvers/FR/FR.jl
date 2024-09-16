@@ -1021,7 +1021,6 @@ extrap_bflux!() = nothing
 #-------------------------------------------------------------------------------
 function solve(equation, problem, scheme, param)
     println("Number of julia threads = ", Threads.nthreads())
-    println("Number of BLAS  threads = ", BLAS.get_num_threads())
     @unpack grid_size, cfl, compute_error_interval = param
 
     # Make 1D/2D grid

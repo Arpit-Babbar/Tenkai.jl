@@ -617,6 +617,103 @@ function riemann_problem(x, y, eq::Euler2D, prim_ur, prim_ul, prim_dl, prim_dr)
     return SVector(ρ, ρ * v1, ρ * v2, p / (γ - 1.0) + 0.5 * (ρ_v1 * v1 + ρ_v2 * v2))
 end
 
+function hurricane_initial_solution(x, y)
+    A = 25.0
+    gamma = 2.0
+    gamma_minus_1 = gamma - 1.0
+    theta = atan(y, x)
+    r = sqrt(x^2 + y^2)
+    rho = 1.0
+    v0 = 10.0 # Choices - (10, 12.5, 7.5) which give M0 as (√2, >√2, <√2)
+    p = A * rho ^ gamma
+
+    v1 =  v0 * sin(theta)
+    v2 = -v0 * cos(theta)
+
+    rho_v1 = rho * v1
+    rho_v2 = rho * v2
+    rho_e = p / gamma_minus_1 + 0.5 * (rho_v1 * v1 + rho_v2 * v2)
+    return SVector(rho, rho_v1, rho_v2, rho_e)
+end
+
+function exact_solution_hurricane_critical(x, y, t)
+    A = 25.0
+    gamma = 2.0
+    gamma_minus_1 = gamma - 1.0
+    theta = atan(y, x)
+    r = sqrt(x^2 + y^2)
+    rho0 = 1.0
+    v0 = 10.0 # Choices - (10, 12.5, 7.5) which give M0 as (√2, >√2, <√2)
+    p0 = A * rho0 ^ gamma
+    p0_prime = gamma * A * rho0 ^ gamma_minus_1
+
+    if r >= 2.0 * t * sqrt(p0_prime)
+        rho = rho0
+
+        v1  = 2.0 * t * p0_prime * cos(theta)
+        v1 += sqrt(2.0 * p0_prime) * sqrt(r^2 - 2.0 * t^2 * p0_prime) * sin(theta)
+        v1 /= r
+
+        v2  = 2.0 * t * p0_prime * sin(theta)
+        v2 -= sqrt(2.0 * p0_prime) * sqrt(r^2 - 2.0 * t^2 * p0_prime) * cos(theta)
+        v2 /= r
+
+        p = p0
+    else
+        rho = r^2 / (8.0 * A * t^2)
+
+        v1 = ( x + y) / (2.0 * t)
+        v2 = (-x + y) / (2.0 * t)
+
+        p = A * rho * gamma # Don't know if it is right,
+                            # but it does not matter in boundary value computation
+    end
+
+    rho_v1 = rho * v1
+    rho_v2 = rho * v2
+    rho_e = p / gamma_minus_1 + 0.5 * (rho_v1 * v1 + rho_v2 * v2)
+    return SVector(rho, rho_v1, rho_v2, rho_e)
+end
+
+function initial_condition_rayleigh_taylor(x, y)
+    gamma = 5.0/3.0
+    if y <= 0.5
+        rho = 2.0
+        p = 2.0 * y + 1.0
+        c  = sqrt(gamma * p / rho)
+        v1 = 0.0
+        v2 = -0.025 * c * cospi(8.0*x)
+    else
+        rho = 1.0
+        p = 1.5 + y
+        c  = sqrt(gamma * p / rho)
+        v1 = 0.0
+        v2 = -0.025 * c * cospi(8.0*x)
+    end
+    rho_v1 = rho * v1
+    rho_v2 = rho * v2
+    gamma_minus_1 = gamma - 1.0
+    rho_e = p / gamma_minus_1 + 0.5 * (rho_v1 * v1 + rho_v2 * v2)
+    return SVector(rho, rho_v1, rho_v2, rho_e)
+end
+
+# Used to set the top and bottom boundary conditions
+function boundary_condition_rayleigh_taylor(x, y, t)
+    gamma = 5.0/3.0
+    if y <= 0.5
+        rho, v1, v2, p = (2.0, 0.0, 0.0, 1.0)
+    else
+        rho, v1, v2, p = (1.0, 0.0, 0.0, 2.5)
+    end
+    rho_v1 = rho * v1
+    rho_v2 = rho * v2
+    gamma_minus_1 = gamma - 1.0
+    rho_e = p / gamma_minus_1 + 0.5 * (rho_v1 * v1 + rho_v2 * v2)
+    return SVector(rho, rho_v1, rho_v2, rho_e)
+end
+
+source_terms_rayleigh_taylor(u, x, t, eq) = SVector(0.0, 0.0, u[1], u[3])
+
 zs_nx = zs_ny = 160
 
 initial_value_sedov_zhang_shu(x, y) = initial_value_sedov_zhang_shu((x, y), zs_nx,
@@ -626,6 +723,37 @@ exact_solution_sedov_zhang_shu(x, y, t) = initial_value_sedov_zhang_shu(x, y)
 sedov2d_zhang_shu_data = (zs_nx, zs_ny,
                           initial_value_sedov_zhang_shu,
                           exact_solution_sedov_zhang_shu)
+
+
+function riemann_problem_12(x, y)
+    γ = 1.4
+    if x >= 0.5 && y >= 0.5
+        ρ = 0.5313
+        v1 = 0.0
+        v2 = 0.0
+        p = 0.4
+    elseif x < 0.5 && y >= 0.5
+        ρ = 1.0
+        v1 = 0.7276
+        v2 = 0.0
+        p = 1.0
+    elseif x < 0.5 && y < 0.5
+        ρ = 0.8
+        v1 = 0.0
+        v2 = 0.0
+        p = 1.0
+    elseif x >= 0.5 && y < 0.5
+        ρ = 1.0
+        v1 = 0.0
+        v2 = 0.7276
+        p = 1.0
+    end
+    ρ_v1 = ρ * v1
+    ρ_v2 = ρ * v2
+    return SVector(ρ, ρ * v1, ρ * v2, p / (γ - 1.0) + 0.5 * (ρ_v1 * v1 + ρ_v2 * v2))
+end
+
+riemann_problem_12_exact(x, y, t) = riemann_problem_12(x, y)
 
 #-------------------------------------------------------------------------------
 # Numerical Fluxes
@@ -1414,7 +1542,7 @@ function Tenkai.update_ghost_values_rkfr!(problem, scheme, eq::Euler2D, grid,
                                           aux, op, cache, t)
     @timeit aux.timer "Update ghost values" begin
     #! format: noindent
-    @unpack Fb, ub = cache
+    @unpack Fb, ub, ua = cache
     update_ghost_values_periodic!(eq, problem, Fb, ub)
 
     @unpack periodic_x, periodic_y = problem
@@ -1530,6 +1658,38 @@ function Tenkai.update_ghost_values_rkfr!(problem, scheme, eq::Euler2D, grid,
                     Fb[2, k, 4, i, 0] *= -1.0 # ρ*vel_x*vel_y
                     Fb[4, k, 4, i, 0] *= -1.0 # (ρ_e + p) * vel_y
                 end
+            end
+        end
+    elseif bottom == hllc_bc
+        y3 = yf[1]
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                x3 = xf[i] + xg[k] * dx[i]
+
+                ubvalue = boundary_value(x3, y3, t)
+                fbvalue = flux(x3, y3, ubvalue, eq, 2)
+
+                ub_node = get_node_vars(ubvalue, eq, 1)
+                fb_node = get_node_vars(fbvalue, eq, 1)
+                set_node_vars!(ub, ub_node, eq, k, 4, i, 0)
+                set_node_vars!(Fb, fb_node, eq, k, 4, i, 0)
+
+                Uu_node = get_node_vars(ub, eq, k, 3, i, 1)
+                Fu_node = get_node_vars(Fb, eq, k, 3, i, 1)
+                Ud_node = get_node_vars(ub, eq, k, 4, i, 0)
+                Fd_node = get_node_vars(Fb, eq, k, 4, i, 0)
+                uad, uau = get_node_vars(ua, eq, i, 0), get_node_vars(ua, eq, i, 1)
+
+                X = SVector{2}(x3, y3)
+                Fn = hllc(X, uad, uau, Fd_node, Fu_node, Ud_node, Uu_node, eq, 2)
+                set_node_vars!(ub, ub_node, eq, k, 3, i, 1)
+                set_node_vars!(Fb, Fn     , eq, k, 3, i, 1)
+                set_node_vars!(Fb, Fn     , eq, k, 4, i, 0)
+
+                # Purely upwind
+
+                # set_node_vars!(Ub, ub, eq, k, 3, i, 1)
+                # set_node_vars!(Fb, fb, eq, k, 3, i, 1)
             end
         end
     else

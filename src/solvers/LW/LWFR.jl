@@ -249,7 +249,7 @@ function solve_ssfr(eq, problem, scheme, param, grid, op, aux, cache)
                                    problem, param, aux, op, u1, ua)
     end
 
-    return Dict("u" => u1, "ua" => ua, "errors" => error_norm,
+    return Dict("u" => u1, "ua" => ua, "errors" => error_norm, "aux" => aux,
                 "plot_data" => aux.plot_data, "grid" => grid,
                 "op" => op, "scheme" => scheme)
 end

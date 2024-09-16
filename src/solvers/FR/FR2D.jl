@@ -710,21 +710,23 @@ function correct_variable!(eq::AbstractEquations{2}, variable, op, aux, grid,
     nx, ny = grid.size
     nd = op.degree + 1
 
-    var_min_avg = 1e-10
+    # Very awkward way to fix type instability
+    # Source - https://discourse.julialang.org/t/type-instability-of-nested-function/57007
+    var_min_avg = Ref(1e-10)
     @threaded for element in CartesianIndices((1:nx, 1:ny))
         el_x, el_y = element[1], element[2]
         ua_ = get_node_vars(ua, eq, el_x, el_y)
-        var_min_avg = min(var_min_avg, variable(eq, ua_))
-        if var_min_avg < admissibility_tolerance(eq)
+        var_min_avg[] = min(var_min_avg[], variable(eq, ua_))
+        if var_min_avg[] < admissibility_tolerance(eq)
             @show variable
             println("Positivity limiter failed in element ", el_x, " ", el_y,
                     "with centre ", xc[el_x], ", ", yc[el_y])
             println("Value = ", variable(eq, ua_), " tolerance = ", admissibility_tolerance(eq))
-            throw(DomainError((var_min_avg)))
+            throw(DomainError((var_min_avg[])))
         end
     end
 
-    eps = min(var_min_avg, eps_)
+    eps = min(var_min_avg[], eps_)
 
     variable_(u_) = variable(eq, u_)
 
@@ -2051,8 +2053,8 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
     end # timer
 end
 
-function blend_cell_residual_muscl_rk!(el_x, el_y, eq::AbstractEquations{2}, scheme,
-                                       aux, dt, grid, dx, dy, xf, yf, op, u1, ::Any, f,
+function blend_cell_residual_muscl_rk!(el_x, el_y, eq::AbstractEquations{2}, problem, scheme,
+                                       aux, t, dt, grid, dx, dy, xf, yf, op, u1, ::Any, f,
                                        res, scaling_factor = 1.0)
     @timeit_debug aux.timer "Blending limiter" begin
     #! format: noindent

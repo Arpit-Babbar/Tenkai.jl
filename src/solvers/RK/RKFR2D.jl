@@ -243,6 +243,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
     @unpack bflux_ind = scheme.bflux
     @unpack blend = aux
     @unpack blend_cell_residual! = blend.subroutines
+    @unpack source_terms = problem
     refresh!(u) = fill!(u, zero(eltype(u)))
 
     refresh!.((ub, Fb, res))
@@ -258,7 +259,9 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
         for j in Base.OneTo(nd), i in Base.OneTo(nd) # solution points loop
             x = xc - 0.5 * dx + xg[i] * dx
             y = yc - 0.5 * dy + xg[j] * dy
+            X = SVector(x, y)
             u_node = get_node_vars(u, eq, i, j)
+
             f_node, g_node = flux(x, y, u_node, eq)
             # @show el_x, i, el_y, j, x, y
             for ii in Base.OneTo(nd)
@@ -272,6 +275,9 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
                 # res[i,jj] = ∑_j g[i,j] * D1[jj,j] for each variable
                 multiply_add_to_node_vars!(r1, lamy * D1[jj, j], g_node, eq, i, jj)
             end
+
+            s_node = calc_source(u_node, X, t, source_terms, eq)
+            multiply_add_to_node_vars!(r1, -dt, s_node, eq, i, j)
 
             # Ub = UT * V
             # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]

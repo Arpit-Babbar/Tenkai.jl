@@ -21,10 +21,6 @@ using LinearAlgebra: axpy!, axpby!
 @muladd begin
 #! format: noindent
 
-#------------------------------------------------------------------------------
-# Extending methods needed in FR.jl which are defined here
-#------------------------------------------------------------------------------
-import ..Tenkai: solve_rkfr
 
 #------------------------------------------------------------------------------
 # Dimension independent methods in FR used here
@@ -415,8 +411,9 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
         t = sol.t[1]
         error_norm = compute_error(problem, grid, eq, aux, op, u1, t)
         post_process_soln(eq, aux, problem, param, scheme)
-        return Dict("u" => u1, "ua" => ua, "errors" => error_norm,
-                    "plot_data" => aux.plot_data)
+        return Dict("u" => u1, "ua" => ua, "errors" => error_norm, "aux" => aux,
+                    "plot_data" => aux.plot_data, "grid" => grid,
+                    "op" => op, "scheme" => scheme)
     end
 
     # Save initial solution to file
@@ -448,7 +445,8 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
     end
     error_norm = compute_error(problem, grid, eq, aux, op, u1, t)
     post_process_soln(eq, aux, problem, param, scheme)
-    return Dict("u" => u1, "ua" => ua, "errors" => error_norm,
-                "plot_data" => aux.plot_data)
+    return Dict("u" => u1, "ua" => ua, "errors" => error_norm, "aux" => aux,
+                "plot_data" => aux.plot_data, "grid" => grid,
+                "op" => op, "scheme" => scheme)
 end
 end # muladd

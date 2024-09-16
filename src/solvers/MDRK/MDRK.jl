@@ -18,8 +18,6 @@ include("$(Tenkai.mdrk_dir)/MDRK2D.jl")
 using Tenkai: apply_limiter!, compute_time_step, adjust_time_step,
               pre_process_limiter!, get_cfl, save_solution
 
-import Tenkai: solve_mdrk
-
 using Printf
 using LinearAlgebra: axpy!, dot
 using UnPack
@@ -128,8 +126,8 @@ function solve_mdrk(eq, problem, scheme, param, grid, op, aux, cache)
     error_norm = compute_error(problem, grid, eq, aux, op, u1, t)
     post_process_soln(eq, aux, problem, param, scheme)
 
-    return Dict("u" => u1, "ua" => ua, "errors" => error_norm,
+    return Dict("u" => u1, "ua" => ua, "errors" => error_norm, "aux" => aux,
                 "plot_data" => aux.plot_data, "grid" => grid,
-                "op" => op)
+                "op" => op, "scheme" => scheme)
 end
 end # @muladd
