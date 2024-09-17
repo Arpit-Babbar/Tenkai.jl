@@ -198,7 +198,7 @@ end
 #-------------------------------------------------------------------------------
 # Scheme information
 #-------------------------------------------------------------------------------
-function Tenkai.compute_time_step(eq::Euler1D, problem, grid, aux, op, cfl, u1, ua)
+function compute_time_step(eq::Euler1D, problem, grid, aux, op, cfl, u1, ua)
     nx = grid.size
     dx = grid.dx
     den = 0.0

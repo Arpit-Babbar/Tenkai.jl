@@ -282,7 +282,7 @@ end
     return 0.5 * (Fl + Fr - λ * (Ur - Ul))
 end
 
-function Tenkai.compute_time_step(eq::TenMoment2D, problem, grid, aux, op, cfl, u1, ua)
+function compute_time_step(eq::TenMoment2D, problem, grid, aux, op, cfl, u1, ua)
     @timeit aux.timer "Time Step computation" begin
     #! format: noindent
     @unpack dx, dy = grid
