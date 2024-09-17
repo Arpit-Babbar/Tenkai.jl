@@ -41,9 +41,7 @@ grid_size = [nx, ny]
 domain = [xmin, xmax, ymin, ymax]
 problem = Problem(domain, initial_value, Eq.boundary_condition_rayleigh_taylor, boundary_condition,
                   final_time, exact_solution, source_terms = Eq.source_terms_rayleigh_taylor)
-mh = mh_blend(equation)
-muscl = muscl_blend(equation)
-limiter = setup_limiter_blend(blend_type = mh,
+limiter = setup_limiter_blend(blend_type = fo_blend(equation),
                               indicating_variables = Eq.rho_p_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner",

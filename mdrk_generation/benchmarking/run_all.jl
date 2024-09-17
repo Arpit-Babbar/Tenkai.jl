@@ -8,18 +8,18 @@ mkpath("Results")
 
 ### Rayleigh Taylor
 
-trixi_include(joinpath(@__DIR__, "run_rayleight_taylor.jl"), nx = 5, solver = "rkfr", blend_type = :muscl,
+trixi_include(joinpath(@__DIR__, "run_rayleight_taylor.jl"), nx = 5, solver = "rkfr",
               cfl = 0.98 * 0.215, degree = 3, final_time = 0.1)
-sol = trixi_include(joinpath(@__DIR__, "run_rayleight_taylor.jl"), nx = 64, solver = "rkfr", blend_type = :muscl,
+sol = trixi_include(joinpath(@__DIR__, "run_rayleight_taylor.jl"), nx = 64, solver = "rkfr",
                     cfl = 0.98 * 0.215, degree = 3, final_time = 2.5)
 rk_time = TimerOutputs.tottime(sol["aux"].timer) * 1e-9
 
 writedlm("Results/rayleigh_taylor_rk.txt", [rk_time])
 
-trixi_include(joinpath(@__DIR__, "run_rayleight_taylor.jl"), nx = 5, solver = "mdrk", blend_type = :mh,
+trixi_include(joinpath(@__DIR__, "run_rayleight_taylor.jl"), nx = 5, solver = "mdrk",
                        cfl = 0.0, degree = 3, final_time = 0.1)
 # Run again after compilation!
-sol = trixi_include(joinpath(@__DIR__, "run_rayleight_taylor.jl"), nx = 64, solver = "mdrk", blend_type = :mh,
+sol = trixi_include(joinpath(@__DIR__, "run_rayleight_taylor.jl"), nx = 64, solver = "mdrk",
 cfl = 0.0, degree = 3, final_time = 2.5)
 lw_time = TimerOutputs.tottime(sol["aux"].timer) * 1e-9
 
