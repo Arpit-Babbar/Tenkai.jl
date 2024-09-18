@@ -21,9 +21,9 @@ trixi_include(joinpath(@__DIR__, "run_rayleight_taylor.jl"), nx = 5, solver = "m
 # Run again after compilation!
 sol = trixi_include(joinpath(@__DIR__, "run_rayleight_taylor.jl"), nx = 64, solver = "mdrk",
 cfl = 0.0, degree = 3, final_time = 2.5)
-lw_time = TimerOutputs.tottime(sol["aux"].timer) * 1e-9
+mdrk_time = TimerOutputs.tottime(sol["aux"].timer) * 1e-9
 
-writedlm("Results/rayleigh_taylor_lw.txt", [lw_time])
+writedlm("Results/rayleigh_taylor_mdrk.txt", [mdrk_time])
 
 ### Double Mach Reflection
 
@@ -41,9 +41,9 @@ trixi_include(joinpath(@__DIR__, "run_double_mach_reflection.jl"), ny = 5, solve
 # Run again after compilation!
 sol = trixi_include(joinpath(@__DIR__, "run_double_mach_reflection.jl"), ny = 150, solver = "mdrk", blend_type = :mh,
                     cfl = 0.0, degree = 3, final_time = 0.2)
-dmr_lw_time = TimerOutputs.tottime(sol["aux"].timer) * 1e-9
+dmr_mdrk_time = TimerOutputs.tottime(sol["aux"].timer) * 1e-9
 
-writedlm("Results/dmr_lw.txt", [dmr_lw_time])
+writedlm("Results/dmr_mdrk.txt", [dmr_mdrk_time])
 
 ### Rotational critical
 
@@ -61,9 +61,9 @@ trixi_include(joinpath(@__DIR__, "run_hurricane_v0critical.jl"), ny = 5, nx = 5,
 # Run again after compilation!
 sol = trixi_include(joinpath(@__DIR__, "run_hurricane_v0critical.jl"), ny = 200, nx = 200, solver = "mdrk", blend_type = :mh,
                     cfl = 0.0, degree = 3, final_time = 0.045)
-rotational_lw_time = TimerOutputs.tottime(sol["aux"].timer) * 1e-9
+rotational_mdrk_time = TimerOutputs.tottime(sol["aux"].timer) * 1e-9
 
-writedlm("Results/hurricane_lw.txt", [rotational_lw_time])
+writedlm("Results/hurricane_mdrk.txt", [rotational_mdrk_time])
 
 ### RP2D
 
@@ -81,6 +81,6 @@ trixi_include(joinpath(@__DIR__, "run_rp2d_12.jl"), ny = 5, nx = 5, solver = "md
 # Run again after compilation!
 sol = trixi_include(joinpath(@__DIR__, "run_rp2d_12.jl"), ny = 512, nx = 512, solver = "mdrk", blend_type = :mh,
                     cfl = 0.0, degree = 3, final_time = 0.25)
-rp2d_lw_time = TimerOutputs.tottime(sol["aux"].timer) * 1e-9
+rp2d_mdrk_time = TimerOutputs.tottime(sol["aux"].timer) * 1e-9
 
-writedlm("Results/rp2d_lw.txt", [rp2d_lw_time])
+writedlm("Results/rp2d_mdrk.txt", [rp2d_mdrk_time])
