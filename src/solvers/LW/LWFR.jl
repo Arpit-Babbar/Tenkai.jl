@@ -224,7 +224,7 @@ function solve_ssfr(eq, problem, scheme, param, grid, op, aux, cache)
                                res, Fb, Ub, cache)
         update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache, t,
                                   dt)
-        compute_face_residual!(eq, grid, op, scheme, param, aux, t, dt, u1,
+        compute_face_residual!(eq, grid, op, problem, scheme, param, aux, t, dt, u1,
                                Fb, Ub, ua, res)
         update_solution_lwfr!(u1, res, aux) # u1 = u1 - res
         compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)

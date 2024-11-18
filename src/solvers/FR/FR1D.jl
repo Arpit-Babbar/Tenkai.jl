@@ -223,7 +223,7 @@ end
 # Add numerical flux to residual
 #-------------------------------------------------------------------------------
 function compute_face_residual!(eq::AbstractEquations{1}, grid, op,
-                                scheme, param, aux, t, dt, u1, Fb, Ub, ua, res,
+                                problem, scheme, param, aux, t, dt, u1, Fb, Ub, ua, res,
                                 scaling_factor = 1.0)
     @timeit aux.timer "Face residual" begin
     #! format: noindent
@@ -241,7 +241,7 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op,
         @views Fn = num_flux(x, ua[:, i - 1], ua[:, i],
                              Fb[:, 2, i - 1], Fb[:, 1, i],
                              Ub[:, 2, i - 1], Ub[:, 1, i], eq, 1)
-        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, dt, grid, op,
+        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid, op, problem,
                                                    scheme, param, Fn, aux, nothing,
                                                    res, scaling_factor)
         for ix in 1:nd
@@ -1573,7 +1573,7 @@ end
 
 @inbounds @inline function blend_face_residual_fo!(i, xf, u1, ua,
                                                    eq::AbstractEquations{1},
-                                                   dt, grid, op, scheme, param,
+                                                   t, dt, grid, op, problem, scheme, param,
                                                    Fn, aux, lamx, res,
                                                    scaling_factor)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead,
@@ -1823,7 +1823,7 @@ end
 # Merge this with blend_cell_residual
 @inbounds function blend_face_residual_muscl!(i, xf, u1, ua,
                                               eq::AbstractEquations{1},
-                                              dt, grid, op, scheme,
+                                              t, dt, grid, op, problem, scheme,
                                               param, Fn, aux, lamx,
                                               res, scaling_factor = 1.0)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead
@@ -2080,13 +2080,13 @@ function get_blended_flux(el_x, eq::AbstractEquations{1}, dt, grid,
 end
 
 @inline function trivial_face_residual(i, x, u1, ua, eq::AbstractEquations{1},
-                                       dt, grid, op, scheme, param, Fn, aux,
+                                       t, dt, grid, op, problem, scheme, param, Fn, aux,
                                        lamx, res, scaling_factor = 1)
     return Fn, (1.0, 1.0)
 end
 
 @inline function blend_flux_face_residual!(i, xf, u1, ua, eq::AbstractEquations{1},
-                                          dt, grid, op, scheme, param, Fn, aux,
+                                          t, dt, grid, op, problem, scheme, param, Fn, aux,
                                           lamx, res, scaling_factor = 1.0)
     #! format: noindent
     @unpack blend = aux
