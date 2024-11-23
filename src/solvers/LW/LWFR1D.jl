@@ -44,8 +44,8 @@ function setup_arrays_lwfr(grid, scheme, eq::AbstractEquations{1})
     Ub = gArray(nvar, 2, nx)
 
     if degree == 0
-        cell_data_size = 7
-        eval_data_size = 6
+        cell_data_size = 0
+        eval_data_size = 0
     elseif degree == 1
         cell_data_size = 7
         eval_data_size = 6
@@ -206,134 +206,20 @@ end
 function compute_cell_residual_0!(eq::AbstractEquations{1}, grid, op, problem,
                                   scheme, aux, t, dt, u1, res, Fb, Ub, cache)
     @unpack source_terms = problem
-    @unpack xg, wg, Dm, D1, Vl, Vr = op
-    nd = length(xg)
+    @unpack xg, wg, = op
     nx = grid.size
-    @unpack bflux_ind = scheme.bflux
-    @unpack blend = aux
-    refresh!(u) = fill!(u, 0.0)
-    # Pre-allocate local variables
-
-    @unpack cell_data, eval_data = cache
-
-    F, f, U, ut, up, um, S = cell_data[Threads.threadid()]
-    refresh!.((res, Ub, Fb)) # Reset previously used variables to zero
 
     @inbounds for cell in Base.OneTo(nx) # Loop over cells
-        dx = grid.dx[cell]
         xc = grid.xc[cell]
-        lamx = dt / dx
-        refresh!(ut)
-
-        # Solution points
-        for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
-            u_node = get_node_vars(u1, eq, i, cell)
-            # Compute flux at all solution points
-            flux1 = flux(x_, u_node, eq)
-            set_node_vars!(F, flux1, eq, i)
-            set_node_vars!(f, flux1, eq, i)
-            for ii in Base.OneTo(nd) # ut = -lamx * DmT * f
-                multiply_add_to_node_vars!(ut, -lamx * Dm[ii, i], flux1, eq, ii)
-            end
-            set_node_vars!(um, u_node, eq, i)
-            set_node_vars!(up, u_node, eq, i)
-            set_node_vars!(U, u_node, eq, i)
-        end
+        u_node = get_node_vars(u1, eq, 1, cell)
+        s_node = calc_source(u_node, xc, t, source_terms, eq)
+        set_node_vars!(res, -dt * s_node, eq, 1, cell)
+        flux1 = flux(xc, u_node, eq)
 
         # Add source term contribution to ut and some to S
-        for i in 1:nd
-            x_ = xc - 0.5 * dx + xg[i] * dx
-            u_node = get_node_vars(u1, eq, i, cell)
-            s_node = calc_source(u_node, x_, t, source_terms, eq)
-            set_node_vars!(S, s_node, eq, i)
-            multiply_add_to_node_vars!(ut, dt, s_node, eq, i)
-        end
-
-        for i in Base.OneTo(nd)
-            ut_node = get_node_vars(ut, eq, i)
-            add_to_node_vars!(up, ut_node, eq, i)
-            subtract_from_node_vars!(um, ut_node, eq, i)
-        end
-        for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
-            um_node = get_node_vars(um, eq, i)
-            up_node = get_node_vars(up, eq, i)
-            fm = flux(x_, um_node, eq)
-            fp = flux(x_, up_node, eq)
-            multiply_add_to_node_vars!(F,
-                                       0.25, fp,
-                                       -0.25, fm,
-                                       eq, i)
-            ut_node = get_node_vars(ut, eq, i)
-            multiply_add_to_node_vars!(U,
-                                       0.5, ut_node,
-                                       eq, i)
-            F_node = get_node_vars(F, eq, i)
-            for ix in Base.OneTo(nd)
-                multiply_add_to_node_vars!(res, lamx * D1[ix, i], F_node, eq, ix, cell)
-            end
-
-            st = calc_source_t_N12(up_node, um_node, x_, t, dt, source_terms, eq)
-            multiply_add_to_node_vars!(S, 0.5, st, eq, i)
-
-            S_node = get_node_vars(S, eq, i)
-            multiply_add_to_node_vars!(res, -dt, S_node, eq, i, cell)
-        end
-        u = @view u1[:, :, cell]
-        r = @view res[:, :, cell]
-        blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
-                                   grid.xf[cell], op, u1, u, cache.ua, f, r)
-        # Interpolate to faces
-        for i in Base.OneTo(nd)
-            U_node = get_node_vars(U, eq, i)
-            multiply_add_to_node_vars!(Ub, Vl[i], U_node, eq, 1, cell)
-            multiply_add_to_node_vars!(Ub, Vr[i], U_node, eq, 2, cell)
-        end
-        if bflux_ind == extrapolate
-            for i in Base.OneTo(nd)
-                Fl_node = get_node_vars(F, eq, i)
-                Fr_node = get_node_vars(F, eq, i)
-                multiply_add_to_node_vars!(Fb, Vl[i], Fl_node, eq, 1, cell)
-                multiply_add_to_node_vars!(Fb, Vr[i], Fr_node, eq, 2, cell)
-            end
-        else
-            ul, ur, upl, upr, uml, umr = eval_data[Threads.threadid()]
-            refresh!.((ul, ur, upl, uml, umr, upr))
-            xl, xr = grid.xf[cell], grid.xf[cell + 1]
-            for i in Base.OneTo(nd)
-                u_node = get_node_vars(u1, eq, i, cell)
-                up_node = get_node_vars(up, eq, i)
-                um_node = get_node_vars(um, eq, i)
-                multiply_add_to_node_vars!(ul, Vl[i], u_node, eq, 1)
-                multiply_add_to_node_vars!(ur, Vr[i], u_node, eq, 1)
-                multiply_add_to_node_vars!(upl, Vl[i], up_node, eq, 1)
-                multiply_add_to_node_vars!(upr, Vr[i], up_node, eq, 1)
-                multiply_add_to_node_vars!(uml, Vl[i], um_node, eq, 1)
-                multiply_add_to_node_vars!(umr, Vr[i], um_node, eq, 1)
-            end
-            # IDEA - Try this in TVB limiter as well
-            ul_node = get_node_vars(ul, eq, 1)
-            ur_node = get_node_vars(ur, eq, 1)
-            upl_node = get_node_vars(upl, eq, 1)
-            upr_node = get_node_vars(upr, eq, 1)
-            uml_node = get_node_vars(uml, eq, 1)
-            umr_node = get_node_vars(umr, eq, 1)
-            fl, fr = flux(xl, ul_node, eq), flux(xr, ur_node, eq)
-
-            set_node_vars!(Fb, fl, eq, 1, cell)
-            set_node_vars!(Fb, fr, eq, 2, cell)
-
-            fml, fmr = flux(xl, uml_node, eq), flux(xr, umr_node, eq)
-            fpl, fpr = flux(xl, upl_node, eq), flux(xr, upr_node, eq)
-            multiply_add_to_node_vars!(Fb,
-                                       0.25, fpl,
-                                       -0.25, fml,
-                                       eq, 1, cell)
-            multiply_add_to_node_vars!(Fb,
-                                       0.25, fpr,
-                                       -0.25, fmr,
-                                       eq, 2, cell)
+        for face in 1:2
+            set_node_vars!(Ub, u_node, eq, face, cell)
+            set_node_vars!(Fb, flux1, eq, face, cell)
         end
     end
     return nothing

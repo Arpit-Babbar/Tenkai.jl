@@ -184,7 +184,9 @@ function get_bflux_function(solver, degree, bflux)
         if bflux == extrapolate
             return extrap_bflux!
         else
-            if degree == 1
+            if degree == 0
+                return extrap_bflux!
+            elseif degree == 1
                 return eval_bflux1!
             elseif degree == 2
                 return eval_bflux2!
