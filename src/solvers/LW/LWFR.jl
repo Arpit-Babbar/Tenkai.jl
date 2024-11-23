@@ -150,7 +150,10 @@ function compute_cell_residual!(eq, grid, op, problem, scheme, aux, t, dt, u1,
     @timeit aux.timer "Cell Residual" begin
     #! format: noindent
     N = op.degree
-    if N == 1
+    if N == 0
+        compute_cell_residual_0!(eq, grid, op, problem, scheme, aux, t, dt, u1,
+                                 res, Fb, Ub, cache)
+    elseif N == 1
         compute_cell_residual_1!(eq, grid, op, problem, scheme, aux, t, dt, u1,
                                  res, Fb, Ub, cache)
     elseif N == 2
