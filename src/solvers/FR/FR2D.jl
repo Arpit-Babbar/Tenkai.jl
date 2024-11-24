@@ -424,7 +424,7 @@ end
 # res[i,j,el_x,el_y] +=  dt/dx*(bL[i]*Fn[j,el_x-1/2,el_y] + bR[i]*Fn[j,el_x+1/2,el_y])
 #                      + dt/dy*(bL[j]*Fn[i,el_x,el_y-1/2] + bR[j]*Fn[i,el_x,el_y+1/2])
 
-function compute_face_residual!(eq::AbstractEquations{2}, grid, op, problem, scheme,
+function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, problem, scheme,
                                 param, aux, t, dt, u1,
                                 Fb, Ub, ua, res, scaling_factor = 1.0)
     @timeit aux.timer "Face residual" begin

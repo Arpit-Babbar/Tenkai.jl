@@ -222,7 +222,7 @@ end
 #-------------------------------------------------------------------------------
 # Add numerical flux to residual
 #-------------------------------------------------------------------------------
-function compute_face_residual!(eq::AbstractEquations{1}, grid, op,
+function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
                                 problem, scheme, param, aux, t, dt, u1, Fb, Ub, ua, res,
                                 scaling_factor = 1.0)
     @timeit aux.timer "Face residual" begin
