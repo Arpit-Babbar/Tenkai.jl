@@ -194,6 +194,8 @@ function get_bflux_function(solver, degree, bflux)
                 return eval_bflux3!
             elseif degree == 4
                 return eval_bflux4!
+            elseif degree == 5
+                return eval_bflux5!
             else
                 @assert false "Incorrect degree"
             end
@@ -1016,6 +1018,7 @@ eval_bflux1!() = nothing
 eval_bflux2!() = nothing
 eval_bflux3!() = nothing
 eval_bflux4!() = nothing
+eval_bflux5!() = nothing
 extrap_bflux!() = nothing
 
 #-------------------------------------------------------------------------------

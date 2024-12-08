@@ -58,6 +58,9 @@ function setup_arrays_lwfr(grid, scheme, eq::AbstractEquations{1})
     elseif degree == 4
         cell_data_size = 16
         eval_data_size = 18
+    elseif degree == 5
+        cell_data_size = 16
+        eval_data_size = 18
     else
         @assert false "Degree not implemented"
     end
@@ -1268,4 +1271,14 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, problem,
     end
     return nothing
 end
+
+#-------------------------------------------------------------------------------
+# Compute cell residual for degree=5 case and for all real cells
+#-------------------------------------------------------------------------------
+function compute_cell_residual_5!(eq::AbstractEquations{1}, grid, op, problem,
+    scheme, aux, t, dt, u1, res, Fb, Ub, cache)
+
+    @assert false "Not implemented"
+end
+
 end # @muladd

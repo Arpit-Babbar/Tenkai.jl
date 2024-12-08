@@ -35,6 +35,7 @@ compute_cell_residual_1!() = nothing
 compute_cell_residual_2!() = nothing
 compute_cell_residual_3!() = nothing
 compute_cell_residual_4!() = nothing
+compute_cell_residual_5!() = nothing
 update_ghost_values_lwfr!() = nothing
 (import Tenkai: eval_bflux1!, eval_bflux2!, eval_bflux3!, eval_bflux4!,
               extrap_bflux!, setup_arrays_lwfr)
@@ -164,6 +165,9 @@ function compute_cell_residual!(eq, grid, op, problem, scheme, aux, t, dt, u1,
                                  res, Fb, Ub, cache)
     elseif N == 4
         compute_cell_residual_4!(eq, grid, op, problem, scheme, aux, t, dt, u1,
+                                 res, Fb, Ub, cache)
+    elseif N == 5
+        compute_cell_residual_5!(eq, grid, op, problem, scheme, aux, t, dt, u1,
                                  res, Fb, Ub, cache)
     else
         println("compute_cell_residual: Not implemented for degree > 1")
