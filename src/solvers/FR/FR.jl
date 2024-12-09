@@ -206,7 +206,7 @@ end
 #------------------------------------------------------------------------------
 # Create a struct of parameters
 #------------------------------------------------------------------------------
-struct Parameters{T1 <: Union{Int64, Vector{Int64}}}
+struct Parameters{T1 <: Union{Int64, Vector{<:Any}}}
     grid_size::T1
     cfl::Float64
     bounds::Tuple{Vector{Float64}, Vector{Float64}}
