@@ -36,7 +36,7 @@ using FastGaussQuadrature
 #-------------------------------------------------------------------------------
 # Create a struct of problem description
 #-------------------------------------------------------------------------------
-struct Problem{F1, F2, F3 <: Function, BoundaryCondition <: Tuple, SourceTerms}
+struct Problem{SourceTerms, BoundaryCondition <: Tuple, F1, F2, F3 <: Function}
     domain::Vector{Float64}
     initial_value::F1
     boundary_value::F2
