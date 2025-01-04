@@ -105,7 +105,7 @@ end
 # Create a struct of scheme description
 #-------------------------------------------------------------------------------
 struct Scheme{Solver, NumericalFlux, Limiter, BFlux <: NamedTuple{<:Any, <:Any},
-              Dissipation}
+              Dissipation, Cache}
     solver::Solver
     solver_enum::SolverType
     degree::Int64
@@ -116,6 +116,7 @@ struct Scheme{Solver, NumericalFlux, Limiter, BFlux <: NamedTuple{<:Any, <:Any},
     limiter::Limiter
     bflux::BFlux
     dissipation::Dissipation
+    cache::Cache
 end
 
 function solver2enum(solver)
@@ -144,7 +145,9 @@ end
 # Constructor
 function Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux::BFluxType,
-                dissipation = "2")
+                dissipation = "2"; cache = nothing)
+    # KLUDGE - The dissipation should have been a key word argument, but
+    # I don't want to change all the run files now.
     bflux_data = (; bflux_ind = bflux,
                   compute_bflux! = get_bflux_function(solver, degree, bflux))
     solver_enum = solver2enum(solver)
@@ -152,20 +155,22 @@ function Scheme(solver, degree, solution_points, correction_function,
 
     Scheme(solver, solver_enum, degree, solution_points, correction_function,
            numerical_flux, bound_limit, limiter, bflux_data,
-           get_dissipation_node_vars)
+           get_dissipation_node_vars, cache)
 end
 
 function Scheme(solver, solver_enum::SolverType, degree, solution_points,
                 correction_function,
                 numerical_flux, bound_limit, limiter, bflux::BFluxType,
-                dissipation = "2")
+                dissipation = "2"; cache = nothing)
+    # KLUDGE - The dissipation should have been a key word argument, but
+    # I don't want to change all the run files now.
     bflux_data = (; bflux_ind = bflux,
                   compute_bflux! = get_bflux_function(solver, degree, bflux))
     get_dissipation_node_vars = diss_arg2method(dissipation)
 
     Scheme(solver, solver_enum, degree, solution_points, correction_function,
            numerical_flux, bound_limit, limiter, bflux_data,
-           get_dissipation_node_vars)
+           get_dissipation_node_vars, cache)
 end
 
 trivial_function(x) = nothing
