@@ -20,7 +20,7 @@ numerical_flux = Eq.rusanov
 bound_limit = "no"
 bflux = evaluate
 
-nx = 40
+nx = 80
 bounds = ([-Inf], [Inf])
 cfl = 0.0
 save_iter_interval = 0

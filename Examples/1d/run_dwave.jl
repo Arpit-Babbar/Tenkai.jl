@@ -4,7 +4,7 @@ using Tenkai
 using Plots
 # Submodules
 Eq = Tenkai.EqEuler1D
-plotlyjs() # Set backend
+# plotlyjs() # Set backend
 
 #------------------------------------------------------------------------------
 xmin, xmax = 0.0, 1.0
@@ -15,7 +15,7 @@ boundary_condition = (periodic, periodic)
 initial_value, exact_solution, final_time, ic_name = Eq.dwave_data
 boundary_value = exact_solution # dummy function
 
-degree = 1
+degree = 5
 solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
@@ -46,7 +46,7 @@ limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               indicator_model = "model1",
                               debug_blend = false,
                               pure_fv = true)
-# limiter = setup_limiter_none()
+limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,

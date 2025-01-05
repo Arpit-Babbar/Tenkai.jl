@@ -104,8 +104,8 @@ end
 #-------------------------------------------------------------------------------
 # Create a struct of scheme description
 #-------------------------------------------------------------------------------
-struct Scheme{Solver, NumericalFlux, Limiter, BFlux <: NamedTuple{<:Any, <:Any},
-              Dissipation, Cache}
+struct Scheme{Solver, Dissipation, NumericalFlux, Limiter, BFlux <: NamedTuple{<:Any, <:Any},
+              Cache}
     solver::Solver
     solver_enum::SolverType
     degree::Int64
@@ -130,16 +130,14 @@ function solver2enum(solver)
 end
 
 function diss_arg2method(dissipation)
-    @assert dissipation in ("1", "2", 1, 2,
-                            get_first_node_vars, # kludge
-                            get_second_node_vars) "dissipation = $dissipation"
-    if dissipation in ("1", 1)
-        get_dissipation_node_vars = get_first_node_vars
+    if dissipation in ("1", 1, get_first_node_vars)
+        return get_first_node_vars
+    elseif dissipation in ("2", 2, get_second_node_vars)
+        return get_second_node_vars
     else
-        @assert dissipation in ("2", 2)
-        get_dissipation_node_vars = get_second_node_vars
+        @warn "User defined dissipation = $dissipation is being used"
+        return dissipation
     end
-    return get_dissipation_node_vars
 end
 
 # Constructor

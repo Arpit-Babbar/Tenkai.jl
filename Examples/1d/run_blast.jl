@@ -1,5 +1,6 @@
 using StaticArrays
 using Tenkai
+using Plots
 # Submodules
 Eq = Tenkai.EqEuler1D
 
@@ -22,12 +23,12 @@ numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
 
-nx = 400
+nx = 100
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 300.0
 save_iter_interval = 0
-save_time_interval = 0.0
+save_time_interval = 0.1 * final_time
 animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
 
@@ -62,7 +63,4 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 
-print(sol["errors"])
-
-return sol
-sol
+sol["plot_data"].p_ua
