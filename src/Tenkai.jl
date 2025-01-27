@@ -129,8 +129,13 @@ include("$eq_dir/EqTenMoment2D.jl")
 
 include("$solvers_dir/cRK/cRK.jl")
 include("$solvers_dir/cRK/cRK1D.jl")
+include("$solvers_dir/cRK/cRK1D_DCSX.jl")
 include("$solvers_dir/cRK/cRK2D.jl")
 
+# Standard cRK solvers
 export cRK11, cRK22, cRK33, cRK44, cRK65
+
+# DCSX dissipation
+export DCSX
 
 end # module

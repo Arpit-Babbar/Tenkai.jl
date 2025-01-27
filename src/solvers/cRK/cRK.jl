@@ -9,8 +9,7 @@ struct cRK33 <: cRKSolver end
 struct cRK22 <: cRKSolver end
 struct cRK11 <: cRKSolver end
 
-struct DCSX <: AbstractDissipation end # Dissipation model of Chen2024, called D-CSX
-
+struct DCSX <: AbstractDissipation end
 
 function update_ghost_values_cRK!(problem, scheme, eq, grid, aux, op, cache,
                                   t, dt, scaling_factor = 1)
