@@ -125,4 +125,12 @@ include("$eq_dir/EqLinAdv2D.jl")
 include("$eq_dir/EqEuler2D.jl")
 include("$eq_dir/EqTenMoment2D.jl")
 
+# cRK methods (developed similar to using Tenkai as a library)
+
+include("$solvers_dir/cRK/cRK.jl")
+include("$solvers_dir/cRK/cRK1D.jl")
+include("$solvers_dir/cRK/cRK2D.jl")
+
+export cRK11, cRK22, cRK33, cRK44, cRK65
+
 end # module
