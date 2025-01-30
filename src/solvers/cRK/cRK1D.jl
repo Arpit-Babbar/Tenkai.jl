@@ -33,6 +33,27 @@ function get_cfl(eq::AbstractEquations{1}, scheme::Scheme{<:cRKSolver}, param)
     end
 end
 
+function prolong_solution_to_face_and_ghosts!(u1, cache, eq::AbstractEquations{1}, grid, op,
+                                              problem, scheme, aux, t, dt)
+    @timeit aux.timer "Update ghost values" begin
+    #! format: noindent
+    nx = grid.size
+    @unpack u1_b = cache
+    refresh!(u1_b)
+    @unpack degree, Vl, Vr = op
+    nd = degree + 1
+    @inbounds for cell in 0:nx+1
+        for i in 1:nd
+            u_node = get_node_vars(u1, eq, i, cell)
+            multiply_add_to_node_vars!(u1_b, Vl[i], u_node, eq, 1, cell)
+            multiply_add_to_node_vars!(u1_b, Vr[i], u_node, eq, 2, cell)
+        end
+    end
+    return nothing
+
+    end # timer
+end
+
 function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44}, eq::AbstractEquations{1},
                                   grid, aux, op, cache, t, dt)
     @timeit aux.timer "Update ghost values" begin
@@ -154,6 +175,7 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
     res = gArray(nvar, nd, nx)
     Fb = gArray(nvar, 2, nx)
     Ub = gArray(nvar, 2, nx)
+    u1_b = copy(Ub)
     ub_N = gArray(nvar, 2, nx) # The final stage of cRK before communication
 
     if degree == 0
@@ -181,7 +203,7 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
     MArr = MArray{Tuple{nvariables(eq), 1}, Float64}
     eval_data = alloc_for_threads(MArr, eval_data_size)
 
-    cache = (; u1, ua, res, Fb, Ub, ub_N, cell_data, eval_data)
+    cache = (; u1, ua, res, Fb, Ub, u1_b, ub_N, cell_data, eval_data)
     return cache
 end
 
@@ -257,6 +279,41 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
         end
     end
     return nothing
+end
+
+function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
+                                problem, scheme::Scheme{<:cRKSolver}, param, aux, t, dt, u1, Fb,
+                                Ub, ua, res, scaling_factor = 1.0)
+    @timeit aux.timer "Face residual" begin
+    #! format: noindent
+    @unpack xg, wg, bl, br = op
+    nd = op.degree + 1
+    nx = grid.size
+    @unpack dx, xf = grid
+    num_flux = scheme.numerical_flux
+    @unpack blend = aux
+    @unpack u1_b = cache
+
+    # Vertical faces, x flux
+    for i in 1:(nx + 1)
+        # Face between i-1 and i
+        x = xf[i]
+        @views Fn = num_flux(x,
+                             u1_b[:, 2, i - 1], u1_b[:, 1, i],
+                             Fb[:, 2, i - 1], Fb[:, 1, i],
+                             Ub[:, 2, i - 1], Ub[:, 1, i], eq, 1)
+        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid, op, problem,
+                                                   scheme, param, Fn, aux, nothing,
+                                                   res, scaling_factor)
+        for ix in 1:nd
+            for n in 1:nvariables(eq)
+                res[n, ix, i - 1] += dt / dx[i - 1] * blend_fac[1] * Fn[n] * br[ix]
+                res[n, ix, i] += dt / dx[i] * blend_fac[2] * Fn[n] * bl[ix]
+            end
+        end
+    end
+    return nothing
+    end # timer
 end
 
 function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,

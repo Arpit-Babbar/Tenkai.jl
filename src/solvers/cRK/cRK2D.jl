@@ -44,6 +44,7 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver}, eq::AbstractEquations{2
     res = gArray(nvar, nd, nd, nx, ny)
     Fb = gArray(nvar, nd, 4, nx, ny)
     Ub = gArray(nvar, nd, 4, nx, ny)
+    u1_b = copy(Ub)
     ub_N = gArray(nvar, nd, 4, nx, ny) # The final stage of cRK before communication
 
     # Cell residual cache
@@ -96,8 +97,36 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver}, eq::AbstractEquations{2
     ghost_cache = alloc_for_threads(Marr, 2)
 
     # KLUDGE - Rename this to LWFR cache
-    cache = (; u1, ua, ub_N, res, Fb, Ub, eval_data, cell_arrays, ghost_cache)
+    cache = (; u1, ua, ub_N, res, Fb, Ub, u1_b,eval_data, cell_arrays, ghost_cache)
     return cache
+end
+
+function prolong_solution_to_face_and_ghosts!(u1, cache, eq::AbstractEquations{2}, grid, op,
+                                              problem, scheme, aux, t, dt)
+    @timeit aux.timer "Update ghost values" begin
+    #! format: noindent
+    nx, ny = grid.size
+    @unpack u1_b = cache
+    refresh!(u1_b)
+    @unpack degree, Vl, Vr = op
+    nd = degree + 1
+    @threaded for element in CartesianIndices((0:nx+1, 0:ny+1)) # Loop over cells
+        el_x, el_y = element[1], element[2]
+        for j in 1:nd, i in 1:nd
+            u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
+            multiply_add_to_node_vars!(u1_b, Vl[i], u_node, eq, j, 1, el_x, el_y)
+            multiply_add_to_node_vars!(u1_b, Vr[i], u_node, eq, j, 2, el_x, el_y)
+
+            # Ub = U * V
+            # Ub[i] += ∑_j U[i,j]*V[j]
+            multiply_add_to_node_vars!(u1_b, Vl[j], u_node, eq, i, 3, el_x, el_y)
+            multiply_add_to_node_vars!(u1_b, Vr[j], u_node, eq, i, 4, el_x, el_y)
+        end
+    end
+
+    return nothing
+
+    end # timer
 end
 
 function get_bflux_function(solver::cRKSolver, degree, bflux)
@@ -334,6 +363,199 @@ function eval_bflux!(eq::AbstractEquations{2}, scheme::Scheme{<:cRK44}, grid,
         multiply_add_to_node_vars!(Fb, 1.0 / 6.0, gu, 1.0 / 3.0, g2u, eq, i, 4)
         multiply_add_to_node_vars!(Fb, 1.0 / 3.0, g3u, 1.0 / 6.0, g4u, eq, i, 4)
     end
+end
+
+function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, problem,
+                                scheme::Scheme{<:cRKSolver}, param, aux, t, dt, u1,
+                                Fb, Ub, ua, res, scaling_factor = 1.0)
+    @timeit aux.timer "Face residual" begin
+    #! format: noindent
+    @unpack bl, br, xg, wg, degree = op
+    nd = degree + 1
+    nx, ny = grid.size
+    @unpack dx, dy, xf, yf = grid
+    @unpack numerical_flux = scheme
+    @unpack blend = aux
+    @unpack blend_face_residual_x!, blend_face_residual_y!, get_element_alpha = blend.subroutines
+    @unpack u1_b = cache
+
+    # Vertical faces, x flux
+    @threaded for element in CartesianIndices((1:(nx + 1), 1:ny)) # Loop over cells
+        el_x, el_y = element[1], element[2]
+        # This is face between elements (el_x-1, el_y), (el_x, el_y)
+        x = xf[el_x]
+        # ul, ur = get_node_vars(ua, eq, el_x - 1, el_y),
+        #            get_node_vars(ua, eq, el_x, el_y)
+        for jy in Base.OneTo(nd)
+            y = yf[el_y] + xg[jy] * dy[el_y]
+            ul, ur = (get_node_vars(u1_b, eq, jy, 2, el_x - 1, el_y),
+                      get_node_vars(u1_b, eq, jy, 1, el_x, el_y))
+            Fl, Fr = (get_node_vars(Fb, eq, jy, 2, el_x - 1, el_y),
+                      get_node_vars(Fb, eq, jy, 1, el_x, el_y))
+            Ul, Ur = (get_node_vars(Ub, eq, jy, 2, el_x - 1, el_y),
+                      get_node_vars(Ub, eq, jy, 1, el_x, el_y))
+            X = SVector{2}(x, y)
+            Fn = numerical_flux(X, ul, ur, Fl, Fr, Ul, Ur, eq, 1)
+            Fn, blend_factors = blend_face_residual_x!(el_x, el_y, jy, x, y, u1, ua,
+                                                       eq, dt, grid, op,
+                                                       scheme, param, Fn, aux,
+                                                       res, scaling_factor)
+
+            # These quantities won't be used so we can store numerical flux here
+            set_node_vars!(Fb, Fn, eq, jy, 2, el_x - 1, el_y)
+            set_node_vars!(Fb, Fn, eq, jy, 1, el_x, el_y)
+            # for ix in Base.OneTo(nd)
+            #    multiply_add_to_node_vars!(res,
+            #                               blend_factors[1] * dt/dx[el_x-1] * br[ix], Fn,
+            #                               eq,
+            #                               ix, jy, el_x-1, el_y )
+
+            #    multiply_add_to_node_vars!(res,
+            #                               blend_factors[2] * dt/dx[el_x]   * bl[ix], Fn,
+            #                               eq,
+            #                               ix, jy, el_x, el_y )
+            # end
+
+            # r = @view res[:, :, jy, el_x-1, el_y]
+            # multiply_add_to_node_vars!(r, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
+            #                            alpha[el_x-1,el_y]*dt/(dx[el_x-1]*wg[nd]), Fn,
+            #                            eq, nd)
+
+            # r = @view res[:, :, jy, el_x, el_y]
+            # multiply_add_to_node_vars!(r, # r[1] -= alpha*dt/(dy*wg[1])*Fn
+            #                            - alpha[el_x,el_y]*dt/(dx[el_x]*wg[1]), Fn,
+            #                            eq, 1)
+        end
+    end
+
+    # Horizontal faces, y flux
+    @threaded for element in CartesianIndices((1:nx, 1:(ny + 1))) # Loop over cells
+        el_x, el_y = element[1], element[2]
+        # This is the face between elements (el_x,el_y-1) and (el_x,el_y)
+        y = yf[el_y]
+        # ul, ur = get_node_vars(ua, eq, el_x, el_y - 1),
+        #            get_node_vars(ua, eq, el_x, el_y)
+        for ix in Base.OneTo(nd)
+            x = xf[el_x] + xg[ix] * dx[el_x]
+            ul, ur = get_node_vars(u1_b, eq, ix, 4, el_x, el_y - 1),
+                     get_node_vars(u1_b, eq, ix, 3, el_x, el_y)
+            Fl, Fr = get_node_vars(Fb, eq, ix, 4, el_x, el_y - 1),
+                     get_node_vars(Fb, eq, ix, 3, el_x, el_y)
+            Ul, Ur = get_node_vars(Ub, eq, ix, 4, el_x, el_y - 1),
+                     get_node_vars(Ub, eq, ix, 3, el_x, el_y)
+            X = SVector{2}(x, y)
+            Fn = numerical_flux(X, ul, ur, Fl, Fr, Ul, Ur, eq, 2)
+            Fn, blend_factors = blend_face_residual_y!(el_x, el_y, ix, x, y,
+                                                       u1, ua, eq, dt, grid, op,
+                                                       scheme, param, Fn, aux,
+                                                       res, scaling_factor)
+            # These quantities won't be used so we can store numerical flux here
+            set_node_vars!(Fb, Fn, eq, ix, 4, el_x, el_y - 1)
+            set_node_vars!(Fb, Fn, eq, ix, 3, el_x, el_y)
+            # for jy in Base.OneTo(nd)
+            #    multiply_add_to_node_vars!(res,
+            #                               blend_factors[1] * dt/dy[el_y-1] * br[jy], Fn,
+            #                               eq,
+            #                               ix, jy, el_x, el_y-1 )
+            #    multiply_add_to_node_vars!(res,
+            #                               blend_factors[2] * dt/dy[el_y]   * bl[jy], Fn,
+            #                               eq,
+            #                               ix, jy, el_x, el_y   )
+            # end
+
+            # r = @view res[:,ix,:,el_x,el_y-1]
+
+            # multiply_add_to_node_vars!(r, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
+            #                            alpha[el_x,el_y-1] * dt/(dy[el_y-1]*wg[nd]),
+            #                            Fn,
+            #                            eq, nd
+            #                            )
+
+            # r = @view res[:,ix,:,el_x,el_y]
+
+            # multiply_add_to_node_vars!(r, # r[1] -= alpha*dt/(dy*wg[1])*Fn
+            #                            - alpha[el_x,el_y] * dt/(dy[el_y]*wg[1]),
+            #                            Fn,
+            #                            eq, 1)
+        end
+    end
+
+    # This loop is slow with Threads.@threads so we use Polyster.jl threads
+    @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
+        el_x, el_y = element[1], element[2]
+        alpha = get_element_alpha(blend, el_x, el_y) # TODO - Use a function to get this
+        one_m_alp = 1.0 - alpha
+        for ix in Base.OneTo(nd)
+            for jy in Base.OneTo(nd)
+                Fl = get_node_vars(Fb, eq, jy, 1, el_x, el_y)
+                Fr = get_node_vars(Fb, eq, jy, 2, el_x, el_y)
+                Fd = get_node_vars(Fb, eq, ix, 3, el_x, el_y)
+                Fu = get_node_vars(Fb, eq, ix, 4, el_x, el_y)
+                # multiply_add_to_node_vars!(res,
+                #                            one_m_alp * dt/dy[el_y] * br[jy], Fu,
+                #                            eq,
+                #                            ix, jy, el_x, el_y)
+                # multiply_add_to_node_vars!(res,
+                #                            one_m_alp * dt/dy[el_y] * bl[jy], Fd,
+                #                            eq,
+                #                            ix, jy, el_x, el_y)
+
+                # multiply_add_to_node_vars!(res,
+                #                            one_m_alp * dt/dx[el_x] * br[ix], Fr,
+                #                            eq,
+                #                            ix, jy, el_x, el_y )
+                # multiply_add_to_node_vars!(res,
+                #                            one_m_alp * dt/dx[el_x] * bl[ix], Fl,
+                #                            eq,
+                #                            ix, jy, el_x, el_y )
+                for n in eachvariable(eq)
+                    res[n, ix, jy, el_x, el_y] += one_m_alp * dt / dy[el_y] *
+                                                  br[jy] * Fu[n]
+                    res[n, ix, jy, el_x, el_y] += one_m_alp * dt / dy[el_y] *
+                                                  bl[jy] * Fd[n]
+                    res[n, ix, jy, el_x, el_y] += one_m_alp * dt / dx[el_x] *
+                                                  br[ix] * Fr[n]
+                    res[n, ix, jy, el_x, el_y] += one_m_alp * dt / dx[el_x] *
+                                                  bl[ix] * Fl[n]
+                end
+            end
+        end
+    end
+
+    # This loop is slow with Threads.@threads so we use Polyster.jl threads
+    @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
+        el_x, el_y = element[1], element[2]
+        alpha = get_element_alpha(blend, el_x, el_y) # TODO - Use a function to get this
+        one_m_alp = 1.0 - alpha
+        for ix in Base.OneTo(nd)
+            Fd = get_node_vars(Fb, eq, ix, 3, el_x, el_y)
+            Fu = get_node_vars(Fb, eq, ix, 4, el_x, el_y)
+
+            # r = @view res[:,ix,:,el_x,el_y]
+
+            multiply_add_to_node_vars!(res, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
+                                       -alpha * dt / (dy[el_y] * wg[1]),
+                                       Fd,
+                                       eq, ix, 1, el_x, el_y)
+
+            multiply_add_to_node_vars!(res, # r[1] -= alpha*dt/(dy*wg[1])*Fn
+                                       alpha * dt / (dy[el_y] * wg[nd]),
+                                       Fu,
+                                       eq, ix, nd, el_x, el_y)
+
+            Fl = get_node_vars(Fb, eq, ix, 1, el_x, el_y)
+            Fr = get_node_vars(Fb, eq, ix, 2, el_x, el_y)
+            # r = @view res[:, :, ix, el_x, el_y]
+            multiply_add_to_node_vars!(res, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
+                                       -alpha * dt / (dx[el_x] * wg[1]), Fl,
+                                       eq, 1, ix, el_x, el_y)
+            multiply_add_to_node_vars!(res, # r[1] -= alpha*dt/(dy*wg[1])*Fn
+                                       alpha * dt / (dx[el_x] * wg[nd]), Fr,
+                                       eq, nd, ix, el_x, el_y)
+        end
+    end
+    return nothing
+    end # timer
 end
 
 function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,

@@ -13,6 +13,7 @@ struct DCSX <: AbstractDissipation end
 
 function update_ghost_values_cRK!(problem, scheme, eq, grid, aux, op, cache, t, dt)
     update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache, t, dt)
+    update_ghost_values_u1!(eq, problem, grid, op, cache.u1, aux, t)
 end
 
 function initialize_solution!(eq, grid, op, problem, scheme, param, aux, cache)
@@ -34,6 +35,7 @@ function evolve_solution!(eq, grid, op, problem, scheme, param, aux, iter, t, dt
                          param, aux, op, u1, ua)
     compute_cell_residual_cRK!(eq, grid, op, problem, scheme, aux, t, dt, cache)
     update_ghost_values_cRK!(problem, scheme, eq, grid, aux, op, cache, t, dt)
+    prolong_solution_to_face_and_ghosts!(u1, cache, eq, grid, op, problem, scheme, aux, t, dt)
     compute_face_residual!(eq, grid, op, cache, problem, scheme, param, aux, t, dt, u1,
                            Fb, Ub, ua, res)
     update_solution_cRK!(u1, eq, grid, problem, scheme, res, aux, t, dt) # u1 = u1 - res

@@ -11,8 +11,8 @@ boundary_condition = (periodic, periodic, periodic, periodic)
 initial_value, exact_solution = Eq.sedov_data
 boundary_value = exact_solution
 
-degree = 4
-solver = "lwfr"
+degree = 3
+solver = cRK44()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
