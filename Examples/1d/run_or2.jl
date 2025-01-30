@@ -13,15 +13,15 @@ final_time = 1.0
 velocity, initial_value, exact_solution = Eq.or_data
 boundary_value = exact_solution
 
-degree = 2
-solver = "lwfr"
+degree = 3
+solver = cRK44()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "no"
 bflux = evaluate
 
-nx = 16
+nx = 32
 bounds = ([-Inf], [Inf])
 cfl = 0.0
 save_iter_interval = 0

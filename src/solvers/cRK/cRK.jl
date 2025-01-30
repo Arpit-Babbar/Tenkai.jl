@@ -11,10 +11,8 @@ struct cRK11 <: cRKSolver end
 
 struct DCSX <: AbstractDissipation end
 
-function update_ghost_values_cRK!(problem, scheme, eq, grid, aux, op, cache,
-                                  t, dt, scaling_factor = 1)
-    update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache, t, dt,
-                              scaling_factor)
+function update_ghost_values_cRK!(problem, scheme, eq, grid, aux, op, cache, t, dt)
+    update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache, t, dt)
 end
 
 function initialize_solution!(eq, grid, op, problem, scheme, param, aux, cache)

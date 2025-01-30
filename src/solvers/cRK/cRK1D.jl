@@ -33,6 +33,109 @@ function get_cfl(eq::AbstractEquations{1}, scheme::Scheme{<:cRKSolver}, param)
     end
 end
 
+function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44}, eq::AbstractEquations{1},
+                                  grid, aux, op, cache, t, dt)
+    @timeit aux.timer "Update ghost values" begin
+    #! format: noindent
+    @unpack Fb, Ub = cache
+    update_ghost_values_periodic!(eq, problem, Fb, Ub)
+    update_ghost_values_u1!(eq, problem, grid, op, cache.u1, aux, t)
+
+    if problem.periodic_x
+        return nothing
+    end
+
+    nx = grid.size
+    @unpack degree, xg, wg = op
+    nd = degree + 1
+    dx, xf = grid.dx, grid.xf
+    nvar = nvariables(eq)
+    @unpack boundary_value, boundary_condition = problem
+    left, right = boundary_condition
+    refresh!(u) = fill!(u, 0.0)
+
+    ub, fb = zeros(nvar), zeros(nvar)
+
+    # For Dirichlet bc, use upwind flux at faces by assigning both physical
+    # and ghost cells through the bc.
+    rk4_time_levels = (0, 0.5, 0.5, 1)
+    rk4_coeff = (1.0/6.0, 1.0/3.0, 1.0/3.0, 1.0/6.0)
+    if left == dirichlet
+        x = xf[1]
+        for l in 1:4 # RK4 stages
+            tq = t + dt * rk4_time_levels[l]
+            ubvalue = boundary_value(x, tq)
+            fbvalue = flux(x, ubvalue, eq)
+            for n in 1:nvar
+                ub[n] += ubvalue[n] * rk4_coeff[l]
+                fb[n] += fbvalue[n] * rk4_coeff[l]
+            end
+        end
+        for n in 1:nvar
+            Ub[n, 1, 1] = Ub[n, 2, 0] = ub[n]
+            Fb[n, 1, 1] = Fb[n, 2, 0] = fb[n]
+        end
+    elseif left == neumann
+        for n in 1:nvar
+            Ub[n, 2, 0] = Ub[n, 1, 1]
+            Fb[n, 2, 0] = Fb[n, 1, 1]
+        end
+    elseif left == reflect
+        # velocity reflected back in opposite direction and density is same
+        for n in 1:nvar
+            Ub[n, 2, 0] = Ub[n, 1, 1]
+            Fb[n, 2, 0] = Fb[n, 1, 1]
+        end
+        Ub[2, 2, 0] = -Ub[2, 2, 0] # velocity reflected back
+        Fb[1, 2, 0], Fb[3, 2, 0] = -Fb[1, 2, 0], -Fb[3, 2, 0] # vel multiple term
+    else
+        println("Incorrect bc specified at left.")
+        @assert false
+    end
+
+    refresh!.((ub, fb))
+    if right == dirichlet
+        x = xf[nx + 1]
+        for l in 1:4 # RK4 stages
+            tq = t + dt * rk4_time_levels[l]
+            ubvalue = boundary_value(x, tq)
+            fbvalue = flux(x, ubvalue, eq)
+            for n in 1:nvar
+                ub[n] += ubvalue[n] * rk4_coeff[l]
+                fb[n] += fbvalue[n] * rk4_coeff[l]
+            end
+        end
+        for n in 1:nvar
+            Ub[n, 2, nx] = Ub[n, 1, nx + 1] = ub[n]
+            Fb[n, 2, nx] = Fb[n, 1, nx + 1] = fb[n]
+        end
+    elseif right == neumann
+        for n in 1:nvar
+            Ub[n, 1, nx + 1] = Ub[n, 2, nx]
+            Fb[n, 1, nx + 1] = Fb[n, 2, nx]
+        end
+    elseif right == reflect
+        # velocity reflected back in opposite direction and density is same
+        for n in 1:nvar
+            Ub[n, 1, nx + 1] = Ub[n, 2, nx]
+            Fb[n, 1, nx + 1] = Fb[n, 2, nx]
+        end
+        Ub[2, 1, nx + 1] = -Ub[2, 1, nx + 1] # velocity reflected back
+        Fb[1, 1, nx + 1], Fb[3, 1, nx + 1] = (-Fb[1, 1, nx + 1],
+                                              -Fb[3, 1, nx + 1]) # vel multiple term
+
+    else
+        println("Incorrect bc specified at right.")
+        @assert false
+    end
+
+    if scheme.limiter.name == "blend"
+        update_ghost_values_fn_blend!(eq, problem, grid, aux)
+    end
+    end # timer
+    return nothing
+end
+
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
                       eq::AbstractEquations{1})
     gArray(nvar, nx) = OffsetArray(zeros(nvar, nx + 2),
