@@ -24,7 +24,7 @@ import Tenkai: admissibility_tolerance
                 write_soln!, compute_time_step, post_process_soln)
 
 (using Tenkai: PlotData, data_dir, get_filename, neumann, minmod,
-               get_node_vars,
+               get_node_vars, sum_node_vars_1d,
                set_node_vars!,
                nvariables, eachvariable,
                add_to_node_vars!, subtract_from_node_vars!,
@@ -703,6 +703,13 @@ function Tenkai.apply_bound_limiter!(eq::Euler1D, grid, scheme, param, op, ua,
                 var_min = min(var_min, var)
             end
             var_min = min(var_min, var_ll, var_rr)
+
+            # In order to correct the solution at the faces, we need to extrapolate it to faces
+            # and then correct it.
+            ul = sum_node_vars_1d(Vl, u1, eq, 1:nd, element) # ul = ∑ Vl*u
+            ur = sum_node_vars_1d(Vr, u1, eq, 1:nd, element) # ur = ∑ Vr*u
+            var_u_ll, var_u_rr = variable(eq, ul), variable(eq, ur)
+            var_min = min(var_min, var_u_ll, var_u_rr)
             ua_ = get_node_vars(ua, eq, element)
             var_avg = variable(eq, ua_)
             ratio = abs(eps - var_avg) / (abs(var_min - var_avg) + 1e-13)

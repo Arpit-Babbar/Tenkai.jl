@@ -299,9 +299,9 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
         # Face between i-1 and i
         x = xf[i]
         @views Fn = num_flux(x,
-                             u1_b[:, 2, i - 1], u1_b[:, 1, i],
-                             Fb[:, 2, i - 1], Fb[:, 1, i],
-                             Ub[:, 2, i - 1], Ub[:, 1, i], eq, 1)
+                            u1_b[:, 2, i - 1], u1_b[:, 1, i],
+                            Fb[:, 2, i - 1], Fb[:, 1, i],
+                            Ub[:, 2, i - 1], Ub[:, 1, i], eq, 1)
         Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid, op, problem,
                                                    scheme, param, Fn, aux, nothing,
                                                    res, scaling_factor)

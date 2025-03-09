@@ -333,7 +333,11 @@ end
 
 #------------------------------------------------------------------------------
 # Static array operations
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+
+@inline function sum_node_vars_1d(V, u, eq, range, element)
+    SVector(ntuple(v -> sum(i -> V[i] * u[v, i, element], range), Val(nvariables(eq))))
+end
 
 @inline function get_node_vars(u, eq, indices...)
     SVector(ntuple(@inline(v->u[v, indices...]), Val(nvariables(eq))))
