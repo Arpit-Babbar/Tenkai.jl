@@ -376,6 +376,14 @@ function correct_variable_bound_limiter!(variable, eq::AbstractEquations{1},
             var_min = min(var_min, var)
         end
         var_min = min(var_min, var_ll, var_rr)
+
+        # In order to correct the solution at the faces, we need to extrapolate it to faces
+        # and then correct it.
+        ul = sum_node_vars_1d(Vl, u1, eq, 1:nd, element) # ul = ∑ Vl*u
+        ur = sum_node_vars_1d(Vr, u1, eq, 1:nd, element) # ur = ∑ Vr*u
+        var_u_ll, var_u_rr = variable(eq, ul), variable(eq, ur)
+        var_min = min(var_min, var_u_ll, var_u_rr)
+
         ua_ = get_node_vars(ua, eq, element)
         var_avg = variable(eq, ua_)
         @assert var_avg>0.0 "Failed at element $element", var_avg
