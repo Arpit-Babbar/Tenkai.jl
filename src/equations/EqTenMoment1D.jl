@@ -308,6 +308,7 @@ function iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
 
     correct_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
     correct_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
+
     # test_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
     iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
                                      u1, aux, remaining_variables)
@@ -324,7 +325,7 @@ function Tenkai.apply_bound_limiter!(eq::TenMoment1D, grid, scheme, param, op, u
     if scheme.bound_limit == "no"
         return nothing
     end
-    variables = (density_constraint, trace_constraint, det_constraint)
+    variables = (density_constraint, trace_constraint, det_constraint, P11_constraint, P22_constraint)
     iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua, u1, aux,
                                      variables)
     return nothing
