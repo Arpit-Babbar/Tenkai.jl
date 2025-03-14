@@ -9,7 +9,7 @@ using Tenkai: set_initial_condition!,
 using MuladdMacro
 using LoopVectorization
 using UnPack
-using OrdinaryDiffEq
+using OrdinaryDiffEqSSPRK, OrdinaryDiffEqTsit5
 using DiffEqCallbacks: StepsizeLimiter
 using Printf
 using LinearAlgebra: axpy!, axpby!
@@ -399,13 +399,14 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
         callback_dt = StepsizeLimiter(dtFE, safety_factor = 1.0, max_step = true)
         callback = (callback_dt)
         # Try adding another function layer?
-        sol = OrdinaryDiffEq.solve(odeprob,
-                                   update_solution_rkfr!(stage_limiter!,
-                                                         step_limiter!),
-                                   dt = dt, adaptive = false,
-                                   callback = callback,
-                                   saveat = final_time, dense = false,
-                                   save_start = false, save_everystep = false)
+        sol = OrdinaryDiffEqLowStorageRK.solve(odeprob,
+                                               update_solution_rkfr!(stage_limiter!,
+                                                                     step_limiter!),
+                                               dt = dt, adaptive = false,
+                                               callback = callback,
+                                               saveat = final_time, dense = false,
+                                               save_start = false,
+                                               save_everystep = false)
         copyto!(u1, sol[1])
         t = sol.t[1]
         error_norm = compute_error(problem, grid, eq, aux, op, u1, t)
