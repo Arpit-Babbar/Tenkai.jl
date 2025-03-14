@@ -33,7 +33,7 @@ jobs:
            arch: aarch64
            version: '1.10'
          - os: windows-latest
-           arch: aarch64
+          #  arch: aarch64
            version: '1.10'
 
     steps:
