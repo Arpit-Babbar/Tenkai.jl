@@ -33,7 +33,8 @@ function get_cfl(eq::AbstractEquations{1}, scheme::Scheme{<:cRKSolver}, param)
     end
 end
 
-function prolong_solution_to_face_and_ghosts!(u1, cache, eq::AbstractEquations{1}, grid, op,
+function prolong_solution_to_face_and_ghosts!(u1, cache, eq::AbstractEquations{1}, grid,
+                                              op,
                                               problem, scheme, aux, t, dt)
     @timeit aux.timer "Update ghost values" begin
     #! format: noindent
@@ -42,7 +43,7 @@ function prolong_solution_to_face_and_ghosts!(u1, cache, eq::AbstractEquations{1
     refresh!(u1_b)
     @unpack degree, Vl, Vr = op
     nd = degree + 1
-    @inbounds for cell in 0:nx+1
+    @inbounds for cell in 0:(nx + 1)
         for i in 1:nd
             u_node = get_node_vars(u1, eq, i, cell)
             multiply_add_to_node_vars!(u1_b, Vl[i], u_node, eq, 1, cell)
@@ -50,11 +51,11 @@ function prolong_solution_to_face_and_ghosts!(u1, cache, eq::AbstractEquations{1
         end
     end
     return nothing
-
     end # timer
 end
 
-function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44}, eq::AbstractEquations{1},
+function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44},
+                                  eq::AbstractEquations{1},
                                   grid, aux, op, cache, t, dt)
     @timeit aux.timer "Update ghost values" begin
     #! format: noindent
@@ -80,7 +81,7 @@ function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44}, eq::Abstract
     # For Dirichlet bc, use upwind flux at faces by assigning both physical
     # and ghost cells through the bc.
     rk4_time_levels = (0, 0.5, 0.5, 1)
-    rk4_coeff = (1.0/6.0, 1.0/3.0, 1.0/3.0, 1.0/6.0)
+    rk4_coeff = (1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0)
     if left == dirichlet
         x = xf[1]
         for l in 1:4 # RK4 stages
@@ -282,7 +283,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 end
 
 function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
-                                problem, scheme::Scheme{<:cRKSolver}, param, aux, t, dt, u1, Fb,
+                                problem, scheme::Scheme{<:cRKSolver}, param, aux, t, dt,
+                                u1, Fb,
                                 Ub, ua, res, scaling_factor = 1.0)
     @timeit aux.timer "Face residual" begin
     #! format: noindent
@@ -299,10 +301,11 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
         # Face between i-1 and i
         x = xf[i]
         @views Fn = num_flux(x,
-                            u1_b[:, 2, i - 1], u1_b[:, 1, i],
-                            Fb[:, 2, i - 1], Fb[:, 1, i],
-                            Ub[:, 2, i - 1], Ub[:, 1, i], eq, 1)
-        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid, op, problem,
+                             u1_b[:, 2, i - 1], u1_b[:, 1, i],
+                             Fb[:, 2, i - 1], Fb[:, 1, i],
+                             Ub[:, 2, i - 1], Ub[:, 1, i], eq, 1)
+        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid,
+                                                   op, problem,
                                                    scheme, param, Fn, aux, nothing,
                                                    res, scaling_factor)
         for ix in 1:nd
@@ -714,6 +717,4 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
         end
     end
 end
-
-
 end # muladd

@@ -13,11 +13,11 @@ function burg_smooth_source(u, x_, t, eq)
     x, y = x_
     xt, yt = x - t, y - t
     u_ex = sinpi(2.0 * xt) + sinpi(2.0 * yt)
-    ut = -2.0 * pi * (cospi(2.0*xt) + cospi(2.0*yt))
-    ux = 2.0 * pi * cospi(2.0*xt)
-    uy = 2.0 * pi * cospi(2.0*yt)
+    ut = -2.0 * pi * (cospi(2.0 * xt) + cospi(2.0 * yt))
+    ux = 2.0 * pi * cospi(2.0 * xt)
+    uy = 2.0 * pi * cospi(2.0 * yt)
 
-    return SVector(ut + u_ex*(ux + uy))
+    return SVector(ut + u_ex * (ux + uy))
 end
 source_terms = burg_smooth_source
 boundary_condition = (periodic, periodic, periodic, periodic)

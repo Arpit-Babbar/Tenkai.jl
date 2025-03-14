@@ -23,10 +23,10 @@ end
 # Wx(x,y) = - 0.02 * (x-50.0) * W(x,y)
 # Wy(x,y) = - 0.02 * (y-50.0) * W(x,y)
 
-@inline W(x, y) = exp(-0.01*(x - 50.0)^2 - 0.01*(y - 50.0)^2)
+@inline W(x, y) = exp(-0.01 * (x - 50.0)^2 - 0.01 * (y - 50.0)^2)
 
 @inline function gauss_source_x(x, y, t)
-    der_factor = - 0.02 * (x-50.0)
+    der_factor = -0.02 * (x - 50.0)
     return der_factor * W(x, y)
 end
 
@@ -45,8 +45,12 @@ end
     return SVector(0.0, 0.0, 0.0, E11, 0.0, E22)
 end
 
-source_term = (u, x, t, equations::Eq.TenMoment2D) -> (addition_energy_source(u, x, t, equations) +
-    ten_moment_source(u, x[1], x[2], t, gauss_source_x, gauss_source_y, equations))
+source_term = (u, x, t, equations::Eq.TenMoment2D) -> (addition_energy_source(u, x, t,
+                                                                              equations) +
+                                                       ten_moment_source(u, x[1], x[2], t,
+                                                                         gauss_source_x,
+                                                                         gauss_source_y,
+                                                                         equations))
 
 dummy_bv(x, t) = 0.0
 
@@ -82,7 +86,7 @@ problem = Problem(domain, uniform_plasma_ic, dummy_bv, boundary_condition,
                   final_time, exact_uniform_plasma, source_terms = source_term)
 limiter = setup_limiter_blend(blend_type = fo_blend(eq),
                               indicating_variables = Eq.conservative_indicator!,
-                            #   indicating_variables = Eq.conservative_indicator!,
+                              #   indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner")
 

@@ -487,7 +487,8 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, problem, s
                                            ix, cell)
             end
             u_node = get_node_vars(u1, eq, i, cell)
-            stt = calc_source_tt_N23(u_node, up_node, um_node, x_, t, dt, source_terms, eq)
+            stt = calc_source_tt_N23(u_node, up_node, um_node, x_, t, dt, source_terms,
+                                     eq)
             multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, eq, i)
 
             S_node = get_node_vars(S, eq, i)
@@ -1276,9 +1277,7 @@ end
 # Compute cell residual for degree=5 case and for all real cells
 #-------------------------------------------------------------------------------
 function compute_cell_residual_5!(eq::AbstractEquations{1}, grid, op, problem,
-    scheme, aux, t, dt, u1, res, Fb, Ub, cache)
-
+                                  scheme, aux, t, dt, u1, res, Fb, Ub, cache)
     @assert false "Not implemented"
 end
-
 end # @muladd

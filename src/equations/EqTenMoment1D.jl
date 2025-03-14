@@ -46,15 +46,15 @@ end
 
 @inline energy_components(::TenMoment1D, u) = u[4], u[5], u[6]
 
-@inline velocity(::TenMoment1D, u) = u[2]/u[1], u[3]/u[1]
+@inline velocity(::TenMoment1D, u) = u[2] / u[1], u[3] / u[1]
 
 @inline function pressure_components(eq::TenMoment1D, u)
     ρ = tenmom_density(eq, u)
     v1, v2 = velocity(eq, u)
     E11, E12, E22 = energy_components(eq, u)
-    P11 = 2.0*E11 - ρ * v1 * v2
-    P12 = 2.0*E12 - ρ * v1 * v2
-    P22 = 2.0*E22 - ρ * v2 * v2
+    P11 = 2.0 * E11 - ρ * v1 * v2
+    P12 = 2.0 * E12 - ρ * v1 * v2
+    P22 = 2.0 * E22 - ρ * v2 * v2
     return P11, P12, P22
 end
 
@@ -181,7 +181,6 @@ end
                                                                                dir,
                                                                                hll_speeds_min_max)
 
-
 @inbounds @inline function hllc3(x, ual, uar, Fl, Fr, Ul, Ur, eq::TenMoment1D, dir,
                                  wave_speeds::Function)
     sl, sr = wave_speeds(eq, ual, uar)
@@ -197,10 +196,10 @@ end
     mr = Fr - sr * Ur
     v1s = (mr[2] - ml[2]) / (mr[1] - ml[1])
     v2s = (mr[3] - ml[3]) / (mr[1] - ml[1])
-    P11s = (ml[2]*mr[1] - ml[1]*mr[2]) / (mr[1] - ml[1]) # TODO - Can use a simpler expression
-    P12s = (ml[3]*mr[1] - ml[1]*mr[3]) / (mr[1] - ml[1])
+    P11s = (ml[2] * mr[1] - ml[1] * mr[2]) / (mr[1] - ml[1]) # TODO - Can use a simpler expression
+    P12s = (ml[3] * mr[1] - ml[1] * mr[3]) / (mr[1] - ml[1])
     dsl, dsr = v1s - sl, v1s - sr
-    @assert dsl > 0.0 && dsr < 0.0 "Middle contact v1s=$v1s outside [sl, sr]=[$sl,$sr]"
+    @assert dsl > 0.0&&dsr < 0.0 "Middle contact v1s=$v1s outside [sl, sr]=[$sl,$sr]"
     if v1s > 0.0
         rhosl = ml[1] / dsl
         E11sl = (ml[4] - v1s * P11s) / dsl
@@ -218,8 +217,16 @@ end
     end
 end
 
-@inbounds @inline hllc3(x, ual, uar, Fl, Fr, Ul, Ur, eq::TenMoment1D, dir) = hllc3(
-    x, ual, uar, Fl, Fr, Ul, Ur, eq::TenMoment1D, dir, hll_speeds_min_max)
+@inbounds @inline hllc3(x, ual, uar, Fl, Fr, Ul, Ur, eq::TenMoment1D, dir) = hllc3(x,
+                                                                                   ual,
+                                                                                   uar,
+                                                                                   Fl,
+                                                                                   Fr,
+                                                                                   Ul,
+                                                                                   Ur,
+                                                                                   eq::TenMoment1D,
+                                                                                   dir,
+                                                                                   hll_speeds_min_max)
 
 function max_abs_eigen_value(eq::TenMoment1D, u)
     ρ = u[1]
@@ -253,7 +260,8 @@ function compute_time_step(eq::TenMoment1D, problem, grid, aux, op, cfl, u1, ua)
         smax = max_abs_eigen_value(eq, u)
         den = max(den, smax / dx[i])
     end
-    dt_source = cfl * compute_source_time_step(eq, source_terms, grid, aux, op, cfl, u1, ua)
+    dt_source = cfl *
+                compute_source_time_step(eq, source_terms, grid, aux, op, cfl, u1, ua)
     dt = cfl / den
     return min(dt, dt_source)
 end
@@ -325,7 +333,8 @@ function Tenkai.apply_bound_limiter!(eq::TenMoment1D, grid, scheme, param, op, u
     if scheme.bound_limit == "no"
         return nothing
     end
-    variables = (density_constraint, trace_constraint, det_constraint, P11_constraint, P22_constraint)
+    variables = (density_constraint, trace_constraint, det_constraint, P11_constraint,
+                 P22_constraint)
     iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua, u1, aux,
                                      variables)
     return nothing
@@ -422,7 +431,7 @@ function eigmatrix(eq::TenMoment1D, u)
     p11 = 2.0 * E11 - rho * v1 * v1
     p12 = 2.0 * E12 - rho * v1 * v2
     p22 = 2.0 * E22 - rho * v2 * v2
-    cx = sqrt(3.0 * abs( p11 / rho))
+    cx = sqrt(3.0 * abs(p11 / rho))
 
     # Right eigenvectors
 
@@ -545,7 +554,8 @@ function eigmatrix(eq::TenMoment1D, u)
     return Rx, Lx
 end
 
-function Tenkai.apply_tvb_limiter!(eq::TenMoment1D, problem, scheme, grid, param, op, ua,
+function Tenkai.apply_tvb_limiter!(eq::TenMoment1D, problem, scheme, grid, param, op,
+                                   ua,
                                    u1, aux)
     @timeit aux.timer "TVB limiter" begin
     #! format: noindent
@@ -627,14 +637,15 @@ function Tenkai.apply_tvb_limiter!(eq::TenMoment1D, problem, scheme, grid, param
         set_node_vars!(char_Δual, Δual_, eq, 1)
         set_node_vars!(char_Δuar, Δuar_, eq, 1)
 
-
         char_Δul_ = get_node_vars(char_Δul, eq, 1)
         char_Δur_ = get_node_vars(char_Δur, eq, 1)
         char_Δual_ = get_node_vars(char_Δual, eq, 1)
         char_Δuar_ = get_node_vars(char_Δuar, eq, 1)
         for n in eachvariable(eq)
-            dulm[n] = minmod(char_Δul_[n], beta_ * char_Δual_[n], beta_ * char_Δuar_[n], Mdx2)
-            durm[n] = minmod(char_Δur_[n], beta_ * char_Δual_[n], beta_ * char_Δuar_[n], Mdx2)
+            dulm[n] = minmod(char_Δul_[n], beta_ * char_Δual_[n],
+                             beta_ * char_Δuar_[n], Mdx2)
+            durm[n] = minmod(char_Δur_[n], beta_ * char_Δual_[n],
+                             beta_ * char_Δuar_[n], Mdx2)
         end
 
         # limit if jumps are detected
@@ -973,7 +984,8 @@ struct TenMoment1DSourceTerms{WxType}
     Wx::WxType
 end
 
-function compute_source_time_step(eq, source_terms::TenMoment1DSourceTerms, grid, aux, op, cfl,
+function compute_source_time_step(eq, source_terms::TenMoment1DSourceTerms, grid, aux,
+                                  op, cfl,
                                   u1, ua)
     nx = grid.size
     L = 1e20
@@ -989,7 +1001,7 @@ function compute_source_time_step(eq, source_terms::TenMoment1DSourceTerms, grid
         a = 0.5 * sqrt(P11 / rho) / abs(Wx)
         b_sqr = det_constraint(eq, ua_node) / (rho * P22)
         b = 0.5 * sqrt(b_sqr) / abs(Wx)
-        L = min(L,a,b)
+        L = min(L, a, b)
         # if L < 1e-12
         #     @assert false rho, v1, v2, P11, P12, P22,Wx,a,b
         # end
@@ -1001,7 +1013,7 @@ function compute_source_time_step(eq, source_terms::TenMoment1DSourceTerms, grid
             a = 0.5 * sqrt(P11 / rho) / abs(Wx)
             b_sqr = det_constraint(eq, u_node) / (rho * P22)
             b = 0.5 * sqrt(b_sqr) / abs(Wx)
-            L = min(L,a,b)
+            L = min(L, a, b)
             # @show L
             # if L < 1e-12
             #     @assert false rho, v1, v2, P11, P12, P22,Wx,a,b
@@ -1013,19 +1025,21 @@ function compute_source_time_step(eq, source_terms::TenMoment1DSourceTerms, grid
 end
 
 function (tem_moment_1d_source::TenMoment1DSourceTerms)(u, x, t, equations::TenMoment1D)
-    rho    = u[1]
+    rho = u[1]
     rho_v1 = u[2]
     rho_v2 = u[3]
     Wx = tem_moment_1d_source.Wx(x, t)
-    return SVector(0.0, -0.5 * rho * Wx, 0.0, -0.5 * rho_v1 * Wx, -0.25 * rho_v2 * Wx, 0.0)
+    return SVector(0.0, -0.5 * rho * Wx, 0.0, -0.5 * rho_v1 * Wx, -0.25 * rho_v2 * Wx,
+                   0.0)
 end
 
 function ten_moment_source_x(u, x, t, Wx_, equations::TenMoment1D)
     rho = u[1]
     rho_v1 = u[2]
     rho_v2 = u[3]
-    Wx = Wx_(x,t)
-    return SVector(0.0, -0.5 * rho * Wx, 0.0, -0.5 * rho_v1 * Wx, -0.25 * rho_v2 * Wx, 0.0)
+    Wx = Wx_(x, t)
+    return SVector(0.0, -0.5 * rho * Wx, 0.0, -0.5 * rho_v1 * Wx, -0.25 * rho_v2 * Wx,
+                   0.0)
 end
 
 get_equation() = TenMoment1D(["rho", "v1", "v2", "P11", "P12", "P22"],

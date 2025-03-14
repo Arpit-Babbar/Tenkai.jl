@@ -23,7 +23,6 @@ bound_limit = "yes"
 bflux = evaluate
 final_time = 0.045
 
-
 nx = 200
 ny = 200
 cfl = 0.0

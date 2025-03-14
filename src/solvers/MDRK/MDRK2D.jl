@@ -87,8 +87,9 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
     return cache
 end
 
-@inline @inbounds function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data, eval_data_big,
-                          xg, Vl, Vr, F, G, F2, G2, Fb, Fb2, aux)
+@inline @inbounds function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data,
+                                            eval_data_big,
+                                            xg, Vl, Vr, F, G, F2, G2, Fb, Fb2, aux)
     @unpack nvar = eq
     nd = length(xg)
 
@@ -185,8 +186,9 @@ end
     end
 end
 
-@inbounds @inline function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data, eval_data_big,
-                          xg, Vl, Vr, F, G, Fb, Fb2, aux, ::Nothing)
+@inbounds @inline function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data,
+                                            eval_data_big,
+                                            xg, Vl, Vr, F, G, Fb, Fb2, aux, ::Nothing)
     @unpack nvar = eq
     nd = length(xg)
 
@@ -267,8 +269,10 @@ end
     end
 end
 
-@inbounds @inline function extrap_bflux!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
-                       xg, Vl, Vr, F, G, F2, G2, Fb, Fb2, aux, n = nothing)
+@inbounds @inline function extrap_bflux!(eq::AbstractEquations{2}, grid, cell_data,
+                                         eval_data,
+                                         xg, Vl, Vr, F, G, F2, G2, Fb, Fb2, aux,
+                                         n = nothing)
     @unpack nvar = eq
     nd = length(xg)
     for j in Base.OneTo(nd), i in Base.OneTo(nd)
@@ -286,8 +290,9 @@ end
     end
 end
 
-@inbounds @inline function extrap_bflux!(eq::AbstractEquations{2}, grid, cell_data, eval_data,
-                       xg, Vl, Vr, F, G, Fb, Fb2, aux, n = nothing)
+@inbounds @inline function extrap_bflux!(eq::AbstractEquations{2}, grid, cell_data,
+                                         eval_data,
+                                         xg, Vl, Vr, F, G, Fb, Fb2, aux, n = nothing)
     @unpack nvar = eq
     nd = length(xg)
     for j in Base.OneTo(nd), i in Base.OneTo(nd)
@@ -368,7 +373,7 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
             x = SVector(x_, y_)
             u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
             s_node = calc_source(u_node, x, t, source_terms, eq)
-            set_node_vars!(S,  0.5 * s_node, eq, i, j)
+            set_node_vars!(S, 0.5 * s_node, eq, i, j)
             set_node_vars!(S2, s_node, eq, i, j, el_x, el_y)
             multiply_add_to_node_vars!(ut, dt, s_node, eq, i, j)
         end
@@ -459,7 +464,7 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
                                    X, t, dt, source_terms, eq)
             multiply_add_to_node_vars!(S, 0.125, st, eq, i, j)
 
-            multiply_add_to_node_vars!(S2, 1.0/6.0, st, eq, i, j, el_x, el_y)
+            multiply_add_to_node_vars!(S2, 1.0 / 6.0, st, eq, i, j, el_x, el_y)
 
             S_node = get_node_vars(S, eq, i, j)
 
@@ -596,9 +601,10 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, probl
             multiply_add_to_node_vars!(G, 1.0 / 3.0, gt, eq, i, j)
             multiply_add_to_node_vars!(U, 1.0 / 3.0, ust_node, eq, i, j)
 
-            st = calc_source_t_N34(us_node, up, upp, um, umm, X, t+0.5*dt, dt, source_terms, eq)
+            st = calc_source_t_N34(us_node, up, upp, um, umm, X, t + 0.5 * dt, dt,
+                                   source_terms, eq)
 
-            multiply_add_to_node_vars!(S2, 1.0/3.0, st, eq, i, j, el_x, el_y)
+            multiply_add_to_node_vars!(S2, 1.0 / 3.0, st, eq, i, j, el_x, el_y)
 
             S_node = get_node_vars(S2, eq, i, j, el_x, el_y)
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, j, el_x, el_y)

@@ -7,7 +7,8 @@ gr()
 xmin, xmax = -1.0, 1.0
 burg_smooth_ic = x -> sinpi(2.0 * x)
 burg_smooth_exact = (x, t) -> sinpi(2.0 * (x - t))
-burg_smooth_source_terms = (u, x, t, eq) -> SVector(pi*(sin(4.0*pi*(x-t))-2.0*cos(2.0*pi*(x-t))))
+burg_smooth_source_terms = (u, x, t, eq) -> SVector(pi * (sin(4.0 * pi * (x - t)) -
+                                                     2.0 * cos(2.0 * pi * (x - t))))
 
 boundary_value = Eq.zero_boundary_value # dummy function
 boundary_condition = (periodic, periodic)

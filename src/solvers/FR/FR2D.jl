@@ -21,17 +21,17 @@ using Tenkai: admissibility_tolerance
 using ..Basis
 
 using Tenkai: periodic, dirichlet, neumann, reflect,
-            lwfr, rkfr,
-            minmod, finite_differences,
-            @threaded, Problem, Scheme, Parameters,
-            get_filename,
-            alloc_for_threads,
-            get_node_vars, set_node_vars!,
-            get_first_node_vars, get_second_node_vars,
-            add_to_node_vars!, subtract_from_node_vars!,
-            multiply_add_to_node_vars!, multiply_add_set_node_vars!,
-            comp_wise_mutiply_node_vars!, zhang_shu_flux_fix,
-            save_solution
+              lwfr, rkfr,
+              minmod, finite_differences,
+              @threaded, Problem, Scheme, Parameters,
+              get_filename,
+              alloc_for_threads,
+              get_node_vars, set_node_vars!,
+              get_first_node_vars, get_second_node_vars,
+              add_to_node_vars!, subtract_from_node_vars!,
+              multiply_add_to_node_vars!, multiply_add_set_node_vars!,
+              comp_wise_mutiply_node_vars!, zhang_shu_flux_fix,
+              save_solution
 
 using ..Equations: AbstractEquations, nvariables, eachvariable
 
@@ -424,7 +424,8 @@ end
 # res[i,j,el_x,el_y] +=  dt/dx*(bL[i]*Fn[j,el_x-1/2,el_y] + bR[i]*Fn[j,el_x+1/2,el_y])
 #                      + dt/dy*(bL[j]*Fn[i,el_x,el_y-1/2] + bR[j]*Fn[i,el_x,el_y+1/2])
 
-function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, problem, scheme,
+function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, problem,
+                                scheme,
                                 param, aux, t, dt, u1,
                                 Fb, Ub, ua, res, scaling_factor = 1.0)
     @timeit aux.timer "Face residual" begin
@@ -721,7 +722,8 @@ function correct_variable!(eq::AbstractEquations{2}, variable, op, aux, grid,
             @show variable
             println("Positivity limiter failed in element ", el_x, " ", el_y,
                     "with centre ", xc[el_x], ", ", yc[el_y])
-            println("Value = ", variable(eq, ua_), " tolerance = ", admissibility_tolerance(eq))
+            println("Value = ", variable(eq, ua_), " tolerance = ",
+                    admissibility_tolerance(eq))
             throw(DomainError((var_min_avg[])))
         end
     end
@@ -1220,7 +1222,8 @@ function debug_blend_limiter!(eq::AbstractEquations{2}, grid, problem, scheme,
             out_max = vtk_save(vtk_alpha_max)
             println("Wrote file ", out_max[1])
 
-            writedlm("output/time_vs_activations", zip(blend.cache.times, blend.cache.total_activations))
+            writedlm("output/time_vs_activations",
+                     zip(blend.cache.times, blend.cache.total_activations))
             writedlm("output/grid_xc.txt", grid.xc)
             writedlm("output/grid_yc.txt", grid.yc)
         end
@@ -1302,32 +1305,32 @@ function Blend(eq::AbstractEquations{2}, op, grid,
     if limiter.name != "blend"
         if limiter.name == "tvb"
             fn_low = OffsetArray(zeros(nvar,
-                                    nd, # Dofs on each face
-                                    4,  # 4 faces
-                                    nx + 2, ny + 2),
-                                OffsetArrays.Origin(1, 1, 1, 0, 0))
+                                       nd, # Dofs on each face
+                                       4,  # 4 faces
+                                       nx + 2, ny + 2),
+                                 OffsetArrays.Origin(1, 1, 1, 0, 0))
             subroutines = (; blend_cell_residual! = store_fn_cell_residual!,
-                             blend_face_residual_x! = blend_flux_face_x_residual!,
-                             blend_face_residual_y! = blend_flux_face_y_residual!,
-                             get_element_alpha = get_element_alpha_other_limiter,
-                             bc_x = no_upwinding_x,
-                             numflux = scheme.numerical_flux)
+                           blend_face_residual_x! = blend_flux_face_x_residual!,
+                           blend_face_residual_y! = blend_flux_face_y_residual!,
+                           get_element_alpha = get_element_alpha_other_limiter,
+                           bc_x = no_upwinding_x,
+                           numflux = scheme.numerical_flux)
             cache = (;
-                    dt = MVector(1.0e20), fn_low, alpha =  EmptyZeros(Float64))
+                     dt = MVector(1.0e20), fn_low, alpha = EmptyZeros(Float64))
             # If limiter is not blend, replace blending with 'do nothing functions'
             return (; subroutines, cache, uEltype = Float64) # TODO - Load uEltype from aux.cache
         else
             fn_low = OffsetArray(zeros(nvar,
-                                    nd, # Dofs on each face
-                                    4,  # 4 faces
-                                    nx + 2, ny + 2),
-                                OffsetArrays.Origin(1, 1, 1, 0, 0))
+                                       nd, # Dofs on each face
+                                       4,  # 4 faces
+                                       nx + 2, ny + 2),
+                                 OffsetArrays.Origin(1, 1, 1, 0, 0))
             subroutines = (; blend_cell_residual! = trivial_cell_residual,
-                        blend_face_residual_x! = trivial_face_residual,
-                        blend_face_residual_y! = trivial_face_residual,
-                        get_element_alpha = get_element_alpha_other_limiter)
+                           blend_face_residual_x! = trivial_face_residual,
+                           blend_face_residual_y! = trivial_face_residual,
+                           get_element_alpha = get_element_alpha_other_limiter)
             cache = (;
-                    dt = MVector(1.0e20), fn_low)
+                     dt = MVector(1.0e20), fn_low)
             # If limiter is not blend, replace blending with 'do nothing functions'
             return (; subroutines, cache, uEltype = Float64) # TODO - Load uEltype from aux.cache
         end
@@ -1705,7 +1708,8 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem, 
     r = @view res[:, :, :, el_x, el_y]
 
     if alpha < 1e-12
-        store_low_flux!(u, el_x, el_y, xf, yf, dx, dy, op, blend, eq, scaling_factor)
+        store_low_flux!(u, el_x, el_y, xf, yf, dx, dy, op, blend, eq,
+                        scaling_factor)
         return nothing
     end
 
@@ -1781,8 +1785,6 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem, 
                                        s_node, eq, ii, jj)
         end
     end
-
-
     end # timer
 end
 
@@ -1815,7 +1817,8 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
     r = @view res[:, :, :, el_x, el_y]
 
     if alpha < 1e-12
-        store_low_flux!(u, el_x, el_y, xf, yf, dx, dy, op, blend, eq, scaling_factor)
+        store_low_flux!(u, el_x, el_y, xf, yf, dx, dy, op, blend, eq,
+                        scaling_factor)
         return nothing
     end
 
@@ -2053,8 +2056,10 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
     end # timer
 end
 
-function blend_cell_residual_muscl_rk!(el_x, el_y, eq::AbstractEquations{2}, problem, scheme,
-                                       aux, t, dt, grid, dx, dy, xf, yf, op, u1, ::Any, f,
+function blend_cell_residual_muscl_rk!(el_x, el_y, eq::AbstractEquations{2}, problem,
+                                       scheme,
+                                       aux, t, dt, grid, dx, dy, xf, yf, op, u1, ::Any,
+                                       f,
                                        res, scaling_factor = 1.0)
     @timeit_debug aux.timer "Blending limiter" begin
     #! format: noindent
@@ -2081,7 +2086,8 @@ function blend_cell_residual_muscl_rk!(el_x, el_y, eq::AbstractEquations{2}, pro
     r = @view res[:, :, :, el_x, el_y]
 
     if alpha < 1e-12
-        store_low_flux!(u, el_x, el_y, xf, yf, dx, dy, op, blend, eq, scaling_factor)
+        store_low_flux!(u, el_x, el_y, xf, yf, dx, dy, op, blend, eq,
+                        scaling_factor)
         return nothing
     end
 
@@ -2381,8 +2387,10 @@ function blend_face_residual_muscl_x!(el_x, el_y, jy, xf, y, u1, ua,
     num_flux = scheme.numerical_flux
 
     if max(alpha[el_x - 1, el_y], alpha[el_x, el_y]) < 1e-12
-        return blend_face_residual_fo_x!(el_x, el_y, jy, xf, y, u1, ua, eq, dt, grid, op,
-                                         scheme, param, Fn, aux, res, scaling_factor)
+        return blend_face_residual_fo_x!(el_x, el_y, jy, xf, y, u1, ua, eq, dt,
+                                         grid, op,
+                                         scheme, param, Fn, aux, res,
+                                         scaling_factor)
     end
 
     id = Threads.threadid()
@@ -2614,8 +2622,10 @@ function blend_face_residual_muscl_rk_x!(el_x, el_y, jy, xf, y, u1, ua,
     num_flux = scheme.numerical_flux
 
     if max(alpha[el_x - 1, el_y], alpha[el_x, el_y]) < 1e-12
-        return blend_face_residual_fo_x!(el_x, el_y, jy, xf, y, u1, ua, eq, dt, grid, op,
-                                         scheme, param, Fn, aux, res, scaling_factor)
+        return blend_face_residual_fo_x!(el_x, el_y, jy, xf, y, u1, ua, eq, dt,
+                                         grid, op,
+                                         scheme, param, Fn, aux, res,
+                                         scaling_factor)
     end
 
     id = Threads.threadid()
@@ -2924,9 +2934,11 @@ function blend_face_residual_muscl_y!(el_x, el_y, ix, x, yf, u1, ua,
     num_flux = scheme.numerical_flux
     nvar = nvariables(eq)
 
-    if max(alpha[el_x, el_y-1], alpha[el_x, el_y]) < 1e-12
-        return blend_face_residual_fo_y!(el_x, el_y, ix, x, yf, u1, ua, eq, dt, grid, op,
-                                         scheme, param, Fn, aux, res, scaling_factor)
+    if max(alpha[el_x, el_y - 1], alpha[el_x, el_y]) < 1e-12
+        return blend_face_residual_fo_y!(el_x, el_y, ix, x, yf, u1, ua, eq, dt,
+                                         grid, op,
+                                         scheme, param, Fn, aux, res,
+                                         scaling_factor)
     end
 
     id = Threads.threadid()
@@ -3154,9 +3166,11 @@ function blend_face_residual_muscl_rk_y!(el_x, el_y, ix, x, yf, u1, ua,
     num_flux = scheme.numerical_flux
     nvar = nvariables(eq)
 
-    if max(alpha[el_x, el_y-1], alpha[el_x, el_y]) < 1e-12
-        return blend_face_residual_fo_y!(el_x, el_y, ix, x, yf, u1, ua, eq, dt, grid, op,
-                                         scheme, param, Fn, aux, res, scaling_factor)
+    if max(alpha[el_x, el_y - 1], alpha[el_x, el_y]) < 1e-12
+        return blend_face_residual_fo_y!(el_x, el_y, ix, x, yf, u1, ua, eq, dt,
+                                         grid, op,
+                                         scheme, param, Fn, aux, res,
+                                         scaling_factor)
     end
 
     id = Threads.threadid()
@@ -3376,7 +3390,8 @@ function trivial_cell_residual(i, j, eq::AbstractEquations{2}, problem, scheme, 
 end
 
 @inline function store_fn_cell_residual!(el_x, el_y, eq::AbstractEquations{2}, problem,
-                                         scheme, aux, t, dt, grid, dx, dy, xf, yf, op, u1, ::Any,
+                                         scheme, aux, t, dt, grid, dx, dy, xf, yf, op,
+                                         u1, ::Any,
                                          f, res, scaling_factor = 1.0)
     @unpack blend = aux
     @unpack fn_low = blend.cache

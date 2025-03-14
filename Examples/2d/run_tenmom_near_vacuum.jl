@@ -12,7 +12,7 @@ boundary_condition = (neumann, neumann, neumann, neumann)
 
 @inline function f_rare(a, b)
     if a < b
-        return -2.0 * (a/b)^3 + 3.0 * (a/b)^2
+        return -2.0 * (a / b)^3 + 3.0 * (a / b)^2
     else
         return 1.0
     end
@@ -67,7 +67,7 @@ problem = Problem(domain, near_vacuum_ic, dummy_bv, boundary_condition,
                   final_time, exact_near_vacuum)
 limiter = setup_limiter_blend(blend_type = fo_blend(eq),
                               indicating_variables = Eq.conservative_indicator!,
-                            #   indicating_variables = Eq.conservative_indicator!,
+                              #   indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner")
 

@@ -1310,8 +1310,9 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
 
             u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
             X = SVector(x, y)
-            stt = calc_source_tt_N23(u_node, up_node, um_node, X, t, dt, source_terms, eq)
-            multiply_add_to_node_vars!(S, 1.0/6.0, stt, eq, i, j)
+            stt = calc_source_tt_N23(u_node, up_node, um_node, X, t, dt, source_terms,
+                                     eq)
+            multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, eq, i, j)
 
             S_node = get_node_vars(S, eq, i, j)
 
@@ -1532,7 +1533,8 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
             u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
             um_node = get_node_vars(um, eq, i, j)
             up_node = get_node_vars(up, eq, i, j)
-            stt = calc_source_tt_N23(u_node, up_node, um_node, X, t, dt, source_terms, eq)
+            stt = calc_source_tt_N23(u_node, up_node, um_node, X, t, dt, source_terms,
+                                     eq)
             multiply_add_to_node_vars!(S, 1.0 / 6.0, stt, eq, i, j)
             multiply_add_to_node_vars!(uttt, dt, stt, eq, i, j) # has no jacobian factor
         end
@@ -1590,7 +1592,7 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
             u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
             X = SVector(x, y)
             sttt = calc_source_ttt_N34(u_node, up_node, um_node, upp_node, umm_node,
-                                        X, t, dt, source_terms, eq)
+                                       X, t, dt, source_terms, eq)
             multiply_add_to_node_vars!(S, 1.0 / 24.0, sttt, eq, i, j)
 
             S_node = get_node_vars(S, eq, i, j)
@@ -1880,7 +1882,7 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
             x = xc - 0.5 * dx + xg[i] * dx
             y = yc - 0.5 * dy + xg[j] * dy
-            X = SVector(x,y)
+            X = SVector(x, y)
             # Add source term contribution to utttt
             u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
             um_node = get_node_vars(um, eq, i, j)

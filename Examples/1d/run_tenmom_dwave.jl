@@ -23,7 +23,7 @@ dummy_bv(x, t) = 0.0
 
 eq = Eq.get_equation()
 
-dwave(x,y) = dwave(x, y, eq)
+dwave(x, y) = dwave(x, y, eq)
 
 exact_dwave(x, y, t) = dwave(x - t, y)
 

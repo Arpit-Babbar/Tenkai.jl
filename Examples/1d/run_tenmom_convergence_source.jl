@@ -12,7 +12,7 @@ function initial_wave(x, equations::Eq.TenMoment1D)
     rho = 2.0 + sinpi(2.0 * x)
     v1 = 1.0
     v2 = 0.0
-    P11 = 1.5 + 1.0/8.0 * (cospi(4.0 * x) -  8.0 * sinpi(2.0 * x))
+    P11 = 1.5 + 1.0 / 8.0 * (cospi(4.0 * x) - 8.0 * sinpi(2.0 * x))
     P12 = 0.0
     P22 = 1.0
     return Eq.prim2con(equations, (rho, v1, v2, P11, P12, P22))
@@ -26,7 +26,7 @@ initial_wave(x) = initial_wave(x, eq)
 
 exact_wave(x, t) = initial_wave(x - t)
 
-Wx(x,t) = 2.0 * pi * cospi(2.0*(x-t))
+Wx(x, t) = 2.0 * pi * cospi(2.0 * (x - t))
 
 source_terms = (u, x, t, equations) -> Eq.ten_moment_source_x(u, x, t, Wx, equations)
 

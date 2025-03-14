@@ -186,7 +186,8 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
         end
         u = @view u1[:, :, cell]
         r = @view res[:, :, cell]
-        blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
+        blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt,
+                                   dx,
                                    grid.xf[cell], op, u1, u, cache.ua, f, r)
     end
     end # timer

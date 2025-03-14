@@ -67,7 +67,8 @@ function Problem(domain::Vector{Float64},
         else
             periodic_x = false
         end
-        return Problem(domain, initial_value, boundary_value, boundary_condition, source_terms,
+        return Problem(domain, initial_value, boundary_value, boundary_condition,
+                       source_terms,
                        periodic_x,
                        false, # Put dummy place holder for periodic_y
                        final_time, exact_solution)
@@ -94,7 +95,8 @@ function Problem(domain::Vector{Float64},
         else
             periodic_y = false
         end
-        return Problem(domain, initial_value, boundary_value, boundary_condition, source_terms,
+        return Problem(domain, initial_value, boundary_value, boundary_condition,
+                       source_terms,
                        periodic_x, periodic_y, final_time, exact_solution)
     else
         @assert false, "Invalid domain"
@@ -104,8 +106,9 @@ end
 #-------------------------------------------------------------------------------
 # Create a struct of scheme description
 #-------------------------------------------------------------------------------
-struct Scheme{Solver, Dissipation, NumericalFlux, Limiter, BFlux <: NamedTuple{<:Any, <:Any},
-              Cache}
+struct Scheme{Solver, Dissipation, NumericalFlux, Limiter,
+              BFlux <: NamedTuple{<:Any, <:Any},
+              Cache, DegreeP1, DegreeP1Square}
     solver::Solver
     solver_enum::SolverType
     degree::Int64
@@ -118,6 +121,12 @@ struct Scheme{Solver, Dissipation, NumericalFlux, Limiter, BFlux <: NamedTuple{<
     dissipation::Dissipation
     cache::Cache
 end
+
+@inline scheme_degree_plus_one(::Scheme{Solver, Dissipation, NumericalFlux, Limiter, BFlux, Cache, DegreeP1, DegreeP1Square}) where {
+Solver, Dissipation, NumericalFlux, Limiter, BFlux, Cache, DegreeP1, DegreeP1Square} = DegreeP1
+
+@inline scheme_n_solution_points(::Scheme{Solver, Dissipation, NumericalFlux, Limiter, BFlux, Cache, DegreeP1, DegreeP1Square}) where {
+Solver, Dissipation, NumericalFlux, Limiter, BFlux, Cache, DegreeP1, DegreeP1Square} = DegreeP1Square
 
 function solver2enum(solver)
     if solver == "lwfr"
@@ -151,9 +160,12 @@ function Scheme(solver, degree, solution_points, correction_function,
     solver_enum = solver2enum(solver)
     get_dissipation_node_vars = diss_arg2method(dissipation)
 
-    Scheme(solver, solver_enum, degree, solution_points, correction_function,
-           numerical_flux, bound_limit, limiter, bflux_data,
-           get_dissipation_node_vars, cache)
+    Scheme{typeof(solver), typeof(get_dissipation_node_vars), typeof(numerical_flux),
+           typeof(limiter), typeof(bflux_data), typeof(cache), degree + 1,
+           (degree + 1)^2}(solver, solver_enum, degree, solution_points,
+                           correction_function,
+                           numerical_flux, bound_limit, limiter, bflux_data,
+                           get_dissipation_node_vars, cache)
 end
 
 function Scheme(solver, solver_enum::SolverType, degree, solution_points,
@@ -166,9 +178,12 @@ function Scheme(solver, solver_enum::SolverType, degree, solution_points,
                   compute_bflux! = get_bflux_function(solver, degree, bflux))
     get_dissipation_node_vars = diss_arg2method(dissipation)
 
-    Scheme(solver, solver_enum, degree, solution_points, correction_function,
-           numerical_flux, bound_limit, limiter, bflux_data,
-           get_dissipation_node_vars, cache)
+    Scheme{typeof(solver), typeof(get_dissipation_node_vars), typeof(numerical_flux),
+           typeof(limiter), typeof(bflux_data), typeof(cache), degree + 1,
+           (degree + 1)^2}(solver, solver_enum, degree, solution_points,
+                           correction_function,
+                           numerical_flux, bound_limit, limiter, bflux_data,
+                           get_dissipation_node_vars, cache)
 end
 
 trivial_function(x) = nothing
@@ -244,12 +259,11 @@ function Parameters(grid_size, cfl, bounds, save_iter_interval,
                saveto, time_scheme, cfl_safety_factor, cfl_style, eps)
 end
 
-
 #------------------------------------------------------------------------------
 # A struct which gives zero whenever you try to index it as a zero
 #------------------------------------------------------------------------------
 struct EmptyZeros{RealT <: Real} end
-@inline Base.getindex(::EmptyZeros{RealT}, i...) where RealT = zero(RealT)
+@inline Base.getindex(::EmptyZeros{RealT}, i...) where {RealT} = zero(RealT)
 EmptyZeros(RealT) = EmptyZeros{RealT}()
 EmptyZeros() = EmptyZeros{Float64}()
 
@@ -828,7 +842,6 @@ function implicit_source_update(eq, u, x, t, dt, source_terms) # u, s are SVecto
     return source_terms(unp1, x, t, eq)
 end
 
-
 function pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme,
                               param, aux, op, u1, ua)
     @timeit aux.timer "Limiter" begin
@@ -882,18 +895,14 @@ end
 end
 
 @inbounds @inline function conservative2characteristic_reconstruction!(ue, ua,
-                                                                       ::AbstractEquations{
-                                                                                           <:Any,
-                                                                                           1
-                                                                                           })
+                                                                       ::AbstractEquations{<:Any,
+                                                                                           1})
     return nothing
 end
 
 @inbounds @inline function characteristic2conservative_reconstruction!(ue, ua,
-                                                                       ::AbstractEquations{
-                                                                                           <:Any,
-                                                                                           1
-                                                                                           })
+                                                                       ::AbstractEquations{<:Any,
+                                                                                           1})
     return nothing
 end
 

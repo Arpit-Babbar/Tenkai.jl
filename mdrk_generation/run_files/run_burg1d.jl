@@ -36,15 +36,13 @@ problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
 equation = Eq.get_equation()
 no_limiter = setup_limiter_none()
-blend_limiter = setup_limiter_blend(
-                              blend_type = mh_blend(equation),
-                              # indicating_variables = Eq.rho_p_indicator!,
-                              indicating_variables = conservative_indicator!,
-                              reconstruction_variables = conservative_reconstruction,
-                              indicator_model = "gassner",
-                              debug_blend = false,
-                              pure_fv = false
-                             )
+blend_limiter = setup_limiter_blend(blend_type = mh_blend(equation),
+                                    # indicating_variables = Eq.rho_p_indicator!,
+                                    indicating_variables = conservative_indicator!,
+                                    reconstruction_variables = conservative_reconstruction,
+                                    indicator_model = "gassner",
+                                    debug_blend = false,
+                                    pure_fv = false)
 limiter = no_limiter
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux, diss)

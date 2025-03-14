@@ -54,18 +54,17 @@ end
 
 @inline energy_components(::TenMoment2D, u) = u[4], u[5], u[6]
 
-@inline velocity(::TenMoment2D, u) = u[2]/u[1], u[3]/u[1]
+@inline velocity(::TenMoment2D, u) = u[2] / u[1], u[3] / u[1]
 
 @inline function pressure_components(eq::TenMoment2D, u)
     ρ = density(eq, u)
     v1, v2 = velocity(eq, u)
     E11, E12, E22 = energy_components(eq, u)
-    P11 = 2.0*E11 - ρ * v1 * v2
-    P12 = 2.0*E12 - ρ * v1 * v2
-    P22 = 2.0*E22 - ρ * v2 * v2
+    P11 = 2.0 * E11 - ρ * v1 * v2
+    P12 = 2.0 * E12 - ρ * v1 * v2
+    P22 = 2.0 * E22 - ρ * v2 * v2
     return P11, P12, P22
 end
-
 
 function con2prim(eq::TenMoment2D, u)
     ρ = u[1]
@@ -208,7 +207,6 @@ end
                                                                                dir,
                                                                                hll_speeds_min_max)
 
-
 @inbounds @inline function hllc3(x, ual, uar, Fl, Fr, Ul, Ur, eq::TenMoment2D, dir,
                                  wave_speeds::Function)
     sl, sr = wave_speeds(eq, ual, uar, dir)
@@ -224,10 +222,10 @@ end
     mr = Fr - sr * Ur
     v1s = (mr[2] - ml[2]) / (mr[1] - ml[1])
     v2s = (mr[3] - ml[3]) / (mr[1] - ml[1])
-    P11s = (ml[2]*mr[1] - ml[1]*mr[2]) / (mr[1] - ml[1]) # TODO - Can use a simpler expression
-    P12s = (ml[3]*mr[1] - ml[1]*mr[3]) / (mr[1] - ml[1])
+    P11s = (ml[2] * mr[1] - ml[1] * mr[2]) / (mr[1] - ml[1]) # TODO - Can use a simpler expression
+    P12s = (ml[3] * mr[1] - ml[1] * mr[3]) / (mr[1] - ml[1])
     dsl, dsr = v1s - sl, v1s - sr
-    @assert dsl > 0.0 && dsr < 0.0 "Middle contact v1s=$v1s outside [sl, sr]=[$sl,$sr]"
+    @assert dsl > 0.0&&dsr < 0.0 "Middle contact v1s=$v1s outside [sl, sr]=[$sl,$sr]"
     if v1s > 0.0
         rhosl = ml[1] / dsl
         E11sl = (ml[4] - v1s * P11s) / dsl
@@ -259,8 +257,16 @@ end
     end
 end
 
-@inbounds @inline hllc3(x, ual, uar, Fl, Fr, Ul, Ur, eq::TenMoment2D, dir) = hllc3(
-    x, ual, uar, Fl, Fr, Ul, Ur, eq::TenMoment2D, dir, hll_speeds_min_max)
+@inbounds @inline hllc3(x, ual, uar, Fl, Fr, Ul, Ur, eq::TenMoment2D, dir) = hllc3(x,
+                                                                                   ual,
+                                                                                   uar,
+                                                                                   Fl,
+                                                                                   Fr,
+                                                                                   Ul,
+                                                                                   Ur,
+                                                                                   eq::TenMoment2D,
+                                                                                   dir,
+                                                                                   hll_speeds_min_max)
 
 @inbounds @inline function max_abs_eigen_value(eq::TenMoment2D, u, dir)
     ρ = u[1]
@@ -296,7 +302,8 @@ function compute_time_step(eq::TenMoment2D, problem, grid, aux, op, cfl, u1, ua)
             continue
         end
         u_node = get_node_vars(ua, eq, el_x, el_y)
-        sx, sy = max_abs_eigen_value(eq, u_node, 1), max_abs_eigen_value(eq, u_node, 2)
+        sx, sy = max_abs_eigen_value(eq, u_node, 1),
+                 max_abs_eigen_value(eq, u_node, 2)
         den = max(den, abs(sx) / dx[el_x] + abs(sy) / dy[el_y] + 1e-12)
     end
 
@@ -374,8 +381,8 @@ function eigmatrix(eq::TenMoment2D, u)
     p11 = 2.0 * E11 - rho * v1 * v1
     p12 = 2.0 * E12 - rho * v1 * v2
     p22 = 2.0 * E22 - rho * v2 * v2
-    cx = sqrt(3.0 * abs( p11 / rho))
-    cy = sqrt(3.0 * abs( p22 / rho))
+    cx = sqrt(3.0 * abs(p11 / rho))
+    cy = sqrt(3.0 * abs(p22 / rho))
 
     # Right eigenvectors
 
@@ -424,7 +431,6 @@ function eigmatrix(eq::TenMoment2D, u)
            (cx * rho * v1 * p12) / 2.0 + (3.0 * p11 * p12) / 2.0
     Rx55 = (rho * v2 * v2 * p11) / 2.0 + p12 * cx * rho * v2 + (p11 * p22) / 2.0 +
            p12 * p12
-
 
     Rx = SMatrix{nvar, nvar}(Rx00, Rx01, Rx02, Rx03, Rx04, Rx05,
                              Rx10, Rx11, Rx12, Rx13, Rx14, Rx15,
@@ -1313,7 +1319,7 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::TenMoment2D, 
     vtk["P12"] = P12_arr
     vtk["P22"] = P22_arr
     for j in 1:ny, i in 1:nx
-        prim[:, i,j] .= con2prim(eq, exact_data[i, j])
+        prim[:, i, j] .= con2prim(eq, exact_data[i, j])
     end
     @views vtk["Exact rho"] = prim[1, 1:nx, 1:ny]
     @views vtk["Exact vx"] = prim[2, 1:nx, 1:ny]
@@ -1371,48 +1377,49 @@ function riemann_problem(x, y, prim_ur, prim_ul, prim_dl, prim_dr)
     end
 end
 
-sod1d_iv(x,y) = riemann_problem(x,y,
-                                (0.125, 0.0, 0.0, 0.2, 0.1, 0.2),
-                                (1.0, 0.0, 0.0, 2.0, 0.05, 0.6),
-                                (1.0, 0.0, 0.0, 2.0, 0.05, 0.6),
-                                (0.125, 0.0, 0.0, 0.2, 0.1, 0.2))
+sod1d_iv(x, y) = riemann_problem(x, y,
+                                 (0.125, 0.0, 0.0, 0.2, 0.1, 0.2),
+                                 (1.0, 0.0, 0.0, 2.0, 0.05, 0.6),
+                                 (1.0, 0.0, 0.0, 2.0, 0.05, 0.6),
+                                 (0.125, 0.0, 0.0, 0.2, 0.1, 0.2))
 
-two_shock1d_iv(x,y) = riemann_problem(x, y,
-                                     (1.0, -1.0, -1.0, 1.0, 0.0, 1.0),
-                                     (1.0, 1.0, 1.0, 1.0, 0.0, 1.0),
-                                     (1.0, 1.0, 1.0, 1.0, 0.0, 1.0),
-                                     (1.0, -1.0, -1.0, 1.0, 0.0, 1.0))
+two_shock1d_iv(x, y) = riemann_problem(x, y,
+                                       (1.0, -1.0, -1.0, 1.0, 0.0, 1.0),
+                                       (1.0, 1.0, 1.0, 1.0, 0.0, 1.0),
+                                       (1.0, 1.0, 1.0, 1.0, 0.0, 1.0),
+                                       (1.0, -1.0, -1.0, 1.0, 0.0, 1.0))
 
-two_rare1d_iv(x,y) = riemann_problem(x, y,
-                                     (1.0, 1.0, 1.0, 1.0, 0.0, 1.0),
-                                     (2.0, -0.5, -0.5, 1.5, 0.5, 1.5),
-                                     (2.0, -0.5, -0.5, 1.5, 0.5, 1.5),
-                                     (1.0, 1.0, 1.0, 1.0, 0.0, 1.0))
+two_rare1d_iv(x, y) = riemann_problem(x, y,
+                                      (1.0, 1.0, 1.0, 1.0, 0.0, 1.0),
+                                      (2.0, -0.5, -0.5, 1.5, 0.5, 1.5),
+                                      (2.0, -0.5, -0.5, 1.5, 0.5, 1.5),
+                                      (1.0, 1.0, 1.0, 1.0, 0.0, 1.0))
 
-two_rare_vacuum1d_iv(x, y) = riemann_problem(x,y,
-                                            (1.0, 5.0, 0.0, 2.0, 0.0, 2.0),
-                                            (1.0, -5.0, 0.0, 2.0, 0.0, 2.0),
-                                            (1.0, -5.0, 0.0, 2.0, 0.0, 2.0),
-                                            (1.0, 5.0, 0.0, 2.0, 0.0, 2.0))
+two_rare_vacuum1d_iv(x, y) = riemann_problem(x, y,
+                                             (1.0, 5.0, 0.0, 2.0, 0.0, 2.0),
+                                             (1.0, -5.0, 0.0, 2.0, 0.0, 2.0),
+                                             (1.0, -5.0, 0.0, 2.0, 0.0, 2.0),
+                                             (1.0, 5.0, 0.0, 2.0, 0.0, 2.0))
 
 function ten_moment_source_x(u, x, y, t, Wx_, equations::TenMoment2D)
     rho = u[1]
     rho_v1 = u[2]
     rho_v2 = u[3]
-    Wx = Wx_(x,y,t)
-    return SVector(0.0, -0.5 * rho * Wx, 0.0, -0.5 * rho_v1 * Wx, -0.25 * rho_v2 * Wx, 0.0)
+    Wx = Wx_(x, y, t)
+    return SVector(0.0, -0.5 * rho * Wx, 0.0, -0.5 * rho_v1 * Wx, -0.25 * rho_v2 * Wx,
+                   0.0)
 end
 
 function ten_moment_source_y(u, x, y, t, Wy_, equations::TenMoment2D)
     rho = u[1]
     rho_v1 = u[2]
     rho_v2 = u[3]
-    Wy = Wy_(x,y,t)
-    return SVector(0.0, 0.0, -0.5 * rho * Wy, 0.0, -0.25 * rho_v1 * Wy, -0.5 * rho_v2 * Wy)
+    Wy = Wy_(x, y, t)
+    return SVector(0.0, 0.0, -0.5 * rho * Wy, 0.0, -0.25 * rho_v1 * Wy,
+                   -0.5 * rho_v2 * Wy)
 end
 
 function ten_moment_source(u, x, y, t, Wx, Wy, equations::TenMoment2D)
-
     source_x = ten_moment_source_x(u, x, y, t, Wx, equations)
     source_y = ten_moment_source_y(u, x, y, t, Wy, equations)
 

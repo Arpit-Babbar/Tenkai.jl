@@ -10,7 +10,8 @@ function periodic_evolution!(eq::AbstractEquations{1}, ub)
             ub, CartesianIndices((1:nvar, 1:1, 1:1)))
 end
 
-function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRKSolver, <:DCSX}, eq, grid, aux, op,
+function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRKSolver, <:DCSX}, eq, grid,
+                                  aux, op,
                                   cache, t, dt, scaling_factor = 1)
     @assert problem.periodic_x # Only implemented for periodic boundaries so far
 
@@ -27,7 +28,8 @@ function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRKSolver, <:DCSX}, 
 end
 
 function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
-                                    problem, scheme::Scheme{<:cRK22, <:DCSX}, aux, t, dt, cache)
+                                    problem, scheme::Scheme{<:cRK22, <:DCSX}, aux, t, dt,
+                                    cache)
     @unpack source_terms = problem
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     nd = length(xg)
@@ -169,7 +171,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 end
 
 function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
-                                problem, scheme::Scheme{<:cRK22, <:DCSX}, param, aux, t, dt, u1,
+                                problem, scheme::Scheme{<:cRK22, <:DCSX}, param, aux, t, dt,
+                                u1,
                                 Fb, Ub, ua, res, scaling_factor = 1.0)
     @timeit aux.timer "Face residual" begin
     #! format: noindent
@@ -188,7 +191,8 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
         u2l, u2r = get_node_vars(u2b, eq, 2, i - 1), get_node_vars(u2b, eq, 1, i)
         fl, fr = flux(x, u2l, eq), flux(x, u2r, eq)
         Fn = num_flux(x, u2l, u2r, fl, fr, u2l, u2r, eq, 1)
-        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid, op, problem,
+        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid, op,
+                                                   problem,
                                                    scheme, param, Fn, aux, nothing,
                                                    res, scaling_factor)
         for ix in 1:nd
@@ -213,7 +217,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
     get_dissipation_node_vars = scheme.dissipation
     @unpack blend = aux
 
-    @unpack cell_data, eval_data, u2b, u3b, ua, u1, res, Fb, Ub,  = cache
+    @unpack cell_data, eval_data, u2b, u3b, ua, u1, res, Fb, Ub, = cache
 
     F, f, U, u2, u3, S = cell_data[Threads.threadid()]
 
@@ -307,7 +311,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 end
 
 function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
-                                problem, scheme::Scheme{<:cRK33, <:DCSX}, param, aux, t, dt, u1,
+                                problem, scheme::Scheme{<:cRK33, <:DCSX}, param, aux, t, dt,
+                                u1,
                                 Fb, Ub, ua, res, scaling_factor = 1.0)
     @timeit aux.timer "Face residual" begin
     #! format: noindent
@@ -331,7 +336,8 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
         fn = num_flux(x, ul, ur, fl, fr, ul, ur, eq, 1)
         f3n = num_flux(x, u3l, u3r, f3l, f3r, u3l, u3r, eq, 1)
         Fn = 0.25 * fn + 0.75 * f3n
-        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid, op, problem,
+        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid, op,
+                                                   problem,
                                                    scheme, param, Fn, aux, nothing,
                                                    res, scaling_factor)
         for ix in 1:nd
@@ -346,7 +352,8 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
 end
 
 function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
-                                    problem, scheme::Scheme{<:cRK44, DCSX}, aux, t, dt, cache)
+                                    problem, scheme::Scheme{<:cRK44, DCSX}, aux, t, dt,
+                                    cache)
     @unpack source_terms = problem
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     nd = length(xg)
@@ -485,7 +492,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 end
 
 function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
-                                problem, scheme::Scheme{<:cRK44, <:DCSX}, param, aux, t, dt, u1,
+                                problem, scheme::Scheme{<:cRK44, <:DCSX}, param, aux, t, dt,
+                                u1,
                                 Fb, Ub, ua, res, scaling_factor = 1.0)
     @timeit aux.timer "Face residual" begin
     #! format: noindent
@@ -515,7 +523,8 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
         f3n = num_flux(x, u3l, u3r, f3l, f3r, u3l, u3r, eq, 1)
         f4n = num_flux(x, u4l, u4r, f4l, f4r, u4l, u4r, eq, 1)
         Fn = 1.0 / 6.0 * fn + 1.0 / 3.0 * f2n + 1.0 / 3.0 * f3n + 1.0 / 6.0 * f4n
-        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid, op, problem,
+        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid, op,
+                                                   problem,
                                                    scheme, param, Fn, aux, nothing,
                                                    res, scaling_factor)
         for ix in 1:nd

@@ -13,7 +13,7 @@ using Tenkai: set_initial_condition!,
 
 # Dimension independent methods in FR
 (using Tenkai: apply_limiter!, compute_time_step, adjust_time_step,
-             pre_process_limiter!, get_cfl, save_solution, calc_source)
+               pre_process_limiter!, get_cfl, save_solution, calc_source)
 
 using Printf
 using LinearAlgebra: axpy!, dot
@@ -38,7 +38,7 @@ compute_cell_residual_4!() = nothing
 compute_cell_residual_5!() = nothing
 update_ghost_values_lwfr!() = nothing
 (import Tenkai: eval_bflux1!, eval_bflux2!, eval_bflux3!, eval_bflux4!,
-              extrap_bflux!, setup_arrays_lwfr)
+                extrap_bflux!, setup_arrays_lwfr)
 # eval_bflux1!() = nothing
 # eval_bflux2!() = nothing
 # eval_bflux3!() = nothing
@@ -231,7 +231,8 @@ function solve_ssfr(eq, problem, scheme, param, grid, op, aux, cache)
                                res, Fb, Ub, cache)
         update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache, t,
                                   dt)
-        compute_face_residual!(eq, grid, op, cache, problem, scheme, param, aux, t, dt, u1,
+        compute_face_residual!(eq, grid, op, cache, problem, scheme, param, aux, t, dt,
+                               u1,
                                Fb, Ub, ua, res)
         update_solution_lwfr!(u1, res, aux) # u1 = u1 - res
         compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)

@@ -97,11 +97,12 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver}, eq::AbstractEquations{2
     ghost_cache = alloc_for_threads(Marr, 2)
 
     # KLUDGE - Rename this to LWFR cache
-    cache = (; u1, ua, ub_N, res, Fb, Ub, u1_b,eval_data, cell_arrays, ghost_cache)
+    cache = (; u1, ua, ub_N, res, Fb, Ub, u1_b, eval_data, cell_arrays, ghost_cache)
     return cache
 end
 
-function prolong_solution_to_face_and_ghosts!(u1, cache, eq::AbstractEquations{2}, grid, op,
+function prolong_solution_to_face_and_ghosts!(u1, cache, eq::AbstractEquations{2}, grid,
+                                              op,
                                               problem, scheme, aux, t, dt)
     @timeit aux.timer "Update ghost values" begin
     #! format: noindent
@@ -110,7 +111,7 @@ function prolong_solution_to_face_and_ghosts!(u1, cache, eq::AbstractEquations{2
     refresh!(u1_b)
     @unpack degree, Vl, Vr = op
     nd = degree + 1
-    @threaded for element in CartesianIndices((0:nx+1, 0:ny+1)) # Loop over cells
+    @threaded for element in CartesianIndices((0:(nx + 1), 0:(ny + 1))) # Loop over cells
         el_x, el_y = element[1], element[2]
         for j in 1:nd, i in 1:nd
             u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
@@ -125,7 +126,6 @@ function prolong_solution_to_face_and_ghosts!(u1, cache, eq::AbstractEquations{2
     end
 
     return nothing
-
     end # timer
 end
 
@@ -572,7 +572,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
         @unpack blend_cell_residual! = aux.blend.subroutines
         @unpack compute_bflux! = scheme.bflux
         get_dissipation_node_vars = scheme.dissipation
-        @unpack eval_data, cell_arrays, ua, u1, res, Fb, Ub,  = cache
+        @unpack eval_data, cell_arrays, ua, u1, res, Fb, Ub, = cache
 
         refresh!.((res, Ub, Fb)) # Reset previously used variables to zero
 
@@ -681,7 +681,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
         @unpack blend_cell_residual! = aux.blend.subroutines
         @unpack compute_bflux! = scheme.bflux
         get_dissipation_node_vars = scheme.dissipation
-        @unpack eval_data, cell_arrays, ua, u1, res, Fb, Ub,  = cache
+        @unpack eval_data, cell_arrays, ua, u1, res, Fb, Ub, = cache
 
         refresh!.((res, Ub, Fb)) # Reset previously used variables to zero
 
@@ -813,7 +813,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
         @unpack blend_cell_residual! = aux.blend.subroutines
         @unpack compute_bflux! = scheme.bflux
         get_dissipation_node_vars = scheme.dissipation
-        @unpack eval_data, cell_arrays, ua, u1, res, Fb, Ub,  = cache
+        @unpack eval_data, cell_arrays, ua, u1, res, Fb, Ub, = cache
 
         refresh!.((res, Ub, Fb)) # Reset previously used variables to zero
 
@@ -997,5 +997,4 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
         end
     end # timer
 end
-
 end # muladd

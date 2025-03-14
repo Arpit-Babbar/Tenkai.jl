@@ -19,7 +19,6 @@ module EqEuler2D
                multiply_add_to_node_vars!, multiply_add_set_node_vars!,
                comp_wise_mutiply_node_vars!, AbstractEquations)
 
-
 using Tenkai: hllc_bc
 
 using Tenkai.CartesianGrids: CartesianGrid2D, save_mesh_file
@@ -81,7 +80,10 @@ end
     end
 end
 
-@inline @inbounds Tenkai.flux(U, eq::Euler2D, orientation::Integer) = Tenkai.flux(1.0, 1.0, U, eq, orientation)
+@inline @inbounds Tenkai.flux(U, eq::Euler2D, orientation::Integer) = Tenkai.flux(1.0,
+                                                                                  1.0,
+                                                                                  U, eq,
+                                                                                  orientation)
 
 # Extending the flux function
 @inline @inbounds function Tenkai.flux(x, y, U, eq::Euler2D)
@@ -625,9 +627,9 @@ function hurricane_initial_solution(x, y)
     r = sqrt(x^2 + y^2)
     rho = 1.0
     v0 = 10.0 # Choices - (10, 12.5, 7.5) which give M0 as (√2, >√2, <√2)
-    p = A * rho ^ gamma
+    p = A * rho^gamma
 
-    v1 =  v0 * sin(theta)
+    v1 = v0 * sin(theta)
     v2 = -v0 * cos(theta)
 
     rho_v1 = rho * v1
@@ -644,17 +646,17 @@ function exact_solution_hurricane_critical(x, y, t)
     r = sqrt(x^2 + y^2)
     rho0 = 1.0
     v0 = 10.0 # Choices - (10, 12.5, 7.5) which give M0 as (√2, >√2, <√2)
-    p0 = A * rho0 ^ gamma
-    p0_prime = gamma * A * rho0 ^ gamma_minus_1
+    p0 = A * rho0^gamma
+    p0_prime = gamma * A * rho0^gamma_minus_1
 
     if r >= 2.0 * t * sqrt(p0_prime)
         rho = rho0
 
-        v1  = 2.0 * t * p0_prime * cos(theta)
+        v1 = 2.0 * t * p0_prime * cos(theta)
         v1 += sqrt(2.0 * p0_prime) * sqrt(r^2 - 2.0 * t^2 * p0_prime) * sin(theta)
         v1 /= r
 
-        v2  = 2.0 * t * p0_prime * sin(theta)
+        v2 = 2.0 * t * p0_prime * sin(theta)
         v2 -= sqrt(2.0 * p0_prime) * sqrt(r^2 - 2.0 * t^2 * p0_prime) * cos(theta)
         v2 /= r
 
@@ -662,11 +664,11 @@ function exact_solution_hurricane_critical(x, y, t)
     else
         rho = r^2 / (8.0 * A * t^2)
 
-        v1 = ( x + y) / (2.0 * t)
+        v1 = (x + y) / (2.0 * t)
         v2 = (-x + y) / (2.0 * t)
 
         p = A * rho * gamma # Don't know if it is right,
-                            # but it does not matter in boundary value computation
+        # but it does not matter in boundary value computation
     end
 
     rho_v1 = rho * v1
@@ -676,19 +678,19 @@ function exact_solution_hurricane_critical(x, y, t)
 end
 
 function initial_condition_rayleigh_taylor(x, y)
-    gamma = 5.0/3.0
+    gamma = 5.0 / 3.0
     if y <= 0.5
         rho = 2.0
         p = 2.0 * y + 1.0
-        c  = sqrt(gamma * p / rho)
+        c = sqrt(gamma * p / rho)
         v1 = 0.0
-        v2 = -0.025 * c * cospi(8.0*x)
+        v2 = -0.025 * c * cospi(8.0 * x)
     else
         rho = 1.0
         p = 1.5 + y
-        c  = sqrt(gamma * p / rho)
+        c = sqrt(gamma * p / rho)
         v1 = 0.0
-        v2 = -0.025 * c * cospi(8.0*x)
+        v2 = -0.025 * c * cospi(8.0 * x)
     end
     rho_v1 = rho * v1
     rho_v2 = rho * v2
@@ -699,7 +701,7 @@ end
 
 # Used to set the top and bottom boundary conditions
 function boundary_condition_rayleigh_taylor(x, y, t)
-    gamma = 5.0/3.0
+    gamma = 5.0 / 3.0
     if y <= 0.5
         rho, v1, v2, p = (2.0, 0.0, 0.0, 1.0)
     else
@@ -723,7 +725,6 @@ exact_solution_sedov_zhang_shu(x, y, t) = initial_value_sedov_zhang_shu(x, y)
 sedov2d_zhang_shu_data = (zs_nx, zs_ny,
                           initial_value_sedov_zhang_shu,
                           exact_solution_sedov_zhang_shu)
-
 
 function riemann_problem_12(x, y)
     γ = 1.4
@@ -1683,8 +1684,8 @@ function Tenkai.update_ghost_values_rkfr!(problem, scheme, eq::Euler2D, grid,
                 X = SVector{2}(x3, y3)
                 Fn = hllc(X, uad, uau, Fd_node, Fu_node, Ud_node, Uu_node, eq, 2)
                 set_node_vars!(ub, ub_node, eq, k, 3, i, 1)
-                set_node_vars!(Fb, Fn     , eq, k, 3, i, 1)
-                set_node_vars!(Fb, Fn     , eq, k, 4, i, 0)
+                set_node_vars!(Fb, Fn, eq, k, 3, i, 1)
+                set_node_vars!(Fb, Fn, eq, k, 4, i, 0)
 
                 # Purely upwind
 
@@ -1936,8 +1937,8 @@ function Tenkai.update_ghost_values_lwfr!(problem, scheme, eq::Euler2D,
                 X = SVector{2}(x3, y3)
                 Fn = hllc(X, uad, uau, Fd_node, Fu_node, Ud_node, Uu_node, eq, 2)
                 set_node_vars!(Ub, ub_node, eq, k, 3, i, 1)
-                set_node_vars!(Fb, Fn     , eq, k, 3, i, 1)
-                set_node_vars!(Fb, Fn     , eq, k, 4, i, 0)
+                set_node_vars!(Fb, Fn, eq, k, 3, i, 1)
+                set_node_vars!(Fb, Fn, eq, k, 4, i, 0)
 
                 # Purely upwind
 

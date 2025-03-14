@@ -70,7 +70,7 @@ function save_mesh_file(mesh::CartesianGrid2D, output_directory)
     mkpath(output_directory)
 
     xmin, xmax, ymin, ymax = mesh.domain
-    mapping(x,y) = (xmin + (xmax - xmin)ymin + (ymax - ymin)*y)
+    mapping(x, y) = (xmin + (xmax - xmin)ymin + (ymax - ymin) * y)
 
     # From src/meshes/structured_mesh.jl in Trixi.jl
     coordinates_min = (xmin, ymin)

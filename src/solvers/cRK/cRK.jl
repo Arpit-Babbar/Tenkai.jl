@@ -28,14 +28,16 @@ function initialize_solution!(eq, grid, op, problem, scheme, param, aux, cache)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
 end
 
-function evolve_solution!(eq, grid, op, problem, scheme, param, aux, iter, t, dt, fcount, cache)
+function evolve_solution!(eq, grid, op, problem, scheme, param, aux, iter, t, dt, fcount,
+                          cache)
     @unpack ua, u1, res, Fb, Ub = cache
 
     pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme,
                          param, aux, op, u1, ua)
     compute_cell_residual_cRK!(eq, grid, op, problem, scheme, aux, t, dt, cache)
     update_ghost_values_cRK!(problem, scheme, eq, grid, aux, op, cache, t, dt)
-    prolong_solution_to_face_and_ghosts!(u1, cache, eq, grid, op, problem, scheme, aux, t, dt)
+    prolong_solution_to_face_and_ghosts!(u1, cache, eq, grid, op, problem, scheme, aux, t,
+                                         dt)
     compute_face_residual!(eq, grid, op, cache, problem, scheme, param, aux, t, dt, u1,
                            Fb, Ub, ua, res)
     update_solution_cRK!(u1, eq, grid, problem, scheme, res, aux, t, dt) # u1 = u1 - res
@@ -83,9 +85,11 @@ function solve_ssfr(eq, problem, scheme::Scheme{<:cRKSolver}, param, grid, op, a
         dt = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
         dt = adjust_time_step(problem, param, t, dt, aux)
 
-        evolve_solution!(eq, grid, op, problem, scheme, param, aux, iter, t, dt, fcount, cache)
+        evolve_solution!(eq, grid, op, problem, scheme, param, aux, iter, t, dt, fcount,
+                         cache)
 
-        t += dt; iter += 1
+        t += dt
+        iter += 1
         @printf("iter,dt,t = %5d %12.4e %12.4e\n", iter, dt, t)
         if save_solution(problem, param, t, iter)
             fcount = write_soln!("sol", fcount, iter, t, dt, eq, grid, problem, param,
@@ -110,5 +114,6 @@ function solve_ssfr(eq, problem, scheme::Scheme{<:cRKSolver}, param, grid, op, a
                 "aux" => aux)
 end
 
-@inbounds @inline update_solution_cRK!(u1, eq, grid, problem, scheme, res, aux, t, dt) =
-    update_solution_lwfr!(u1, res, aux)
+@inbounds @inline update_solution_cRK!(u1, eq, grid, problem, scheme, res, aux, t, dt) = update_solution_lwfr!(u1,
+                                                                                                               res,
+                                                                                                               aux)

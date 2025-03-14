@@ -5,25 +5,25 @@ Eq = Tenkai.EqEuler2D
 using Tenkai.EqEuler2D: hllc_bc
 #------------------------------------------------------------------------------
 xmin, xmax = 0.0, 0.25
-ymin, ymax = 0.0,  1.0
+ymin, ymax = 0.0, 1.0
 
 boundary_condition = (reflect, reflect, hllc_bc, dirichlet)
-γ = 5.0/3.0
+γ = 5.0 / 3.0
 equation = Eq.get_equation(γ)
 function initial_condition_rayleigh_taylor(x, y)
-    gamma = 5.0/3.0
+    gamma = 5.0 / 3.0
     if y <= 0.5
         rho = 2.0
         p = 2.0 * y + 1.0
-        c  = sqrt(gamma * p / rho)
+        c = sqrt(gamma * p / rho)
         v1 = 0.0
-        v2 = -0.025 * c * cospi(8.0*x)
+        v2 = -0.025 * c * cospi(8.0 * x)
     else
         rho = 1.0
         p = 1.5 + y
-        c  = sqrt(gamma * p / rho)
+        c = sqrt(gamma * p / rho)
         v1 = 0.0
-        v2 = -0.025 * c * cospi(8.0*x)
+        v2 = -0.025 * c * cospi(8.0 * x)
     end
     rho_v1 = rho * v1
     rho_v2 = rho * v2
@@ -34,7 +34,7 @@ end
 
 # Used to set the top and bottom boundary conditions
 function boundary_condition_rayleigh_taylor(x, y, t)
-    gamma = 5.0/3.0
+    gamma = 5.0 / 3.0
     if y <= 0.5
         rho, v1, v2, p = (2.0, 0.0, 0.0, 1.0)
     else
@@ -75,7 +75,8 @@ cfl_safety_factor = 0.6
 #------------------------------------------------------------------------------
 grid_size = [nx, ny]
 domain = [xmin, xmax, ymin, ymax]
-problem = Problem(domain, initial_value, boundary_condition_rayleigh_taylor, boundary_condition,
+problem = Problem(domain, initial_value, boundary_condition_rayleigh_taylor,
+                  boundary_condition,
                   final_time, exact_solution, source_terms = source_terms_rayleigh_taylor)
 limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               indicating_variables = Eq.rho_p_indicator!,

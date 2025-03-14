@@ -49,7 +49,7 @@ FO = fo_blend(equation)
 MH = mh_blend(equation)
 limiter = setup_limiter_blend(blend_type = MH,
                               indicating_variables = Eq.rho_p_indicator!,
-                            #   indicating_variables = Eq.conservative_indicator!,
+                              #   indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = indicator_model,
                               constant_node_factor = 1.0,

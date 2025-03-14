@@ -13,7 +13,6 @@ using SimpleUnPack: @unpack
 using LinearAlgebra
 using Printf
 
-
 markers_array_new() = ["s", "o", "^", "*", "D", ">", "p"]
 colors_array_new() = ["red", "royalblue", "green", "m", "c", "y", "k"]
 function plot_solns(files::Vector{String}, labels::Vector{String};
@@ -174,8 +173,8 @@ function plot_solns_scalar(files::Vector{String}, labels::Vector{String};
         soln_data = readdlm(files[i])
         if plt_type == "avg"
             @views ax.plot(soln_data[:, 1], soln_data[:, 2], markers[i],
-                                   fillstyle = "none",
-                                   c = colors[i], label = label)
+                           fillstyle = "none",
+                           c = colors[i], label = label)
         elseif plt_type in ("cts_sol", "cts_avg")
             @views ax.plot(soln_data[:, 1], soln_data[:, 2], fillstyle = "none",
                            c = colors[i], label = label, linewidth = soln_line_width)
@@ -183,15 +182,15 @@ function plot_solns_scalar(files::Vector{String}, labels::Vector{String};
             nu = max(2, degree + 1)
             nx = Int(size(soln_data, 1) / nu)
             @views ax.plot(soln_data[1:nu, 1], soln_data[1:nu, 2],
-                                   fillstyle = "none",
-                                   color = colors[i], label = label,
-                                   linewidth = soln_line_width)
+                           fillstyle = "none",
+                           color = colors[i], label = label,
+                           linewidth = soln_line_width)
             for ix in 2:nx
                 i1 = (ix - 1) * nu + 1
                 i2 = ix * nu
                 @views ax.plot(soln_data[i1:i2, 1], soln_data[i1:i2, 2],
-                                       fillstyle = "none",
-                                       c = colors[i], linewidth = soln_line_width)
+                               fillstyle = "none",
+                               c = colors[i], linewidth = soln_line_width)
             end
         end
     end
@@ -211,13 +210,15 @@ using Tenkai
 Eq = Tenkai.EqBurg1D
 exact_solution = Eq.exact_solution_burger_sin
 test_case = "burg1d"
-files_labels(t) = (["mdrk_results/output_burg1d_lwfr_t$t/sol.txt",
-                    "mdrk_results/output_burg1d_lwfr_t$t/sol.txt"],
-                   ["LWFR", "MDRK"])
+function files_labels(t)
+    (["mdrk_results/output_burg1d_lwfr_t$t/sol.txt",
+         "mdrk_results/output_burg1d_lwfr_t$t/sol.txt"],
+     ["LWFR", "MDRK"])
+end
 function my_exact_data(t)
     data = deepcopy(readdlm(files_labels(t)[1][1]))
     exact(x) = exact_solution(x, t)
-    @views data[:,2] .= exact.(data[:,1])
+    @views data[:, 2] .= exact.(data[:, 1])
     return data
 end
 

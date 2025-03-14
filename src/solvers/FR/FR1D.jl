@@ -3,8 +3,8 @@ using StaticArrays
 using ..Tenkai: fr_dir, lwfr_dir, rkfr_dir, eq_dir, src_dir
 using ..Tenkai: update_ghost_values_periodic!, flux, con2prim
 (using Tenkai: Scheme, Problem, Parameters, @threaded, PlotData,
-             get_filename, minmod, prim2con!, con2prim!, save_solution,
-             finite_differences, zhang_shu_flux_fix)
+               get_filename, minmod, prim2con!, con2prim!, save_solution,
+               finite_differences, zhang_shu_flux_fix)
 using ..Equations: AbstractEquations, nvariables, eachvariable
 using ..Basis: Vandermonde_lag, weights_and_points, nodal2modal, nodal2modal_krivodonova,
                Vandermonde_leg_krivodonova
@@ -42,11 +42,11 @@ using ..Basis: Vandermonde_lag, weights_and_points, nodal2modal, nodal2modal_kri
                   post_process_soln)
 
 (using Tenkai: periodic, dirichlet, neumann, reflect,
-             get_node_vars, set_node_vars!,
-             get_first_node_vars, get_second_node_vars,
-             add_to_node_vars!, subtract_from_node_vars!,
-             multiply_add_to_node_vars!, multiply_add_set_node_vars!,
-             comp_wise_mutiply_node_vars!, calc_source)
+               get_node_vars, set_node_vars!,
+               get_first_node_vars, get_second_node_vars,
+               add_to_node_vars!, subtract_from_node_vars!,
+               multiply_add_to_node_vars!, multiply_add_set_node_vars!,
+               comp_wise_mutiply_node_vars!, calc_source)
 
 using UnPack
 using MuladdMacro
@@ -241,7 +241,8 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
         @views Fn = num_flux(x, ua[:, i - 1], ua[:, i],
                              Fb[:, 2, i - 1], Fb[:, 1, i],
                              Ub[:, 2, i - 1], Ub[:, 1, i], eq, 1)
-        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid, op, problem,
+        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid,
+                                                   op, problem,
                                                    scheme, param, Fn, aux, nothing,
                                                    res, scaling_factor)
         for ix in 1:nd
@@ -319,7 +320,6 @@ function update_ghost_values_periodic!(eq::AbstractEquations{1}, problem, Fb,
     nx = size(Fb, 3) - 2
     nvar = size(Fb, 1) # Temporary, should take from eq
     if problem.periodic_x
-
         copyto!(Ub, CartesianIndices((1:nvar, 2:2, 0:0)),
                 Ub, CartesianIndices((1:nvar, 2:2, nx:nx)))
         copyto!(Fb, CartesianIndices((1:nvar, 2:2, 0:0)),
@@ -418,14 +418,18 @@ function test_variable_bound_limiter!(variable, eq::AbstractEquations{1},
             var_ll += var * Vl[i]
             var_rr += var * Vr[i]
             var_min = min(var_min, var)
-            @assert var_min>0.0 "Failed at element $element at $(xc[element])", variable, var_min, variable(eq, get_node_vars(ua, eq, element))
+            @assert var_min>0.0 "Failed at element $element at $(xc[element])",
+                                variable, var_min,
+                                variable(eq, get_node_vars(ua, eq, element))
         end
-        @assert var_ll>0.0 "Failed at element $element at $(xc[element])", variable, var_ll, variable(eq, get_node_vars(ua, eq, element))
-        @assert var_rr>0.0 "Failed at element $element at $(xc[element])", variable, var_rr, variable(eq, get_node_vars(ua, eq, element))
-
+        @assert var_ll>0.0 "Failed at element $element at $(xc[element])", variable,
+                           var_ll, variable(eq, get_node_vars(ua, eq, element))
+        @assert var_rr>0.0 "Failed at element $element at $(xc[element])", variable,
+                           var_rr, variable(eq, get_node_vars(ua, eq, element))
 
         var_min = min(var_min, var_ll, var_rr)
-        @assert var_min>0.0 "Failed at element $element at $(xc[element])", variable, var_min, variable(eq, get_node_vars(ua, eq, element))
+        @assert var_min>0.0 "Failed at element $element at $(xc[element])", variable,
+                            var_min, variable(eq, get_node_vars(ua, eq, element))
     end
 end
 
@@ -983,7 +987,8 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
 
     # smoothing in time
     for i in 1:nx
-        alpha[i] = max(0.9 * alpha0[i], 0.5 * alpha0[i-1], 0.5 * alpha0[i+1], alpha[i])
+        alpha[i] = max(0.9 * alpha0[i], 0.5 * alpha0[i - 1], 0.5 * alpha0[i + 1],
+                       alpha[i])
     end
 
     # Smoothening of alpha
@@ -1538,7 +1543,7 @@ end
 
     for j in 2:nd
         xx = xxf[j]
-        ul, ur = get_node_vars(u, eq, j-1), get_node_vars(u, eq, j)
+        ul, ur = get_node_vars(u, eq, j - 1), get_node_vars(u, eq, j)
         fl, fr = flux(xx, ul, eq), flux(xx, ur, eq)
         fn = scaling_factor * num_flux(xx, ul, ur, fl, fr, ul, ur, eq, 1)
         for n in 1:nvar
@@ -1581,7 +1586,8 @@ end
 
 @inbounds @inline function blend_face_residual_fo!(i, xf, u1, ua,
                                                    eq::AbstractEquations{1},
-                                                   t, dt, grid, op, problem, scheme, param,
+                                                   t, dt, grid, op, problem, scheme,
+                                                   param,
                                                    Fn, aux, lamx, res,
                                                    scaling_factor)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead,
@@ -1597,8 +1603,9 @@ end
     nd = length(xg)
     alp = 0.5 * (alpha[i - 1] + alpha[i])
     if alp < 1e-12
-        return blend_flux_only(i, op, scheme, blend, grid, xf, u1, eq, dt, alp, Fn, lamx,
-                         scaling_factor)
+        return blend_flux_only(i, op, scheme, blend, grid, xf, u1, eq, dt, alp, Fn,
+                               lamx,
+                               scaling_factor)
     end
 
     # Reuse arrays to save memory
@@ -1840,7 +1847,8 @@ end
     @unpack alpha = blend
     alp = 0.5 * (alpha[i - 1] + alpha[i])
     if alp < 1e-12
-        return blend_flux_only(i, op, scheme, blend, grid, xf, u1, eq, dt, alp, Fn, lamx,
+        return blend_flux_only(i, op, scheme, blend, grid, xf, u1, eq, dt, alp, Fn,
+                               lamx,
                                scaling_factor)
     end
     @unpack xg, wg = op
@@ -2006,9 +2014,10 @@ end
     return nothing
 end
 
-@inline function store_fn_cell_residual!(cell, eq::AbstractEquations{1}, problem, scheme,
-                                        aux, lamx, t, dt, dx, xf, op, u1, u, ua, f, r,
-                                        scaling_factor = 1)
+@inline function store_fn_cell_residual!(cell, eq::AbstractEquations{1}, problem,
+                                         scheme,
+                                         aux, lamx, t, dt, dx, xf, op, u1, u, ua, f, r,
+                                         scaling_factor = 1)
     @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead, it's supposed
     #! format: noindent
     # to be 0.25 microseconds
@@ -2094,14 +2103,15 @@ end
 end
 
 @inline function blend_flux_face_residual!(i, xf, u1, ua, eq::AbstractEquations{1},
-                                          t, dt, grid, op, problem, scheme, param, Fn, aux,
-                                          lamx, res, scaling_factor = 1.0)
-    #! format: noindent
-    @unpack blend = aux
-    alp = 0.0
-    # return Fn, (1.0, 1.0)
-    return blend_flux_only(i, op, scheme, blend, grid, xf, u1, eq, dt, alp, Fn, lamx,
-                            scaling_factor)
+                                           t, dt, grid, op, problem, scheme, param, Fn,
+                                           aux,
+                                           lamx, res, scaling_factor = 1.0)
+#! format: noindent
+@unpack blend = aux
+alp = 0.0
+# return Fn, (1.0, 1.0)
+return blend_flux_only(i, op, scheme, blend, grid, xf, u1, eq, dt, alp, Fn, lamx,
+                       scaling_factor)
 end
 
 function is_admissible(::AbstractEquations{1, <:Any}, ::AbstractVector)
@@ -2178,18 +2188,18 @@ function Blend(eq::AbstractEquations{1}, op, grid,
     if limiter.name != "blend"
         if limiter.name == "tvb"
             fn_low = OffsetArray(zeros(nvar, 2, nx + 2),
-            OffsetArrays.Origin(1, 1, 0))
+                                 OffsetArrays.Origin(1, 1, 0))
             return (
-                ; blend_cell_residual! = store_fn_cell_residual!,
-                blend_face_residual! = blend_flux_face_residual!,
-                dt = [1e20],
-                numflux = scheme.numerical_flux,
-                fn_low = fn_low)
+                    ; blend_cell_residual! = store_fn_cell_residual!,
+                    blend_face_residual! = blend_flux_face_residual!,
+                    dt = [1e20],
+                    numflux = scheme.numerical_flux,
+                    fn_low = fn_low)
         else
-        return (
-                ; blend_cell_residual! = trivial_cell_residual,
-                blend_face_residual! = trivial_face_residual,
-                dt = [1e20])
+            return (
+                    ; blend_cell_residual! = trivial_cell_residual,
+                    blend_face_residual! = trivial_face_residual,
+                    dt = [1e20])
         end
     end
     println("Setting up blending limiter...")

@@ -24,19 +24,21 @@ end
 # Wy(x,y) = -400 * c * (y-2) * exp(-200 * ((x-2)^2 + (y-2)^2) )
 
 function gauss_source_x(x, y, t)
-    a = - 200 * ( (x-2.0)^2 + (y-2.0)^2 )
-    der_factor = - 400.0 * (x-2.0)
+    a = -200 * ((x - 2.0)^2 + (y - 2.0)^2)
+    der_factor = -400.0 * (x - 2.0)
     return 25.0 * der_factor * exp(a)
 end
 
 function gauss_source_y(x, y, t)
-    a = - 200 * ( (x-2.0)^2 + (y-2)^2 )
-    der_factor = - 400.0 * (y-2.0)
+    a = -200 * ((x - 2.0)^2 + (y - 2)^2)
+    der_factor = -400.0 * (y - 2.0)
     return 25.0 * der_factor * exp(a)
 end
 
-source_term = (u, x, t, equations::Eq.TenMoment2D) -> ten_moment_source(
-    u, x[1], x[2], t, gauss_source_x, gauss_source_y, equations)
+source_term = (u, x, t, equations::Eq.TenMoment2D) -> ten_moment_source(u, x[1], x[2], t,
+                                                                        gauss_source_x,
+                                                                        gauss_source_y,
+                                                                        equations)
 
 dummy_bv(x, t) = 0.0
 
@@ -72,7 +74,7 @@ problem = Problem(domain, uniform_plasma_ic, dummy_bv, boundary_condition,
                   final_time, exact_uniform_plasma, source_terms = source_term)
 limiter = setup_limiter_blend(blend_type = fo_blend(eq),
                               indicating_variables = Eq.conservative_indicator!,
-                            #   indicating_variables = Eq.conservative_indicator!,
+                              #   indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner")
 

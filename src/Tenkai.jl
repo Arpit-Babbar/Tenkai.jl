@@ -88,7 +88,6 @@ include("$rkfr_dir/RKFR.jl")
 include("$rkfr_dir/RKFR1D.jl")
 include("$rkfr_dir/RKFR2D.jl")
 
-
 # ( # RKFR API exported
 # export setup_arrays_rkfr,
 #        compute_cell_residual_rkfr!,
@@ -108,7 +107,6 @@ include("$lwfr_dir/LWFR2D.jl")
 #        eval_bflux1!, eval_bflux2!, eval_bflux3!, eval_bflux4!,
 #        extrap_bflux!
 # )
-
 
 include("$mdrk_dir/MDRK.jl")
 
@@ -137,5 +135,7 @@ export cRK11, cRK22, cRK33, cRK44, cRK65
 
 # DCSX dissipation
 export DCSX
+
+export scheme_degree_plus_one, scheme_n_solution_points
 
 end # module

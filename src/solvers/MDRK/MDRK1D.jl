@@ -120,7 +120,7 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op, probl
             x_ = xc - 0.5 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             s_node = calc_source(u_node, x_, t, source_terms, eq)
-            set_node_vars!(S,  0.5 * s_node, eq, i)
+            set_node_vars!(S, 0.5 * s_node, eq, i)
             set_node_vars!(S2, s_node, eq, i, cell)
             multiply_add_to_node_vars!(ut, dt, s_node, eq, i)
         end
@@ -167,9 +167,8 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op, probl
             S_node = get_node_vars(S, eq, i)
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, cell)
 
-            multiply_add_to_node_vars!(S2, 1.0/6.0, st, eq, i, cell)
+            multiply_add_to_node_vars!(S2, 1.0 / 6.0, st, eq, i, cell)
         end
-
 
         for i in 1:nd # Loop over solution points
             F_node = get_node_vars(F, eq, i)
@@ -311,9 +310,10 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op, probl
 
             multiply_add_to_node_vars!(U, 1.0 / 3.0, ust_node, eq, i)    # U += 1/6 * dt * ut
 
-            st = calc_source_t_N34(us_node, up, upp, um, umm, x_, t+0.5*dt, dt, source_terms, eq)
+            st = calc_source_t_N34(us_node, up, upp, um, umm, x_, t + 0.5 * dt, dt,
+                                   source_terms, eq)
 
-            multiply_add_to_node_vars!(S2, 1.0/3.0, st, eq, i, cell)
+            multiply_add_to_node_vars!(S2, 1.0 / 3.0, st, eq, i, cell)
 
             S_node = get_node_vars(S2, eq, i, cell)
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, cell)

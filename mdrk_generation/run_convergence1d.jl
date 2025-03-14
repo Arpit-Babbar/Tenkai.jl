@@ -27,11 +27,11 @@ function trixi_convergence(test, solver, nx_array;
     data = zeros(M, 2)
     for i in eachindex(nx_array)
         sol = trixi_include("$(@__DIR__)/run_files/run_$test.jl",
-                             solver = solver, degree = 3, bflux = bflux,
-                             solution_points = points, diss = diss,
-                             correction_function = corr, nx = nx_array[i])
-        data[i,1] = nx_array[i]
-        data[i,2] = sol["errors"]["l2_error"]
+                            solver = solver, degree = 3, bflux = bflux,
+                            solution_points = points, diss = diss,
+                            correction_function = corr, nx = nx_array[i])
+        data[i, 1] = nx_array[i]
+        data[i, 2] = sol["errors"]["l2_error"]
     end
     writedlm(outdir, data)
     return
@@ -72,9 +72,11 @@ trixi_convergence("burg1d", "lwfr", nx_array, bflux = extrapolate,
 
 # Diss = 2
 trixi_convergence("burg1d", "mdrk", nx_array, bflux = evaluate, points = "gll", corr = "g2")
-trixi_convergence("burg1d", "mdrk", nx_array, bflux = extrapolate, points = "gll", corr = "g2")
+trixi_convergence("burg1d", "mdrk", nx_array, bflux = extrapolate, points = "gll",
+                  corr = "g2")
 trixi_convergence("burg1d", "lwfr", nx_array, bflux = evaluate, points = "gll", corr = "g2")
-trixi_convergence("burg1d", "lwfr", nx_array, bflux = extrapolate, points = "gll", corr = "g2")
+trixi_convergence("burg1d", "lwfr", nx_array, bflux = extrapolate, points = "gll",
+                  corr = "g2")
 
 # RKFR
 trixi_convergence("burg1d", "rkfr", nx_array, bflux = evaluate, points = "gll", corr = "g2")
@@ -98,10 +100,11 @@ trixi_convergence("linadv1d", "mdrk", nx_array, bflux = extrapolate,
 trixi_convergence("linadv1d", "lwfr", nx_array, bflux = extrapolate,
                   diss = "1", points = "gll", corr = "g2")
 
-
 # diss = 2
-trixi_convergence("linadv1d", "mdrk", nx_array, bflux = extrapolate, points = "gll", corr = "g2")
-trixi_convergence("linadv1d", "lwfr", nx_array, bflux = extrapolate, points = "gll", corr = "g2")
+trixi_convergence("linadv1d", "mdrk", nx_array, bflux = extrapolate, points = "gll",
+                  corr = "g2")
+trixi_convergence("linadv1d", "lwfr", nx_array, bflux = extrapolate, points = "gll",
+                  corr = "g2")
 
 # rkfr
 
@@ -122,4 +125,3 @@ trixi_convergence("or2", "lwfr", nx_array, bflux = extrapolate)
 
 # RKFR
 trixi_convergence("or2", "rkfr", nx_array, bflux = evaluate)
-

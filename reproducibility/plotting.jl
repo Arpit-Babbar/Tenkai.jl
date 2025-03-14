@@ -423,7 +423,7 @@ function plot_python_ncells_vs_y(; legend = nothing,
         marker = markers[i]
         ax_error.loglog(error[:, 1], error[:, 2], marker = marker, c = colors[d], mec = "k",
                         fillstyle = "none", label = "\$ N = $d \$")
-        add_theo_factors!(ax_error, error[:, 1], error[:,2], degree, i,
+        add_theo_factors!(ax_error, error[:, 1], error[:, 2], degree, i,
                           theo_factor_even, theo_factor_odd)
     end
     ax_error.set_xlabel("Number of elements \$ (M^2) \$")
@@ -469,7 +469,7 @@ function plot_python_ndofs_vs_y(; legend = nothing,
         ax_error.loglog(error[:, 1] * (d + 1), error[:, 2], marker = marker, c = colors[d],
                         mec = "k",
                         fillstyle = "none", label = "\$ N = $d \$")
-        add_theo_factors!(ax_error, (d + 1) * error[:, 1], error[:,2], degree, i,
+        add_theo_factors!(ax_error, (d + 1) * error[:, 1], error[:, 2], degree, i,
                           theo_factor_even, theo_factor_odd)
     end
     ax_error.set_xlabel("Degrees of freedom \$ (M^2) \$")

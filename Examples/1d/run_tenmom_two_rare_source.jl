@@ -25,7 +25,7 @@ initial_wave(x) = initial_wave(x, eq)
 
 exact_wave(x, t) = initial_wave(x - t)
 
-Wx(x,t) = -10000.0 * (x-2.0) * exp(-200 * (x-2.0)^2)
+Wx(x, t) = -10000.0 * (x - 2.0) * exp(-200 * (x - 2.0)^2)
 
 source_terms = Eq.TenMoment1DSourceTerms(Wx)
 

@@ -45,10 +45,10 @@ problem = Problem(domain, initial_value, boundary_value, boundary_condition,
 mh = mh_blend(equation)
 muscl = muscl_blend(equation)
 limiter = setup_limiter_blend(blend_type = mh,
-                            indicating_variables = Eq.rho_p_indicator!,
-                            reconstruction_variables = conservative_reconstruction,
-                            indicator_model = "gassner",
-                            debug_blend = false)
+                              indicating_variables = Eq.rho_p_indicator!,
+                              reconstruction_variables = conservative_reconstruction,
+                              indicator_model = "gassner",
+                              debug_blend = false)
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,

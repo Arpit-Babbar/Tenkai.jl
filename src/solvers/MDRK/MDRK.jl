@@ -41,13 +41,15 @@ function perform_mdrk_step!(eq, t, iter, fcount, dt, grid, problem, scheme,
     #! format: noindent
     pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme,
                          param, aux, op, uprev, ua)
-    @timeit aux.timer "Cell Residual" cell_residual!(eq, grid, op, problem, scheme, aux,
+    @timeit aux.timer "Cell Residual" cell_residual!(eq, grid, op, problem, scheme,
+                                                     aux,
                                                      t, dt, uprev, res, Fb, Ub,
                                                      cache)
 
     update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache, t,
                               dt, stage_scaling_factor)
-    compute_face_residual!(eq, grid, op, cache, problem, scheme, param, aux, t, dt, uprev,
+    compute_face_residual!(eq, grid, op, cache, problem, scheme, param, aux, t, dt,
+                           uprev,
                            Fb, Ub, ua, res, stage_scaling_factor)
     @turbo unew .= uprev # Does nothing in the second stage. TODO - Fix this for performance
     update_solution_lwfr!(unew, res, aux) # s1: us = u1 - res, s2: u1 = u1 - res

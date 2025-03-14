@@ -5,12 +5,11 @@ Eq = Tenkai.EqEuler2D
 using Tenkai.EqEuler2D: hllc_bc
 #------------------------------------------------------------------------------
 xmin, xmax = 0.0, 0.25
-ymin, ymax = 0.0,  1.0
+ymin, ymax = 0.0, 1.0
 
 boundary_condition = (reflect, reflect, hllc_bc, dirichlet)
-γ = 5.0/3.0
+γ = 5.0 / 3.0
 equation = Eq.get_equation(γ)
-
 
 initial_value = Eq.initial_condition_rayleigh_taylor
 
@@ -39,8 +38,10 @@ cfl_safety_factor = 0.98
 #------------------------------------------------------------------------------
 grid_size = [nx, ny]
 domain = [xmin, xmax, ymin, ymax]
-problem = Problem(domain, initial_value, Eq.boundary_condition_rayleigh_taylor, boundary_condition,
-                  final_time, exact_solution, source_terms = Eq.source_terms_rayleigh_taylor)
+problem = Problem(domain, initial_value, Eq.boundary_condition_rayleigh_taylor,
+                  boundary_condition,
+                  final_time, exact_solution,
+                  source_terms = Eq.source_terms_rayleigh_taylor)
 limiter = setup_limiter_blend(blend_type = fo_blend(equation),
                               indicating_variables = Eq.rho_p_indicator!,
                               reconstruction_variables = conservative_reconstruction,

@@ -19,9 +19,9 @@ function hurricane_initial_solution(x, y)
     r = sqrt(x^2 + y^2)
     rho = 1.0
     v0 = 12.5 # Choices - (10, 12.5, 7.5) which give M0 as (√2, >√2, <√2)
-    p = A * rho ^ gamma
+    p = A * rho^gamma
 
-    v1 =  v0 * sin(theta)
+    v1 = v0 * sin(theta)
     v2 = -v0 * cos(theta)
 
     rho_v1 = rho * v1
@@ -32,7 +32,7 @@ end
 
 initial_value = hurricane_initial_solution
 
-exact_solution = (x,y,t) -> hurricane_initial_solution(x,y) # Dummy
+exact_solution = (x, y, t) -> hurricane_initial_solution(x, y) # Dummy
 degree = 4
 solver = "lwfr"
 solution_points = "gl"

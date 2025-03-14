@@ -49,13 +49,13 @@ tvb = setup_limiter_tvb(equation; tvbM = tvbM)
 MH = mh_blend(equation)
 FO = fo_blend(equation)
 blend = setup_limiter_blend(blend_type = MH,
-                              # indicating_variables = Eq.rho_p_indicator!,
-                              indicating_variables = Eq.rho_p_indicator!,
-                              reconstruction_variables = conservative_reconstruction,
-                              indicator_model = indicator_model,
-                              debug_blend = debug_blend,
-                              pure_fv = pure_fv,
-                              numflux = Eq.rusanov)
+                            # indicating_variables = Eq.rho_p_indicator!,
+                            indicating_variables = Eq.rho_p_indicator!,
+                            reconstruction_variables = conservative_reconstruction,
+                            indicator_model = indicator_model,
+                            debug_blend = debug_blend,
+                            pure_fv = pure_fv,
+                            numflux = Eq.rusanov)
 limiter = blend # To enable using trixi_include
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux, diss)

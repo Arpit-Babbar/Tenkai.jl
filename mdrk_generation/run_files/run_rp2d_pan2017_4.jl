@@ -12,8 +12,8 @@ boundary_condition = (periodic, periodic, periodic, periodic)
 equation = Eq.get_equation(γ)
 function riemann_problem_pan_1(x, y)
     Eq.riemann_problem(x, y, equation,
-                       (1.5,  0.0, 0.0, 1.5),
-                       (0.5323,  1.206,  0.0, 0.3),
+                       (1.5, 0.0, 0.0, 1.5),
+                       (0.5323, 1.206, 0.0, 0.3),
                        (0.138, 1.206, 1.206, 0.029),
                        (0.5323, 0.0, 1.206, 0.3))
 end
@@ -52,7 +52,7 @@ limiter = setup_limiter_blend(blend_type = fo_blend(equation),
                               indicating_variables = Eq.rho_p_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner",
-			      amax = 1.0,
+                              amax = 1.0,
                               debug_blend = false)
 # limiter = setup_limiter_tvb(equation; tvbM = tvbM)
 scheme = Scheme(solver, degree, solution_points, correction_function,
@@ -67,4 +67,3 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 sol = Tenkai.solve(equation, problem, scheme, param)
 
 return sol["errors"]
-

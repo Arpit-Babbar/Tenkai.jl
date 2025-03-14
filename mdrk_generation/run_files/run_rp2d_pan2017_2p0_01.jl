@@ -13,9 +13,9 @@ equation = Eq.get_equation(γ)
 function riemann_problem_pan_1(x, y)
     p0 = 0.1
     Eq.riemann_problem(x, y, equation,
-                       (1.0,  0.75, -0.5, p0),
-                       (2.0,  0.75,  0.5, p0),
-                       (1.0, -0.75,  0.5, p0),
+                       (1.0, 0.75, -0.5, p0),
+                       (2.0, 0.75, 0.5, p0),
+                       (1.0, -0.75, 0.5, p0),
                        (3.0, -0.75, -0.5, p0))
 end
 

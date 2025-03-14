@@ -12,9 +12,9 @@ boundary_condition = (neumann, neumann, neumann, neumann)
 equation = Eq.get_equation(γ)
 function riemann_problem_pan_1(x, y)
     Eq.riemann_problem(x, y, equation,
-                       (1.0,  0.0312, 0.0312, 0.5),
-                       (0.927,  -0.0312,  0.0312, 0.45),
-                       (1.0, -0.0312,  -0.0312, 0.5),
+                       (1.0, 0.0312, 0.0312, 0.5),
+                       (0.927, -0.0312, 0.0312, 0.45),
+                       (1.0, -0.0312, -0.0312, 0.5),
                        (0.927, 0.0312, -0.0312, 0.45))
 end
 

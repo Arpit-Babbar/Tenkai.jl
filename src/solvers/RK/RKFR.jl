@@ -21,12 +21,11 @@ using LinearAlgebra: axpy!, axpby!
 @muladd begin
 #! format: noindent
 
-
 #------------------------------------------------------------------------------
 # Dimension independent methods in FR used here
 #------------------------------------------------------------------------------
 (using Tenkai: apply_limiter!, compute_time_step, adjust_time_step,
-             pre_process_limiter!, get_cfl, save_solution)
+               pre_process_limiter!, get_cfl, save_solution)
 
 #------------------------------------------------------------------------------
 # Methods to be defined in RKFR1D, RKFR2D
@@ -401,12 +400,12 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
         callback = (callback_dt)
         # Try adding another function layer?
         sol = OrdinaryDiffEq.solve(odeprob,
-                                          update_solution_rkfr!(stage_limiter!,
-                                                                step_limiter!),
-                                          dt = dt, adaptive = false,
-                                          callback = callback,
-                                          saveat = final_time, dense = false,
-                                          save_start = false, save_everystep = false)
+                                   update_solution_rkfr!(stage_limiter!,
+                                                         step_limiter!),
+                                   dt = dt, adaptive = false,
+                                   callback = callback,
+                                   saveat = final_time, dense = false,
+                                   save_start = false, save_everystep = false)
         copyto!(u1, sol[1])
         t = sol.t[1]
         error_norm = compute_error(problem, grid, eq, aux, op, u1, t)

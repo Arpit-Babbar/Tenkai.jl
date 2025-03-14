@@ -329,7 +329,7 @@ function initial_value_titarev_toro(x)
     if -5.0 <= x <= -4.5
         rho, v, p = 1.515695, 0.523346, 1.805
     else
-        rho, v, p = 1.0 + 0.1*sinpi(20*x), 0.0, 1.0
+        rho, v, p = 1.0 + 0.1 * sinpi(20 * x), 0.0, 1.0
     end
     return SVector(rho, rho * v, p / (γ - 1.0) + 0.5 * rho * v^2)
 end
