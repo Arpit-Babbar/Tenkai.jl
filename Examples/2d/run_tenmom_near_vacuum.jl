@@ -1,6 +1,6 @@
 using StaticArrays
 using Tenkai
-using Plots
+
 using LinearAlgebra: norm
 # Submodules
 Eq = Tenkai.EqTenMoment2D

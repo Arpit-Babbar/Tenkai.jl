@@ -1,8 +1,7 @@
 using Tenkai
 using StaticArrays
 Eq = Tenkai.EqBurg1D
-using Plots
-gr()
+
 #------------------------------------------------------------------------------
 xmin, xmax = -1.0, 1.0
 burg_smooth_ic = x -> sinpi(2.0 * x)

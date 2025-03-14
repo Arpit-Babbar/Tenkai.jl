@@ -1,5 +1,5 @@
 using Tenkai
-using Plots
+
 plotlyjs()
 Eq = Tenkai.EqEuler1D
 #------------------------------------------------------------------------------

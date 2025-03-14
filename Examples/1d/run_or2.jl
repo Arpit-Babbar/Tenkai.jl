@@ -2,8 +2,8 @@ using StaticArrays
 using Tenkai
 Eq = Tenkai.EqLinAdv1D
 # Submodules
-using Plots
-gr() # Set backend
+
+# Set backend
 
 #------------------------------------------------------------------------------
 xmin, xmax = 0.1, 1.0

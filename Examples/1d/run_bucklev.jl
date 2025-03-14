@@ -1,7 +1,7 @@
 import Roots.find_zero
 using Tenkai
 # Submodules
-using Plots
+
 Eq = Tenkai.EqBuckleyLeverett1D
 plotlyjs() # Set backend
 

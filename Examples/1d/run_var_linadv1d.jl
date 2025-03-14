@@ -2,7 +2,7 @@ using StaticArrays
 using Tenkai
 Eq = Tenkai.EqLinAdv1D
 # Submodules
-using Plots
+
 plotlyjs() # Set backend
 
 #------------------------------------------------------------------------------

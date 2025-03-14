@@ -1,7 +1,7 @@
 # For Riemann problems in domain [0.0,1.0]
 using StaticArrays
 using Tenkai
-using Plots
+
 # Submodules
 Eq = Tenkai.EqEuler1D
 # plotlyjs() # Set backend

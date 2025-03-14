@@ -1,6 +1,6 @@
 using StaticArrays
 using Tenkai
-using Plots
+
 Eq = Tenkai.EqLinAdv1D
 plotlyjs() # Set backend
 

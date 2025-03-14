@@ -1,6 +1,6 @@
 using StaticArrays
 using Tenkai
-using Plots
+
 # Submodules
 Eq = Tenkai.EqTenMoment2D
 plotlyjs() # Set backend

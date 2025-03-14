@@ -1,9 +1,9 @@
 using StaticArrays
 using Tenkai
-using Plots
+
 # Submodules
 Eq = Tenkai.EqEuler1D
-gr() # Set backend
+# Set backend
 
 #------------------------------------------------------------------------------
 xmin, xmax = -5.0, 5.0
