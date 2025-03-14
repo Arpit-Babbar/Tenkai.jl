@@ -3,7 +3,7 @@ using Tenkai
 
 # Submodules
 Eq = Tenkai.EqEuler1D
- # Set backend
+# Set backend
 
 #------------------------------------------------------------------------------
 xmin, xmax = 0.0, 1.0

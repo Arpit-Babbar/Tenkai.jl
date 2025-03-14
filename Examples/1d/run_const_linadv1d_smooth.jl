@@ -3,7 +3,6 @@ using Tenkai
 Eq = Tenkai.EqLinAdv1D
 # Submodules
 
-
 #------------------------------------------------------------------------------
 xmin, xmax = -1.0, 1.0
 

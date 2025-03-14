@@ -3,7 +3,7 @@ using Tenkai
 
 # Submodules
 Eq = Tenkai.EqTenMoment2D
- # Set backend
+# Set backend
 
 xmin, xmax = -0.5, 1.5
 ymin, ymax = -0.5, 1.5

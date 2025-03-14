@@ -3,7 +3,7 @@ using Tenkai
 
 # Submodules
 Eq = Tenkai.EqTenMoment1D
- # Set backend
+# Set backend
 
 xmin, xmax = 0.0, 4.0
 boundary_condition = (neumann, neumann)

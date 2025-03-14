@@ -3,7 +3,7 @@ using Tenkai
 Eq = Tenkai.EqLinAdv1D
 # Submodules
 
- # Set backend
+# Set backend
 
 #------------------------------------------------------------------------------
 xmin, xmax = 0.1, 1.0

@@ -5,7 +5,7 @@ using LinearAlgebra: norm
 # Submodules
 Eq = Tenkai.EqTenMoment2D
 ten_moment_source = Eq.ten_moment_source
- # Set backend
+# Set backend
 
 xmin, xmax = 0.0, 4.0
 ymin, ymax = 0.0, 4.0
