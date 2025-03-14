@@ -3,7 +3,7 @@ using Tenkai
 
 # Submodules
 Eq = Tenkai.EqTenMoment1D
-plotlyjs() # Set backend
+ # Set backend
 
 xmin, xmax = -1.0, 1.0
 boundary_condition = (periodic, periodic)

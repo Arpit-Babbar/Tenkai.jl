@@ -39,3 +39,30 @@ end
     data_name = "burg1d_smooth_sine.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
+
+@testset "Blast 1-D" begin
+    trixi_include(joinpath(examples_dir(), "1d", "run_blast.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.01, nx = 5)
+    data_name = "blast.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+end
+
+@testset "Bucklev" begin
+    trixi_include(joinpath(examples_dir(), "1d", "run_bucklev.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.01, nx = 5)
+    data_name = "bucklev.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+end
+
+@testset "Burg 1D hat" begin
+    trixi_include(joinpath(examples_dir(), "1d", "run_burg1d_hat.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.01, nx = 5)
+    data_name = "burg1d_hat.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+end

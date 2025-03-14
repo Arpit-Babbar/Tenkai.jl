@@ -3,7 +3,7 @@ using Tenkai
 Eq = Tenkai.EqLinAdv1D
 # Submodules
 
-plotlyjs()
+
 #------------------------------------------------------------------------------
 xmin, xmax = -1.0, 1.0
 

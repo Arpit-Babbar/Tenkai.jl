@@ -4,7 +4,7 @@ using Tenkai
 using LinearAlgebra: norm
 # Submodules
 Eq = Tenkai.EqTenMoment2D
-plotlyjs() # Set backend
+ # Set backend
 
 xmin, xmax = -1.0, 1.0
 ymin, ymax = -1.0, 1.0

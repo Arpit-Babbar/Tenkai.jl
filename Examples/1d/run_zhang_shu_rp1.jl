@@ -4,7 +4,7 @@ using Tenkai
 
 # Submodules
 Eq = Tenkai.EqEuler1D
-plotlyjs() # Set backend
+ # Set backend
 
 #------------------------------------------------------------------------------
 xmin, xmax = -1.0, 1.0

@@ -2,7 +2,7 @@ using StaticArrays
 using Tenkai
 
 Eq = Tenkai.EqLinAdv1D
-plotlyjs() # Set backend
+ # Set backend
 
 #------------------------------------------------------------------------------
 xmin, xmax = -1.0, 1.0
