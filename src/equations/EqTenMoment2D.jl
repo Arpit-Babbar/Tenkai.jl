@@ -66,7 +66,7 @@ end
     return P11, P12, P22
 end
 
-function con2prim(eq::TenMoment2D, u)
+@inline @inbounds function con2prim(eq::TenMoment2D, u)
     ρ = u[1]
     v1 = u[2] / ρ
     v2 = u[3] / ρ
