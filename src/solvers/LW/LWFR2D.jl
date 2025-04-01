@@ -1024,7 +1024,8 @@ end
 # Compute cell residual for degree=1 case and for all real cells
 #-------------------------------------------------------------------------------
 function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, problem,
-                                  scheme, aux, t, dt, u1, res, Fb, Ub, cache)
+                                  scheme::Scheme{<:String}, aux, t, dt, u1, res, Fb, Ub,
+                                  cache)
     @unpack source_terms = problem
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
@@ -1160,7 +1161,8 @@ end
 # Compute cell residual for degree=2 case and for all real cells
 #-------------------------------------------------------------------------------
 function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
-                                  scheme, aux, t, dt, u1, res, Fb, Ub, cache)
+                                  scheme::Scheme{<:String}, aux, t, dt, u1, res, Fb, Ub,
+                                  cache)
     @unpack source_terms = problem
     @unpack xg, Dm, D1, DmT, D1T, Vl, Vr = op
     nd = length(xg)
@@ -1349,7 +1351,8 @@ end
 # Compute cell residual for degree=3 case and for all real cells
 #-------------------------------------------------------------------------------
 function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
-                                  scheme, aux, t, dt, u1, res, Fb, Ub, cache)
+                                  scheme::Scheme{<:String}, aux, t, dt, u1, res, Fb, Ub,
+                                  cache)
     nvar = nvariables(eq)
     @unpack source_terms = problem
     @unpack xg, Dm, D1, Vl, Vr = op
@@ -1627,7 +1630,8 @@ end
 # Compute cell residual for degree=4 case and for all real cells
 #-------------------------------------------------------------------------------
 function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
-                                  scheme, aux, t, dt, u1, res, Fb, Ub, cache)
+                                  scheme::Scheme{<:String}, aux, t, dt, u1, res, Fb, Ub,
+                                  cache)
     nvar = nvariables(eq)
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
