@@ -3446,7 +3446,9 @@ function compute_error(problem, grid, eq::AbstractEquations{2}, aux, op, u1, t)
 
     @unpack exact_solution = problem
 
-    @unpack xq, w2d, V, arr_cache = error_cache
+    @unpack w2d, arr_cache = error_cache
+
+    xq = xg
 
     nq = length(xq)
 
@@ -3468,12 +3470,14 @@ function compute_error(problem, grid, eq::AbstractEquations{2}, aux, op, u1, t)
         refresh!(un)
         for j in 1:nd, i in 1:nd
             u_node = get_node_vars(u1_, eq, i, j)
-            for jj in 1:nq, ii in 1:nq
-                # un = V*u*V', so that
-                # un[ii,jj] = ∑_ij V[ii,i]*u[i,j]*V[jj,j]
-                multiply_add_to_node_vars!(un, V[ii, i] * V[jj, j], u_node, eq, ii,
-                                           jj)
-            end
+            set_node_vars!(un, u_node, eq, i, j)
+            # for jj in 1:nq, ii in 1:nq
+            #     # un = V*u*V', so that
+            #     # un[ii,jj] = ∑_ij V[ii,i]*u[i,j]*V[jj,j]
+            #     # multiply_add_to_node_vars!(un, V[ii, i] * V[jj, j], u_node, eq, ii,
+            #     #                            jj)
+            #     set_node_vars!(un, u_node, eq, ii, jj)
+            # end
         end
         l1 = l2 = e = 0.0
         for j in 1:nq, i in 1:nq

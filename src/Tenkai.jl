@@ -97,7 +97,9 @@ include("$rkfr_dir/RKFR2D.jl")
 include("$lwfr_dir/LWFR.jl")
 
 include("$lwfr_dir/LWFR1D.jl")
+include("$lwfr_dir/LWFR1D_ad.jl")
 include("$lwfr_dir/LWFR2D.jl")
+include("$lwfr_dir/LWFR2D_ad.jl")
 
 # ( # LWFR API exported
 # export setup_arrays_lwfr,
@@ -137,5 +139,7 @@ export cRK11, cRK22, cRK33, cRK44, cRK65
 export DCSX
 
 export scheme_degree_plus_one, scheme_n_solution_points
+
+export LWEnzymeTower
 
 end # module

@@ -21,6 +21,12 @@ using UnPack
 using TimerOutputs
 using MuladdMacro
 
+abstract type LWSolver end
+abstract type LWADSolver <: LWSolver end
+struct LWEnzymeTower <: LWADSolver end
+
+Tenkai.solver2enum(solver::LWADSolver) = Tenkai.ssfr # solver type enum
+
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
