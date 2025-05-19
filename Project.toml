@@ -43,4 +43,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 test = ["Test"]
 
 [sources]
-TowerOfEnzyme = {url = "https://github.com/vchuravy/TowerOfEnzyme.jl", rev = "master"}
+TowerOfEnzyme = {url = "https://github.com/vchuravy/TowerOfEnzyme.jl", rev = "main"}
