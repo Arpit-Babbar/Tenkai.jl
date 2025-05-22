@@ -18,13 +18,13 @@ using Tenkai: @threaded
 import Tenkai: extrap_bflux!
 
 import Tenkai: compute_cell_residual_mdrk_1!, compute_cell_residual_mdrk_2!,
-                    setup_arrays_mdrk
+               setup_arrays_mdrk
 
 @muladd begin
 #! format: noindent
 
 @inline @inbounds function refresh!(u)
-   @turbo u .= zero(eltype(u))
+    @turbo u .= zero(eltype(u))
 end
 
 function setup_arrays(grid, scheme::Scheme{<:MDRKEnzymeTower},
@@ -113,8 +113,9 @@ function get_cfl(eq::AbstractEquations{2}, scheme::Scheme{<:MDRKADSolver}, param
     end
 end
 
-@inline @inbounds function eval_bflux_mdrk_ad!(eq::AbstractEquations{2}, grid, cell_data, eval_data_big,
-                          xg, Vl, Vr, F, G, F2, G2, Fb, Fb2, aux)
+@inline @inbounds function eval_bflux_mdrk_ad!(eq::AbstractEquations{2}, grid,
+                                               cell_data, eval_data_big,
+                                               xg, Vl, Vr, F, G, F2, G2, Fb, Fb2, aux)
     @unpack nvar = eq
     nd = length(xg)
 
@@ -175,8 +176,10 @@ end
     end
 end
 
-@inbounds @inline function eval_bflux_mdrk_ad!(eq::AbstractEquations{2}, grid, cell_data, eval_data_big,
-                          xg, Vl, Vr, F, G, Fb, Fb2, aux, ::Nothing)
+@inbounds @inline function eval_bflux_mdrk_ad!(eq::AbstractEquations{2}, grid,
+                                               cell_data, eval_data_big,
+                                               xg, Vl, Vr, F, G, Fb, Fb2, aux,
+                                               ::Nothing)
     @unpack nvar = eq
     nd = length(xg)
 
@@ -290,7 +293,7 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
             x = SVector(x_, y_)
             u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
             s_node = calc_source(u_node, x, t, source_terms, eq)
-            set_node_vars!(S,  0.5 * s_node, eq, i, j)
+            set_node_vars!(S, 0.5 * s_node, eq, i, j)
             set_node_vars!(S2, s_node, eq, i, j, el_x, el_y)
             multiply_add_to_node_vars!(ut, dt, s_node, eq, i, j)
         end
@@ -369,8 +372,8 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
                              0.5)
         @views cell_data = (u1_, el_x, el_y)
         @views eval_bflux_mdrk_ad!(eq, grid, cell_data, eval_data_big, xg, Vl, Vr,
-                                F, G, F2_loc, G2_loc, Fb[:, :, :, el_x, el_y],
-                                Fb2[:, :, :, el_x, el_y], aux)
+                                   F, G, F2_loc, G2_loc, Fb[:, :, :, el_x, el_y],
+                                   Fb2[:, :, :, el_x, el_y], aux)
         # @views extrap_bflux!(eq, grid, cell_data, eval_data, xg, Vl, Vr,
         #    F, G, F2_loc, G2_loc, Fb[:, :, :, el_x, el_y], Fb2[:, :, :, el_x, el_y], aux)
     end
@@ -504,10 +507,10 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, probl
                              grid.xf[el_x], grid.yf[el_y], op, u1, u, nothing, res)
         cell_data = (el_x, el_y)
         @views eval_bflux_mdrk_ad!(eq, grid, cell_data, eval_data_big, xg, Vl, Vr,
-                              F, G, Fb[:, :, :, el_x, el_y], Fb2[:, :, :, el_x, el_y],
-                              aux, nothing)
+                                   F, G, Fb[:, :, :, el_x, el_y],
+                                   Fb2[:, :, :, el_x, el_y],
+                                   aux, nothing)
     end
     return nothing
 end
-
 end # muladd

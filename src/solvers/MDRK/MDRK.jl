@@ -139,5 +139,4 @@ function solve_mdrk(eq, problem, scheme, param, grid, op, aux, cache)
                 "plot_data" => aux.plot_data, "grid" => grid,
                 "op" => op, "scheme" => scheme)
 end
-
 end # @muladd
