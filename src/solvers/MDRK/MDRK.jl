@@ -8,8 +8,15 @@ using Tenkai: set_initial_condition!,
 using LoopVectorization
 using Tenkai
 
+abstract type MDRKSolver end
+abstract type MDRKADSolver <: MDRKSolver end
+struct MDRKEnzymeTower <: MDRKADSolver end
+
+Tenkai.solver2enum(solver::MDRKADSolver) = Tenkai.ssfr # solver type enum
+
 include("$(Tenkai.mdrk_dir)/MDRK1D.jl")
 include("$(Tenkai.mdrk_dir)/MDRK2D.jl")
+include("$(Tenkai.mdrk_dir)/MDRK2D_ad.jl")
 
 #------------------------------------------------------------------------------
 # Extending methods needed in Tenkai.jl which are defined here
@@ -132,4 +139,5 @@ function solve_mdrk(eq, problem, scheme, param, grid, op, aux, cache)
                 "plot_data" => aux.plot_data, "grid" => grid,
                 "op" => op, "scheme" => scheme)
 end
+
 end # @muladd

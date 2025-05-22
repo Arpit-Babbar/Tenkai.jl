@@ -140,6 +140,6 @@ export DCSX
 
 export scheme_degree_plus_one, scheme_n_solution_points
 
-export LWEnzymeTower
+export LWEnzymeTower, MDRKEnzymeTower
 
 end # module

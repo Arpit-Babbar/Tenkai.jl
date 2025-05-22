@@ -1063,7 +1063,7 @@ function solve(equation, problem, scheme, param)
     elseif solver == "rkfr"
         out = solve_rkfr(equation, problem, scheme, param, grid, op, aux,
                          cache)
-    elseif solver == "mdrk"
+    elseif solver == "mdrk" || solver isa MDRKSolver
         out = solve_mdrk(equation, problem, scheme, param, grid, op, aux,
                          cache)
     else
