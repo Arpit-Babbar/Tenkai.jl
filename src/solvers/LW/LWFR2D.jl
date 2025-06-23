@@ -6,7 +6,7 @@ using ..Tenkai: periodic, dirichlet, neumann, reflect,
                 comp_wise_mutiply_node_vars!, flux,
                 update_ghost_values_periodic!, update_ghost_values_fn_blend!
 
-using UnPack
+using SimpleUnPack
 using TimerOutputs
 using Polyester
 using MuladdMacro

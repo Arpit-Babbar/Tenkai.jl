@@ -23,10 +23,6 @@ import Tenkai: compute_cell_residual_mdrk_1!, compute_cell_residual_mdrk_2!,
 @muladd begin
 #! format: noindent
 
-@inline @inbounds function refresh!(u)
-    @turbo u .= zero(eltype(u))
-end
-
 function setup_arrays(grid, scheme::Scheme{<:MDRKEnzymeTower},
                       eq::AbstractEquations{2})
     function gArray(nvar, nx, ny)

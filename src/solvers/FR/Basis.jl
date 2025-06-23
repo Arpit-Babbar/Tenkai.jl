@@ -4,7 +4,7 @@ using FastGaussQuadrature
 using LinearAlgebra
 using StaticArrays
 using Printf
-using UnPack
+using SimpleUnPack
 using TimerOutputs
 using MuladdMacro
 

@@ -3,7 +3,7 @@ module EqTenMoment1D
 using TimerOutputs
 using StaticArrays
 using LinearAlgebra
-using UnPack
+using SimpleUnPack
 using Plots
 using Printf
 using JSON3

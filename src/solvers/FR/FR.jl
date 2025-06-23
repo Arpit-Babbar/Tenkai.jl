@@ -12,7 +12,7 @@ using FLoops
 using Polyester
 using TimerOutputs
 using StaticArrays
-using UnPack
+using SimpleUnPack
 using Plots
 using DelimitedFiles
 using LoopVectorization
@@ -36,7 +36,7 @@ using FastGaussQuadrature
 #-------------------------------------------------------------------------------
 # Create a struct of problem description
 #-------------------------------------------------------------------------------
-struct Problem{SourceTerms, BoundaryCondition <: Tuple, F1, F2, F3 <: Function}
+struct Problem{SourceTerms, BoundaryCondition <: Tuple, F1, F2, F3}
     domain::Vector{Float64}
     initial_value::F1
     boundary_value::F2
@@ -50,11 +50,11 @@ end
 
 # Constructor
 function Problem(domain::Vector{Float64},
-                 initial_value::Function,
-                 boundary_value::Function,
+                 initial_value,
+                 boundary_value,
                  boundary_condition::Tuple,
                  final_time::Float64,
-                 exact_solution::Function;
+                 exact_solution;
                  source_terms = nothing)
     if length(domain) == 2
         @assert length(boundary_condition)==2 "Invalid Problem"

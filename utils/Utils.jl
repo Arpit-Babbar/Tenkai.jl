@@ -1,7 +1,7 @@
 module Utils
 
 using Plots
-using UnPack
+using SimpleUnPack
 using DelimitedFiles
 using Measures
 using NaturalSort

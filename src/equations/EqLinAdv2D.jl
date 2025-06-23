@@ -6,7 +6,7 @@ using MuladdMacro
 using Tenkai
 using TimerOutputs
 using Tenkai: correct_variable!
-using UnPack
+using SimpleUnPack
 
 # methods to be extended in this module
 import Tenkai: flux

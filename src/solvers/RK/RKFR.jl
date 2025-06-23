@@ -8,7 +8,7 @@ using Tenkai: set_initial_condition!,
 
 using MuladdMacro
 using LoopVectorization
-using UnPack
+using SimpleUnPack
 using OrdinaryDiffEqSSPRK, OrdinaryDiffEqTsit5
 using DiffEqCallbacks: StepsizeLimiter
 using Printf

@@ -66,3 +66,12 @@ end
     data_name = "burg1d_hat.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
+
+@testset "MHD 1D alfven" begin
+    trixi_include(joinpath(examples_dir(), "1d", "run_mhd_alfven_wave.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.01, nx = 5)
+    data_name = "alfven_mhd.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+end

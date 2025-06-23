@@ -28,7 +28,7 @@ using Polyester
 using StaticArrays
 using LoopVectorization
 using TimerOutputs
-using UnPack
+using SimpleUnPack
 using WriteVTK
 using LinearAlgebra
 using MuladdMacro
