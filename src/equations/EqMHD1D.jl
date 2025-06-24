@@ -87,6 +87,12 @@ function Tenkai.eigmatrix(eq::MHD1D, u)
     @assert false "eigmatrix is not implemented for MHD1D"
 end
 
+@inbounds @inline function max_abs_eigen_value(eq::MHD1D, u, dir)
+    v1 = u[2] / u[1]
+    cf = Trixi.calc_fast_wavespeed(u, dir, eq.trixi_equations)
+    return abs(v1) + cf
+end
+
 function compute_time_step(eq::MHD1D, problem, grid, aux, op, cfl, u1, ua)
     @unpack source_terms = problem
     nx = grid.size
@@ -94,7 +100,7 @@ function compute_time_step(eq::MHD1D, problem, grid, aux, op, cfl, u1, ua)
     den = 0.0
     for i in 1:nx
         u = get_node_vars(ua, eq, i)
-        smax = Trixi.calc_fast_wavespeed(u, 1, eq.trixi_equations)
+        smax = max_abs_eigen_value(eq, u, 1)
         den = max(den, smax / dx[i])
     end
     dt = cfl / den
