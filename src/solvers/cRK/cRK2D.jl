@@ -597,8 +597,6 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
                 y = yc - 0.5 * dy + xg[j] * dy
                 u_node = get_node_vars(u1_, eq, i, j)
                 flux1, flux2 = flux(x, y, u_node, eq)
-                set_node_vars!(F, flux1, eq, i, j)
-                set_node_vars!(G, flux2, eq, i, j)
                 for ii in Base.OneTo(nd)
                     # ut              += -lam * D * f for each variable
                     # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
@@ -611,7 +609,16 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
                     multiply_add_to_node_vars!(u2, -0.5 * lamy * Dm[jj, j], flux2, eq,
                                                i, jj)
                 end
-                set_node_vars!(U, u_node, eq, i, j)
+            end
+
+            # Add source term contribution to u2 and some to S
+            for j in 1:nd, i in 1:nd
+                x = xc - 0.5 * dx + xg[i] * dx
+                y = yc - 0.5 * dy + xg[j] * dy
+                u_node = get_node_vars(u1_, eq, i, j)
+                X = SVector(x, y)
+                s_node = calc_source(u_node, X, t, source_terms, eq)
+                multiply_add_to_node_vars!(u2, 0.5 * dt, s_node, eq, i, j)
             end
 
             for j in Base.OneTo(nd), i in Base.OneTo(nd)
@@ -638,6 +645,11 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
                     # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
                     multiply_add_to_node_vars!(r1, lamy * D1[jj, j], G_node, eq, i, jj)
                 end
+
+                u2_node = get_node_vars(u2, eq, i, j)
+                X = SVector(x, y)
+                S_node = calc_source(u2_node, X, t + 0.5 * dt, source_terms, eq)
+                multiply_add_to_node_vars!(r1, -dt, S_node, eq, i, j)
 
                 # KLUDGE - update to v1.8 and call with @inline
                 # Give u1_ or U depending on dissipation model
