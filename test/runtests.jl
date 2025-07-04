@@ -75,3 +75,12 @@ end
     data_name = "alfven_mhd.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
+
+@testset "Burgers' equation 2D smooth sin" begin
+    trixi_include(joinpath(examples_dir(), "2d", "run_burg2d_smooth_sin.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 1.0, nx = 5, ny = 5)
+    data_name = "burg2d_smooth_sine.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+end

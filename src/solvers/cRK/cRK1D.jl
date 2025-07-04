@@ -359,7 +359,6 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             x_ = xc - 0.5 * dx + xg[i] * dx
             # cache_node = get_cache_node(cache, i, cell)
             u_node = get_node_vars(u1, eq, i, cell)
-            u_node = get_node_vars(u1, eq, i, cell)
             s_node = calc_source(u_node, x_, t, source_terms, eq)
             # s_node = calc_source(u_node, cache_node, x_, t, source_terms, eq)
             multiply_add_to_node_vars!(u2, 0.5 * dt, s_node, eq, i)
@@ -380,7 +379,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 
             s2_node = calc_source(u2_node, x_, t + 0.5 * dt, source_terms, eq)
 
-            S_node = s2_node # S array is not needed in this degree N = 2 case
+            S_node = s2_node # S array is not needed in this degree N = 1 case
 
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, cell)
         end
