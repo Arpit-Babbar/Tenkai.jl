@@ -3,11 +3,43 @@ abstract type AbstractDissipation end # Don't think it'll be used beyond D-CSX
 
 solver2enum(solver::cRKSolver) = ssfr # solver type enum
 
-struct cRK64 <: cRKSolver end # TODO - Implement
-struct cRK44 <: cRKSolver end
-struct cRK33 <: cRKSolver end
-struct cRK22 <: cRKSolver end
-struct cRK11 <: cRKSolver end
+struct VolumeIntegralWeak end
+
+struct cRK64{VolumeIntegral} <: cRKSolver
+    volume_integral::VolumeIntegral
+end # TODO - Implement
+struct cRK44{VolumeIntegral} <: cRKSolver
+    volume_integral::VolumeIntegral
+end
+struct cRK33{VolumeIntegral} <: cRKSolver
+    volume_integral::VolumeIntegral
+end
+struct cRK22{VolumeIntegral} <: cRKSolver
+    volume_integral::VolumeIntegral
+end
+struct cRK11{VolumeIntegral} <: cRKSolver
+    volume_integral::VolumeIntegral
+end
+
+function cRK64(; volume_integral = VolumeIntegralWeak())
+    return cRK64{typeof(volume_integral)}(volume_integral)
+end
+
+function cRK44(; volume_integral = VolumeIntegralWeak())
+    return cRK44{typeof(volume_integral)}(volume_integral)
+end
+
+function cRK33(; volume_integral = VolumeIntegralWeak())
+    return cRK33{typeof(volume_integral)}(volume_integral)
+end
+
+function cRK22(; volume_integral = VolumeIntegralWeak())
+    return cRK22{typeof(volume_integral)}(volume_integral)
+end
+
+function cRK11(; volume_integral = VolumeIntegralWeak())
+    return cRK11{typeof(volume_integral)}(volume_integral)
+end
 
 struct DCSX <: AbstractDissipation end
 
