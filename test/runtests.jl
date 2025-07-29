@@ -84,3 +84,31 @@ end
     data_name = "burg2d_smooth_sine.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
+
+@testset "Isentropic 2D" begin
+    local solver_degrees = Dict("mdrk" => [3],
+                                "lwfr" => [1, 2, 3, 4],
+                                "rkfr" => [1, 2, 3, 4])
+    for solver in ["mdrk", "lwfr", "rkfr"], degree in solver_degrees[solver]
+        trixi_include(joinpath(examples_dir(), "2d", "run_isentropic.jl"),
+                      save_time_interval = 0.0, save_iter_interval = 0,
+                      compute_error_interval = 0,
+                      solver = solver, degree = degree,
+                      limiter = setup_limiter_none(),
+                      animate = false, final_time = 1.0, nx = 5, ny = 5)
+        data_name = "isentropic_2d_$(solver)_$(degree).txt"
+        compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+    end
+
+    for time_scheme in ["RK4", "Tsit5"]
+        trixi_include(joinpath(examples_dir(), "2d", "run_isentropic.jl"),
+                      save_time_interval = 0.0, save_iter_interval = 0,
+                      compute_error_interval = 0,
+                      solver = "rkfr", degree = 4,
+                      time_scheme = time_scheme,
+                      limiter = setup_limiter_none(),
+                      animate = false, final_time = 1.0, nx = 5, ny = 5)
+        data_name = "isentropic_2d_rkfr_4_$(time_scheme).txt"
+        compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+    end
+end
