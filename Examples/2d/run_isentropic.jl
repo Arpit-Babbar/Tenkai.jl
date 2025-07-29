@@ -21,7 +21,8 @@ bound_limit = "yes"
 bflux = evaluate
 final_time = 1.0 # 20 * sqrt(2.0) / 0.5
 
-nx, ny = 120, 120
+nx = 120
+ny = 120
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
@@ -50,7 +51,8 @@ scheme = Scheme(solver, degree, solution_points, correction_function,
                 2)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
-                   animate = animate)
+                   animate = animate,
+                   time_scheme = "by degree")
 #------------------------------------------------------------------------------
 # problem, scheme, param = ParseCommandLine(problem, param, scheme, equation,
 #                                           ARGS)
