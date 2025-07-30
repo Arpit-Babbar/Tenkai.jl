@@ -33,12 +33,13 @@ degree = 4
 solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
-numerical_flux = Eq.hllc3
+numerical_flux = Eq.rusanov
 bound_limit = "no"
 bflux = evaluate
 final_time = 0.01
 
-nx, ny = 20, 20
+nx = 20
+ny = 20
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0

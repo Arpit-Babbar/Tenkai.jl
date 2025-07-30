@@ -41,7 +41,7 @@ function setup_arrays_rkfr(grid, scheme, eq::AbstractEquations{2})
     end
     # Allocate memory
     @unpack degree = scheme
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     nd = degree + 1
     nx, ny = grid.size
     u0 = gArray(nvar, nd, nd, nx, ny)
@@ -240,7 +240,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
     @unpack xg, D1, Vl, Vr = op
     nx, ny = grid.size
     nd = length(xg)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     @unpack bflux_ind = scheme.bflux
     @unpack blend = aux
     @unpack blend_cell_residual! = blend.subroutines

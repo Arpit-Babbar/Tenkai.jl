@@ -41,7 +41,7 @@ function setup_arrays_rkfr(grid, scheme, eq::AbstractEquations{1})
     @unpack degree = scheme
     nd = degree + 1
     nx = grid.size
-    nvar = eq.nvar
+    nvar = nvariables(eq)
     u0 = gArray(nvar, nd, nx) # ghost indices not needed, only for copyto!
     u1 = gArray(nvar, nd, nx) # ghost indices needed for blending limiter
     ua = gArray(nvar, nx)
@@ -68,7 +68,7 @@ function update_ghost_values_rkfr!(problem, scheme, eq::AbstractEquations{1},
 
     nx = grid.size
     xf = grid.xf
-    nvar = eq.nvar
+    nvar = nvariables(eq)
     left, right = problem.boundary_condition
     @unpack boundary_value = problem
 
