@@ -1213,6 +1213,174 @@ function Tenkai.update_ghost_values_lwfr!(problem, scheme, eq::TenMoment2D,
     end # timer
 end
 
+function Tenkai.update_ghost_values_rkfr!(problem, scheme, eq::TenMoment2D,
+                                          grid, aux, op, cache, t)
+    @timeit aux.timer "Update ghost values" begin
+    #! format: noindent
+    @unpack Fb, ub = cache
+    update_ghost_values_periodic!(eq, problem, Fb, ub)
+
+    @unpack periodic_x, periodic_y = problem
+    if periodic_x && periodic_y
+        return nothing
+    end
+
+    nx, ny = grid.size
+    @unpack degree, xg = op
+    nd = degree + 1
+    nvar = nvariables(eq)
+    @unpack dx, dy, xf, yf = grid
+    @unpack boundary_value, boundary_condition = problem
+    left, right, bottom, top = boundary_condition
+
+    # For Dirichlet bc, use upwind flux at faces by assigning both physical
+    # and ghost cells through the bc.
+    if left == dirichlet
+        @threaded for j in 1:ny
+            x1 = xf[1]
+            for k in Base.OneTo(nd)
+                y1 = yf[j] + xg[k] * dy[j]
+                ub_value = boundary_value(x1, y1, t)
+                set_node_vars!(ub, ub_value, eq, k, 2, 0, j)
+                fb_value = flux(x1, y1, ub_value, eq, 1)
+                set_node_vars!(Fb, fb_value, eq, k, 2, 0, j)
+
+                # Purely upwind at boundary
+                # set_node_vars!(ub, ub_value, eq, k, 1, 1, j)
+                # set_node_vars!(Fb, fb_value, eq, k, 1, 1, j)
+            end
+        end
+    elseif left in [neumann, reflect]
+        @threaded for j in 1:ny
+            for k in 1:nd
+                for n in 1:nvar
+                    ub[n, k, 2, 0, j] = ub[n, k, 1, 1, j]
+                    Fb[n, k, 2, 0, j] = Fb[n, k, 1, 1, j]
+                end
+                if left == reflect
+                    ub[2, k, 2, 0, j] *= -1.0
+                    Fb[1, k, 2, 0, j] *= -1.0
+                    Fb[3, k, 2, 0, j] *= -1.0
+                    Fb[4, k, 2, 0, j] *= -1.0
+                end
+            end
+        end
+    else
+        println("Incorrect bc specified at left.")
+        @assert false
+    end
+
+    if right == dirichlet
+        @threaded for j in 1:ny
+            x2 = xf[nx + 1]
+            for k in 1:nd
+                y2 = yf[j] + xg[k] * dy[j]
+                ub_value = boundary_value(x2, y2, t)
+                fb_value = flux(x2, y2, ub_value, eq, 1)
+                for n in 1:nvar
+                    ub[n, k, 2, nx, j] = ub[n, k, 1, nx + 1, j] = ub_value[n] # upwind
+                    Fb[n, k, 2, nx, j] = Fb[n, k, 1, nx + 1, j] = fb_value[n] # upwind
+                end
+            end
+        end
+    elseif right in [neumann, reflect]
+        @threaded for j in 1:ny
+            for k in 1:nd
+                for n in 1:nvar
+                    ub[n, k, 1, nx + 1, j] = ub[n, k, 2, nx, j]
+                    Fb[n, k, 1, nx + 1, j] = Fb[n, k, 2, nx, j]
+                end
+                if right == reflect
+                    ub[2, k, 1, nx + 1, j] *= -1.0 # ρ*u1
+                    Fb[1, k, 1, nx + 1, j] *= -1.0 # ρ*u1
+                    Fb[3, k, 1, nx + 1, j] *= -1.0 # ρ*u1*u2
+                    Fb[4, k, 1, nx + 1, j] *= -1.0 # (ρ_e + p) * u1
+                end
+            end
+        end
+    else
+        println("Incorrect bc specified at right.")
+        @assert false
+    end
+
+    if bottom == dirichlet # in [dirichlet, reflect]
+        @threaded for i in 1:nx
+            y3 = yf[1]
+            for k in Base.OneTo(nd)
+                x3 = xf[i] + xg[k] * dx[i]
+                ub_value = boundary_value(x3, y3, t)
+                fb_value = flux(x3, y3, ub_value, eq, 2)
+                for n in 1:nvar
+                    ub[n, k, 3, i, 1] = ub[n, k, 4, i, 0] = ub_value[n] # upwind
+                    Fb[n, k, 3, i, 1] = Fb[n, k, 4, i, 0] = fb_value[n] # upwind
+                end
+            end
+        end
+    elseif bottom in [neumann, reflect]
+        @threaded for i in 1:nx
+            for k in 1:nd
+                for n in 1:nvar
+                    ub[n, k, 4, i, 0] = ub[n, k, 3, i, 1]
+                    Fb[n, k, 4, i, 0] = Fb[n, k, 3, i, 1]
+                end
+                if bottom == reflect
+                    ub[3, k, 4, i, 0] *= -1.0
+                    Fb[1, k, 4, i, 0] *= -1.0
+                    Fb[2, k, 4, i, 0] *= -1.0
+                    Fb[4, k, 4, i, 0] *= -1.0
+                end
+            end
+        end
+    elseif periodic_y
+        nothing
+    else
+        @assert typeof(bottom) <: Tuple{Any, Any}
+        bc! = bottom[1]
+        bc!(grid, eq, op, Fb, ub)
+    end
+
+    if top == dirichlet
+        @threaded for i in 1:nx
+            y4 = yf[ny + 1]
+            for k in 1:nd
+                x4 = xf[i] + xg[k] * dx[i]
+                ub_value = boundary_value(x4, y4, t)
+                fb_value = flux(x4, y4, ub_value, eq, 2)
+                for n in 1:nvar
+                    ub[n, k, 4, i, ny] = ub[n, k, 3, i, ny + 1] = ub_value[n] # upwind
+                    Fb[n, k, 4, i, ny] = Fb[n, k, 3, i, ny + 1] = fb_value[n] # upwind
+                    # ub[n, k, 3, i, ny+1] = ub_value[n] # upwind
+                    # Fb[n, k, 3, i, ny+1] = fb_value[n] # upwind
+                end
+            end
+        end
+    elseif top in [neumann, reflect]
+        @threaded for i in 1:nx
+            for k in 1:nd
+                for n in 1:nvar
+                    ub[n, k, 3, i, ny + 1] = ub[n, k, 4, i, ny]
+                    Fb[n, k, 3, i, ny + 1] = Fb[n, k, 4, i, ny]
+                end
+                if top == reflect
+                    ub[3, k, 3, i, ny + 1] *= -1.0
+                    Fb[1, k, 3, i, ny + 1] *= -1.0
+                    Fb[2, k, 3, i, ny + 1] *= -1.0
+                    Fb[4, k, 3, i, ny + 1] *= -1.0
+                end
+            end
+        end
+    else
+        @assert periodic_y "Incorrect bc specified at top"
+    end
+
+    if scheme.limiter.name == "blend"
+        update_ghost_values_fn_blend!(eq, problem, grid, aux)
+    end
+
+    return nothing
+    end # timer
+end
+
 #-------------------------------------------------------------------------------
 # Plotting functions
 #-------------------------------------------------------------------------------

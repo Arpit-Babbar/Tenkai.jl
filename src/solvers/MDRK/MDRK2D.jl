@@ -33,7 +33,7 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
     # Allocate memory
     @unpack degree, bflux = scheme
     @unpack bflux_ind = bflux
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     nd = degree + 1
     nx, ny = grid.size
     u1 = gArray(nvar, nd, nd, nx, ny)
@@ -90,7 +90,7 @@ end
 @inline @inbounds function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data,
                                             eval_data_big,
                                             xg, Vl, Vr, F, G, F2, G2, Fb, Fb2, aux)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     nd = length(xg)
 
     # Load pre-allocated arrays
@@ -189,7 +189,7 @@ end
 @inbounds @inline function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data,
                                             eval_data_big,
                                             xg, Vl, Vr, F, G, Fb, Fb2, aux, ::Nothing)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     nd = length(xg)
 
     # Load pre-allocated arrays
@@ -313,7 +313,7 @@ end
 function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
                                        problem, scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
     nx, ny = grid.size
@@ -492,7 +492,7 @@ end
 function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, problem,
                                        scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
     nx, ny = grid.size

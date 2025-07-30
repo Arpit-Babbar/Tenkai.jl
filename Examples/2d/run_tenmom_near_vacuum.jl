@@ -46,7 +46,8 @@ bound_limit = "yes"
 bflux = evaluate
 final_time = 0.02
 
-nx, ny = 100, 100
+nx = 100
+ny = 100
 
 near_vacuum_ic(x, y) = near_vacuum_ic(x, y, (xmax - xmin) / nx, eq)
 

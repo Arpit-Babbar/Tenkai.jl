@@ -112,3 +112,26 @@ end
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
     end
 end
+
+@testset "Ten Moment 2D" begin
+    for solver in ["mdrk", "lwfr", "rkfr", cRK33()]
+        trixi_include(joinpath(examples_dir(), "2d", "run_tenmom_dwave.jl"),
+                      save_time_interval = 0.0, save_iter_interval = 0,
+                      compute_error_interval = 0,
+                      solver = solver, degree = 3,
+                      limiter = setup_limiter_none(),
+                      animate = false, final_time = 1.0, nx = 5, ny = 5)
+        data_name = "tenmom_dwave_2d_$(solver)_$(degree).txt"
+        compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+        trixi_include(joinpath(examples_dir(), "2d", "run_tenmom_near_vacuum.jl"),
+                      save_time_interval = 0.0, save_iter_interval = 0,
+                      compute_error_interval = 0,
+                      solver = solver, degree = 3,
+                      # eq comes from the previous test
+                      limiter = setup_limiter_tvbβ(eq; tvbM = 0.0, beta = 0.9),
+                      animate = false, final_time = 0.02, nx = 5, ny = 5)
+        data_name = "tenmom_near_vacuum_2d_$(solver)_$(degree).txt"
+        compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
+    end
+end
