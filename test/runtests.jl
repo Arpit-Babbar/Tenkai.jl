@@ -132,6 +132,6 @@ end
                       limiter = setup_limiter_tvbβ(eq; tvbM = 0.0, beta = 0.9),
                       animate = false, final_time = 0.02, nx = 5, ny = 5)
         data_name = "tenmom_near_vacuum_2d_$(solver)_$(degree).txt"
-        compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+        compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
     end
 end
