@@ -1213,15 +1213,6 @@ function Tenkai.update_ghost_values_lwfr!(problem, scheme, eq::TenMoment2D,
     end # timer
 end
 
-function Tenkai.update_ghost_values_rkfr!(problem, scheme, eq::TenMoment2D, grid, aux,
-                                          op, cache, t)
-    @timeit aux.timer "Update ghost values" begin
-    #! format: noindent
-    @unpack Fb, ub, ua = cache
-    update_ghost_values_periodic!(eq, problem, Fb, ub)
-    end # timer
-end
-
 function Tenkai.update_ghost_values_rkfr!(problem, scheme, eq::TenMoment2D,
                                           grid, aux, op, cache, t)
     @timeit aux.timer "Update ghost values" begin
