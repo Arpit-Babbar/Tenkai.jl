@@ -1278,8 +1278,8 @@ function Tenkai.update_ghost_values_rkfr!(problem, scheme, eq::TenMoment2D,
                 ub_value = boundary_value(x2, y2, t)
                 fb_value = flux(x2, y2, ub_value, eq, 1)
                 for n in 1:nvar
-                    ub[n, k, 2, nx, j] = ub[n, k, 1, nx + 1, j] = ub_value[n] # upwind
-                    Fb[n, k, 2, nx, j] = Fb[n, k, 1, nx + 1, j] = fb_value[n] # upwind
+                    ub[n, k, 1, nx + 1, j] = ub_value[n] # upwind
+                    Fb[n, k, 1, nx + 1, j] = fb_value[n] # upwind
                 end
             end
         end
@@ -1311,8 +1311,8 @@ function Tenkai.update_ghost_values_rkfr!(problem, scheme, eq::TenMoment2D,
                 ub_value = boundary_value(x3, y3, t)
                 fb_value = flux(x3, y3, ub_value, eq, 2)
                 for n in 1:nvar
-                    ub[n, k, 3, i, 1] = ub[n, k, 4, i, 0] = ub_value[n] # upwind
-                    Fb[n, k, 3, i, 1] = Fb[n, k, 4, i, 0] = fb_value[n] # upwind
+                    ub[n, k, 4, i, 0] = ub_value[n] # upwind
+                    Fb[n, k, 4, i, 0] = fb_value[n] # upwind
                 end
             end
         end
@@ -1347,8 +1347,8 @@ function Tenkai.update_ghost_values_rkfr!(problem, scheme, eq::TenMoment2D,
                 ub_value = boundary_value(x4, y4, t)
                 fb_value = flux(x4, y4, ub_value, eq, 2)
                 for n in 1:nvar
-                    ub[n, k, 4, i, ny] = ub[n, k, 3, i, ny + 1] = ub_value[n] # upwind
-                    Fb[n, k, 4, i, ny] = Fb[n, k, 3, i, ny + 1] = fb_value[n] # upwind
+                    ub[n, k, 3, i, ny + 1] = ub_value[n] # upwind
+                    Fb[n, k, 3, i, ny + 1] = fb_value[n] # upwind
                     # ub[n, k, 3, i, ny+1] = ub_value[n] # upwind
                     # Fb[n, k, 3, i, ny+1] = fb_value[n] # upwind
                 end
