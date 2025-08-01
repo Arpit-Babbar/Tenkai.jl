@@ -1050,11 +1050,11 @@ function solve(equation, problem, scheme, param;
                # fr operators like differentiation matrix, correction functions
                op = fr_operators(scheme.degree, scheme.solution_points,
                                  scheme.correction_function),
+               # cache for storing solution and other arrays
+               cache = setup_arrays(grid, scheme, equation),
                # auxiliary objects like plot data, blending limiter, etc.
                aux = create_auxiliaries(equation, op, grid, problem, scheme, param,
-                                        setup_arrays(grid, scheme, equation)),
-               # cache for storing solution and other arrays
-               cache = setup_arrays(grid, scheme, equation))
+                                        cache))
     println("Number of julia threads = ", Threads.nthreads())
 
     @unpack solver = scheme
