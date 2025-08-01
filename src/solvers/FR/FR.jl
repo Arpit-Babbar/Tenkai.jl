@@ -1039,21 +1039,23 @@ extrap_bflux!() = nothing
 
 #-------------------------------------------------------------------------------
 # Solve the problem
+# The solve function allows some cache/container type functions to be keyword
+# arguments, so that the user can pass in their own containers if they want to.
+# This way, if the simulation crashes, the user can inspect the state of the
+# simulation at the time of the crash.
 #-------------------------------------------------------------------------------
-function solve(equation, problem, scheme, param)
+function solve(equation, problem, scheme, param;
+               # 1D/2D Cartesian grid
+               grid = make_cartesian_grid(problem, param.grid_size),
+               # fr operators like differentiation matrix, correction functions
+               op = fr_operators(scheme.degree, scheme.solution_points,
+                                 scheme.correction_function),
+               # auxiliary objects like plot data, blending limiter, etc.
+               aux = create_auxiliaries(equation, op, grid, problem, scheme, param,
+                                        setup_arrays(grid, scheme, equation)),
+               # cache for storing solution and other arrays
+               cache = setup_arrays(grid, scheme, equation))
     println("Number of julia threads = ", Threads.nthreads())
-    @unpack grid_size, cfl, compute_error_interval = param
-
-    # Make 1D/2D grid
-    grid = make_cartesian_grid(problem, grid_size)
-
-    # Make fr operators
-    @unpack degree, solution_points, correction_function = scheme
-
-    op = fr_operators(degree, solution_points, correction_function)
-
-    cache = setup_arrays(grid, scheme, equation)
-    aux = create_auxiliaries(equation, op, grid, problem, scheme, param, cache)
 
     @unpack solver = scheme
     if solver == "lwfr"

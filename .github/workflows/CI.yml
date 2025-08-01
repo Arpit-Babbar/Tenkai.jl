@@ -1,4 +1,4 @@
-# Source - https://github.com/ranocha/Julia_User_Group_Mainz/tree/main/2025-01-09_Infrastructure_GitHub_pkg_dev
+# Source - https://github.com/ranocha/Julia_User_Group_Mainz/tree/main/2025-01-09__Infrastructure_GitHub_pkg_dev
 name: CI
 on:
   push:

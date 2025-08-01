@@ -307,23 +307,6 @@ end
 # sol_pts = gl, gll
 # N       = degree
 #-------------------------------------------------------------------------------
-# Struct storing FR Operators
-struct OP{T1, T2}
-    degree::Int64
-    xg::T1
-    wg::T1
-    Vl::T1
-    Vr::T1
-    bl::T1
-    br::T1
-    Dm::T2
-    DmT::T2
-    bV::T2
-    D1::T2
-    D1T::T2
-    Vgll::T2
-end
-
 function fr_operators(N, sol_pts, cor_fun)
     println("Setting up differentiation operators")
     @printf("   Degree     = %d\n", N)
@@ -377,7 +360,7 @@ function fr_operators(N, sol_pts, cor_fun)
         Vgll = SMatrix{nd, nd}(Vgll)
     end
 
-    op = OP(N, xg, wg, Vl, Vr, bl, br, Dm, DmT, bV, D1, D1T, Vgll)
+    op = (; degree = N, xg, wg, Vl, Vr, bl, br, Dm, DmT, bV, D1, D1T, Vgll)
     return op
 end
 
