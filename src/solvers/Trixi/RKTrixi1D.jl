@@ -10,6 +10,10 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
     @unpack bflux_ind = scheme.bflux
     refresh!(u) = fill!(u, 0.0)
 
+    @unpack ode = cache
+    semi = ode.p
+
+
     refresh!.((ub, Fb, res))
     nvar = nvariables(eq)
     f = zeros(nvar, nd)
@@ -20,6 +24,15 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
         xc = grid.xc[cell]
         lamx = dt / dx
         xl, xr = grid.xf[cell], grid.xf[cell + 1]
+
+        Trixi.weak_form_kernel!(res, u1, cell, semi.mesh, Trixi.have_nonconservative_terms(semi.equations), semi.equations, semi.solver, semi.cache)
+
+        # res .*= -semi.cache.elements.inverse_jacobian[1]
+
+        # display(D1 ./ semi.solver.basis.derivative_dhat)
+        # display(semi.solver.basis.derivative_dhat)
+        # @assert false
+
         for ix in Base.OneTo(nd)
             # Solution points
             x = xc - 0.5 * dx + xg[ix] * dx
@@ -28,10 +41,10 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
             flux1 = flux(x, u_node, eq)
             set_node_vars!(f, flux1, eq, ix)
             # KLUDGE - Remove dx, xf arguments. just pass grid and i
-            for iix in 1:nd
-                multiply_add_to_node_vars!(res, lamx * D1[iix, ix], flux1, eq,
-                                           iix, cell)
-            end
+            # for iix in 1:nd
+            #     multiply_add_to_node_vars!(res, lamx * D1[iix, ix], flux1, eq,
+            #                                iix, cell)
+            # end
             multiply_add_to_node_vars!(ub, Vl[ix], u_node, eq, 1, cell)
             multiply_add_to_node_vars!(ub, Vr[ix], u_node, eq, 2, cell)
             if bflux_ind == extrapolate
@@ -45,6 +58,8 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
                 set_node_vars!(Fb, fbr, eq, 2, cell)
             end
         end
+
+        res[:,:,cell] .*= 2.0 * lamx
         u = @view u1[:, :, cell]
         r = @view res[:, :, cell]
         blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt,
