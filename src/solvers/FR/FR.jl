@@ -1037,7 +1037,7 @@ eval_bflux4!() = nothing
 eval_bflux5!() = nothing
 extrap_bflux!() = nothing
 
-tenkai2trixisemi(solver, equation, problem, scheme, param) = ()
+tenkai2trixiode(solver, equation, problem, scheme, param) = ()
 
 #-------------------------------------------------------------------------------
 # Solve the problem
@@ -1054,7 +1054,7 @@ function solve(equation, problem, scheme, param;
                                  scheme.correction_function),
                # cache for storing solution and other arrays
                cache = (; setup_arrays(grid, scheme, equation)...,
-                        trixi_ode = tenkai2trixisemi(scheme.solver, equation, problem,
+                        trixi_ode = tenkai2trixiode(scheme.solver, equation, problem,
                                                      scheme, param)),
                # auxiliary objects like plot data, blending limiter, etc.
                aux = create_auxiliaries(equation, op, grid, problem, scheme, param,

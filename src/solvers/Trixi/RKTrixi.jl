@@ -18,7 +18,7 @@ function tenkai2trixiequation(equations::EqMHD1D.MHD1D)
     equations.trixi_equations
 end
 
-function tenkai2trixisemi(solver::TrixiRKSolver, equation, problem, scheme, param)
+function tenkai2trixiode(solver::TrixiRKSolver, equation, problem, scheme, param)
     @unpack grid_size = param
     @assert ispow2(grid_size) "Grid size must be a power of 2 for TreeMesh."
     @assert scheme.solution_points=="gll" "Only GLL solution points are supported for Trixi."
