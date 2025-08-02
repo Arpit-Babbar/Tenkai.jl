@@ -302,7 +302,7 @@ function get_cfl(eq::AbstractEquations{2}, scheme, param)
         if diss == get_second_node_vars # Diss 2
             cfl_radau = os_vector([1.0, 0.259, 0.170, 0.103, 0.069])
             cfl_g2 = os_vector([1.0, 0.511, 0.333, 0.170, 0.103])
-            if solver == "rkfr"
+            if solver == "rkfr" || solver isa AbstractRKSolver
                 println("Using LW-D2 CFL with RKFR")
             else
                 println("Using LW-D2 CFL with LW-D2")
@@ -311,16 +311,16 @@ function get_cfl(eq::AbstractEquations{2}, scheme, param)
             # @assert degree > 1 "CFL of D1 not known for degree 1"
             cfl_radau = os_vector([1.0, 0.226, 0.117, 0.072, 0.049])
             cfl_g2 = os_vector([1.0, 0.465, 0.204, 0.116, 0.060])
-            if solver == "rkfr"
+            if solver == "rkfr" || solver isa AbstractRKSolver
                 println("Using LW-D1 CFL with RKFR")
             else
                 println("Using LW-D1 CFL with LW-D1")
             end
         end
-        if solver == "rkfr"
+        if solver == "rkfr" || solver isa AbstractRKSolver
             println("Using LW-D2 CFL with RKFR")
         end
-    elseif solver == "rkfr"
+    elseif solver == "rkfr" || solver isa AbstractRKSolver
         cfl_radau = os_vector([1.0, 0.333, 0.209, 0.145, 0.110])
         cfl_g2 = os_vector([1.0, 1.0, 0.45, 0.2875, 0.212])
         # Source - Gassner,Dumbser,Hindenlang,Munz(2010) & Gassner,Kopriva(2011)
