@@ -47,6 +47,7 @@ save_iter_interval = 0
 save_time_interval = 0.0 * final_time
 animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
+cfl_safety_factor = 0.98
 
 #------------------------------------------------------------------------------
 grid_size = [nx, ny]
@@ -64,7 +65,8 @@ limiter = setup_limiter_blend(blend_type = fo_blend(eq),
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
-                   compute_error_interval, animate = animate)
+                   compute_error_interval, animate = animate,
+                   cfl_safety_factor = cfl_safety_factor)
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(eq, problem, scheme, param);
 
