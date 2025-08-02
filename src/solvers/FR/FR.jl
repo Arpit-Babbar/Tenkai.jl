@@ -1055,7 +1055,7 @@ function solve(equation, problem, scheme, param;
                # cache for storing solution and other arrays
                cache = (; setup_arrays(grid, scheme, equation)...,
                         trixi_ode = tenkai2trixiode(scheme.solver, equation, problem,
-                                                     scheme, param)),
+                                                    scheme, param)),
                # auxiliary objects like plot data, blending limiter, etc.
                aux = create_auxiliaries(equation, op, grid, problem, scheme, param,
                                         cache))
