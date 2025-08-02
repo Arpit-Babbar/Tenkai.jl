@@ -68,16 +68,22 @@ end
 end
 
 @testset "MHD 1D alfven" begin
-    local solver2name(solver) = solver isa TrixiRKSolver ? "_rktrixi" : ""
-    for solver in [cRK44(), TrixiRKSolver(nothing)]
-        trixi_include(joinpath(examples_dir(), "1d", "run_mhd_alfven_wave.jl"),
-                      save_time_interval = 0.0, save_iter_interval = 0,
-                      compute_error_interval = 0,
-                      animate = false, final_time = 0.01, nx = 5)
-        solver_name = solver2name(solver)
-        data_name = "alfven_mhd$(solver_name).txt"
-        compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
-    end
+    trixi_include(joinpath(examples_dir(), "1d", "run_mhd_alfven_wave.jl"),
+                    save_time_interval = 0.0, save_iter_interval = 0,
+                    compute_error_interval = 0,
+                    animate = false, final_time = 0.01, nx = 5,
+                    solver = cRK44())
+    data_name = "alfven_mhd.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(examples_dir(), "1d", "run_mhd_alfven_wave_trixirk.jl"),
+                    save_time_interval = 0.0, save_iter_interval = 0,
+                    compute_error_interval = 0,
+                    animate = false, final_time = 1.0, nx = 8,
+                    solver = TrixiRKSolver(nothing))
+
+    data_name = "alfven_mhd_trixirk.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
 
 @testset "Burgers' equation 2D smooth sin" begin

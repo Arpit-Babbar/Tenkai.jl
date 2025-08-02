@@ -10,8 +10,8 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
     @unpack bflux_ind = scheme.bflux
     refresh!(u) = fill!(u, 0.0)
 
-    @unpack ode = cache
-    semi = ode.p
+    @unpack trixi_ode = cache
+    semi = trixi_ode.p
 
 
     refresh!.((ub, Fb, res))
@@ -25,6 +25,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
         lamx = dt / dx
         xl, xr = grid.xf[cell], grid.xf[cell + 1]
 
+        # TODO - keep a copied version of weak_form_kernel because it is not API
         Trixi.weak_form_kernel!(res, u1, cell, semi.mesh, Trixi.have_nonconservative_terms(semi.equations), semi.equations, semi.solver, semi.cache)
 
         # res .*= -semi.cache.elements.inverse_jacobian[1]

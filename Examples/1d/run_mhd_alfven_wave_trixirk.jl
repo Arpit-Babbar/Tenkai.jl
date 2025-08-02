@@ -17,14 +17,14 @@ exact_solution_alfven_wave = Eq.ExactSolutionAlfvenWave(equation)
 initial_value_alfven_wave(x) = exact_solution_alfven_wave(x, 0.0)
 
 degree = 3
-solver = cRK44()
-solution_points = "gl"
-correction_function = "radau"
+solver = TrixiRKSolver(nothing)
+solution_points = "gll"
+correction_function = "g2"
 numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
 
-nx = 40
+nx = 32
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in MHD
 tvbM = 300.0
@@ -53,7 +53,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    cfl_safety_factor = cfl_safety_factor,
                    time_scheme = "SSPRK54")
 #------------------------------------------------------------------------------
-sol = Tenkai.solve(equation, problem, scheme, param);
+sol = Tenkai.solve(equation, problem, scheme, param)#; grid, op, cache, aux);
 
 println(sol["errors"])
 
