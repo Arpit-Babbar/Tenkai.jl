@@ -53,7 +53,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    cfl_safety_factor = cfl_safety_factor,
                    time_scheme = "SSPRK54")
 #------------------------------------------------------------------------------
-sol = Tenkai.solve(equation, problem, scheme, param)#; grid, op, cache, aux);
+sol = Tenkai.solve(equation, problem, scheme, param)
 
 println(sol["errors"])
 
