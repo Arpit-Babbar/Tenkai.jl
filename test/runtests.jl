@@ -145,3 +145,23 @@ end
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
     end
 end
+
+# Shu-Osher test
+@testset "Shu-Osher 1D" begin
+    γ = 1.4
+    trixi_include(joinpath(examples_dir(), "1d", "run_shuosher.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 1.8, nx = 16,
+                  γ = γ,
+                  solver = TrixiRKSolver(nothing), degree = 3,
+                  solution_points = "gll", correction_function = "g2",
+                  limiter = setup_limiter_blend(blend_type = fo_blend(Eq.get_equation(γ)),
+                                                indicating_variables = Eq.rho_p_indicator!,
+                                                reconstruction_variables = conservative_reconstruction,
+                                                indicator_model = "gassner",
+                                                debug_blend = false,
+                                                pure_fv = false))
+    data_name = "shuosher_1d_rkfr_3.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+end

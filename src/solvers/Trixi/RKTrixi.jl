@@ -11,7 +11,7 @@ include(joinpath(@__DIR__, "RKTrixi1D.jl"))
 include(joinpath(@__DIR__, "RKTrixi2D.jl"))
 
 function tenkai2trixiequation(equation::EqEuler1D.Euler1D)
-    Trixi.CompressibleEulerEquations1D(equation.gamma)
+    Trixi.CompressibleEulerEquations1D(equation.γ)
 end
 
 function tenkai2trixiequation(equations::EqMHD1D.MHD1D)
@@ -27,7 +27,7 @@ function tenkai2trixiode(solver::TrixiRKSolver, equation, problem, scheme, param
     initial_condition(x, t, equations) = problem.exact_solution(x..., t)
     dg_solver = Trixi.DGSEM(polydeg = scheme.degree,
                             surface_flux = Trixi.flux_lax_friedrichs,
-                            volume_integral = Trixi.VolumeIntegralWeakForm())
+                            volume_integral = Trixi.VolumeIntegralShockCapturingHG(nothing))
     mesh = Trixi.TreeMesh(problem.domain[1], problem.domain[2],
                           initial_refinement_level = Int(log2(grid_size)),
                           n_cells_max = 10000000)
