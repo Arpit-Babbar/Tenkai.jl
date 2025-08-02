@@ -149,6 +149,7 @@ end
 # Shu-Osher test
 @testset "Shu-Osher 1D" begin
     γ = 1.4
+    Eq = Tenkai.EqEuler1D
     trixi_include(joinpath(examples_dir(), "1d", "run_shuosher.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,
@@ -162,6 +163,6 @@ end
                                                 indicator_model = "gassner",
                                                 debug_blend = false,
                                                 pure_fv = false))
-    data_name = "shuosher_1d_rkfr_3.txt"
+    data_name = "shuosher_1d_trixi_rkfr_3.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
