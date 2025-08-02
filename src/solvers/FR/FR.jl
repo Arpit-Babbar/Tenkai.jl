@@ -31,7 +31,7 @@ using FastGaussQuadrature
 
 @enum BCType periodic dirichlet neumann reflect hllc_bc
 @enum BFluxType extrapolate evaluate
-@enum SolverType rkfr lwfr mdrk ssfr # TODO - Is this only needed for D2 / D1?
+@enum SolverType rkfr lwfr mdrk ssfr rktrixi # TODO - Is this only needed for D2 / D1?
 
 #-------------------------------------------------------------------------------
 # Create a struct of problem description
@@ -667,7 +667,7 @@ function setup_arrays(grid, scheme, equation)
     @unpack solver = scheme
     if solver == "lwfr"
         return setup_arrays_lwfr(grid, scheme, equation)
-    elseif solver == "rkfr"
+    elseif solver == "rkfr" || solver isa AbstractRKSolver
         return setup_arrays_rkfr(grid, scheme, equation)
     elseif solver == "mdrk"
         return setup_arrays_mdrk(grid, scheme, equation)
@@ -1062,7 +1062,7 @@ function solve(equation, problem, scheme, param;
         # SSFR = Single Stage Flux Reconstruction. It defaults to LWFR
         out = solve_ssfr(equation, problem, scheme, param, grid, op, aux,
                          cache)
-    elseif solver == "rkfr"
+    elseif solver == "rkfr" || solver isa AbstractRKSolver
         out = solve_rkfr(equation, problem, scheme, param, grid, op, aux,
                          cache)
     elseif solver == "mdrk" || solver isa MDRKSolver

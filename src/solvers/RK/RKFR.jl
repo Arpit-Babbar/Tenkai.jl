@@ -21,6 +21,8 @@ using LinearAlgebra: axpy!, axpby!
 @muladd begin
 #! format: noindent
 
+abstract type AbstractRKSolver end
+
 #------------------------------------------------------------------------------
 # Dimension independent methods in FR used here
 #------------------------------------------------------------------------------

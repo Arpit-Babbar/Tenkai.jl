@@ -133,11 +133,17 @@ include("$solvers_dir/cRK/cRK1D.jl")
 include("$solvers_dir/cRK/cRK1D_DCSX.jl")
 include("$solvers_dir/cRK/cRK2D.jl")
 
+# RKTrixi methods
+include("$solvers_dir/Trixi/RKTrixi.jl")
+
 # Standard cRK solvers
 export cRK11, cRK22, cRK33, cRK44, cRK65
 
 # DCSX dissipation
 export DCSX
+
+# TrixiRKSolver
+export TrixiRKSolver
 
 export scheme_degree_plus_one, scheme_n_solution_points
 

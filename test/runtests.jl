@@ -68,12 +68,16 @@ end
 end
 
 @testset "MHD 1D alfven" begin
-    trixi_include(joinpath(examples_dir(), "1d", "run_mhd_alfven_wave.jl"),
-                  save_time_interval = 0.0, save_iter_interval = 0,
-                  compute_error_interval = 0,
-                  animate = false, final_time = 0.01, nx = 5)
-    data_name = "alfven_mhd.txt"
-    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+    local solver2name(solver) = solver isa TrixiRKSolver ? "_rktrixi" : ""
+    for solver in [cRK44(), TrixiRKSolver(nothing)]
+        trixi_include(joinpath(examples_dir(), "1d", "run_mhd_alfven_wave.jl"),
+                      save_time_interval = 0.0, save_iter_interval = 0,
+                      compute_error_interval = 0,
+                      animate = false, final_time = 0.01, nx = 5)
+        solver_name = solver2name(solver)
+        data_name = "alfven_mhd$(solver_name).txt"
+        compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+    end
 end
 
 @testset "Burgers' equation 2D smooth sin" begin
@@ -114,14 +118,16 @@ end
 end
 
 @testset "Ten Moment 2D" begin
-    for solver in ["mdrk", "lwfr", "rkfr", cRK33()]
+    local solver2name(solver) = solver isa TrixiRKSolver ? "rktrixi" : solver
+    for solver in ["mdrk", "lwfr", "rkfr", cRK33(), TrixiRKSolver(nothing)]
         trixi_include(joinpath(examples_dir(), "2d", "run_tenmom_dwave.jl"),
                       save_time_interval = 0.0, save_iter_interval = 0,
                       compute_error_interval = 0,
                       solver = solver, degree = 3,
                       limiter = setup_limiter_none(),
                       animate = false, final_time = 1.0, nx = 5, ny = 5)
-        data_name = "tenmom_dwave_2d_$(solver)_$(degree).txt"
+        solver_name = solver2name(solver)
+        data_name = "tenmom_dwave_2d_$(solver_name)_$(degree).txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 
         trixi_include(joinpath(examples_dir(), "2d", "run_tenmom_near_vacuum.jl"),
@@ -131,7 +137,7 @@ end
                       # eq comes from the previous test
                       limiter = setup_limiter_tvbβ(eq; tvbM = 0.0, beta = 0.9),
                       animate = false, final_time = 0.02, nx = 5, ny = 5)
-        data_name = "tenmom_near_vacuum_2d_$(solver)_$(degree).txt"
+        data_name = "tenmom_near_vacuum_2d_$(solver_name)_$(degree).txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
     end
 end
