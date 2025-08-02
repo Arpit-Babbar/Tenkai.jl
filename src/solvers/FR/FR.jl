@@ -31,7 +31,7 @@ using FastGaussQuadrature
 
 @enum BCType periodic dirichlet neumann reflect hllc_bc
 @enum BFluxType extrapolate evaluate
-@enum SolverType rkfr lwfr mdrk ssfr # TODO - Is this only needed for D2 / D1?
+@enum SolverType rkfr lwfr mdrk ssfr rktrixi # TODO - Is this only needed for D2 / D1?
 
 #-------------------------------------------------------------------------------
 # Create a struct of problem description
@@ -667,7 +667,7 @@ function setup_arrays(grid, scheme, equation)
     @unpack solver = scheme
     if solver == "lwfr"
         return setup_arrays_lwfr(grid, scheme, equation)
-    elseif solver == "rkfr"
+    elseif solver == "rkfr" || solver isa AbstractRKSolver
         return setup_arrays_rkfr(grid, scheme, equation)
     elseif solver == "mdrk"
         return setup_arrays_mdrk(grid, scheme, equation)
@@ -1037,6 +1037,8 @@ eval_bflux4!() = nothing
 eval_bflux5!() = nothing
 extrap_bflux!() = nothing
 
+tenkai2trixiode(solver, equation, problem, scheme, param) = ()
+
 #-------------------------------------------------------------------------------
 # Solve the problem
 # The solve function allows some cache/container type functions to be keyword
@@ -1051,7 +1053,9 @@ function solve(equation, problem, scheme, param;
                op = fr_operators(scheme.degree, scheme.solution_points,
                                  scheme.correction_function),
                # cache for storing solution and other arrays
-               cache = setup_arrays(grid, scheme, equation),
+               cache = (; setup_arrays(grid, scheme, equation)...,
+                        trixi_ode = tenkai2trixiode(scheme.solver, equation, problem,
+                                                    scheme, param)),
                # auxiliary objects like plot data, blending limiter, etc.
                aux = create_auxiliaries(equation, op, grid, problem, scheme, param,
                                         cache))
@@ -1062,7 +1066,7 @@ function solve(equation, problem, scheme, param;
         # SSFR = Single Stage Flux Reconstruction. It defaults to LWFR
         out = solve_ssfr(equation, problem, scheme, param, grid, op, aux,
                          cache)
-    elseif solver == "rkfr"
+    elseif solver == "rkfr" || solver isa AbstractRKSolver
         out = solve_rkfr(equation, problem, scheme, param, grid, op, aux,
                          cache)
     elseif solver == "mdrk" || solver isa MDRKSolver

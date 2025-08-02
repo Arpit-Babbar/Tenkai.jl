@@ -1,0 +1,105 @@
+function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem,
+                                     scheme::Scheme{<:TrixiRKSolver},
+                                     aux, t, dt, u1, res, Fb, ub, cache)
+    @unpack timer = aux
+    @timeit aux.timer "Cell residual" begin
+    #! format: noindent
+    @unpack xg, D1, Vl, Vr = op
+    nx, ny = grid.size
+    nd = length(xg)
+    nvar = nvariables(eq)
+    @unpack bflux_ind = scheme.bflux
+    @unpack blend = aux
+    @unpack blend_cell_residual! = blend.subroutines
+    @unpack source_terms = problem
+    refresh!(u) = fill!(u, zero(eltype(u)))
+
+    refresh!.((ub, Fb, res))
+    @threaded for element in CartesianIndices((1:nx, 1:ny)) # element loop
+        el_x, el_y = element[1], element[2]
+        dx, dy = grid.dx[el_x], grid.dy[el_y]
+        xc, yc = grid.xc[el_x], grid.yc[el_y]
+        lamx, lamy = dt / dx, dt / dy
+        u = @view u1[:, :, :, el_x, el_y]
+        r1 = @view res[:, :, :, el_x, el_y]
+        ub_ = @view ub[:, :, :, el_x, el_y]
+        Fb_ = @view Fb[:, :, :, el_x, el_y]
+        for j in Base.OneTo(nd), i in Base.OneTo(nd) # solution points loop
+            x = xc - 0.5 * dx + xg[i] * dx
+            y = yc - 0.5 * dy + xg[j] * dy
+            X = SVector(x, y)
+            u_node = get_node_vars(u, eq, i, j)
+
+            f_node, g_node = flux(x, y, u_node, eq)
+            # @show el_x, i, el_y, j, x, y
+            for ii in Base.OneTo(nd)
+                # res = D * f for each variable
+                # res[ii,j] = ∑_i D[ii,i] * f[i,j] for each variable
+                multiply_add_to_node_vars!(r1, lamx * D1[ii, i], f_node, eq, ii, j)
+            end
+
+            for jj in Base.OneTo(nd)
+                # res = g * D' for each variable
+                # res[i,jj] = ∑_j g[i,j] * D1[jj,j] for each variable
+                multiply_add_to_node_vars!(r1, lamy * D1[jj, j], g_node, eq, i, jj)
+            end
+
+            s_node = calc_source(u_node, X, t, source_terms, eq)
+            multiply_add_to_node_vars!(r1, -dt, s_node, eq, i, j)
+
+            # Ub = UT * V
+            # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
+            multiply_add_to_node_vars!(ub_, Vl[i], u_node, eq, j, 1)
+            multiply_add_to_node_vars!(ub_, Vr[i], u_node, eq, j, 2)
+
+            # Ub = U * V
+            # Ub[i] += ∑_j U[i,j]*V[j]
+            multiply_add_to_node_vars!(ub_, Vl[j], u_node, eq, i, 3)
+            multiply_add_to_node_vars!(ub_, Vr[j], u_node, eq, i, 4)
+        end
+        blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
+                             dy,
+                             grid.xf[el_x], grid.yf[el_y], op, u1, u,
+                             nothing, res)
+
+        if bflux_ind == extrapolate
+            # Very inefficient, not meant to be used.
+            for j in Base.OneTo(nd), i in Base.OneTo(nd) # solution points loop
+                x = xc - 0.5 * dx + xg[i] * dx
+                y = yc - 0.5 * dy + xg[j] * dy
+                u_node = get_node_vars(u, eq, i, j)
+                f_node, g_node = flux(x, y, u_node, eq)
+
+                # Ub = UT * V
+                # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
+                multiply_add_to_node_vars!(Fb_, Vl[i], f_node, eq, j, 1)
+                multiply_add_to_node_vars!(Fb_, Vr[i], f_node, eq, j, 2)
+
+                # Ub = U * V
+                # Ub[i] += ∑_j U[i,j]*V[j]
+                multiply_add_to_node_vars!(Fb_, Vl[j], g_node, eq, i, 3)
+                multiply_add_to_node_vars!(Fb_, Vr[j], g_node, eq, i, 4)
+            end
+        else
+            xl, xr = grid.xf[el_x], grid.xf[el_x + 1]
+            yd, yu = grid.yf[el_y], grid.yf[el_y + 1]
+            dx, dy = grid.dx[el_x], grid.dy[el_y]
+            for ii in 1:nd
+                ubl, ubr = get_node_vars(ub_, eq, ii, 1),
+                           get_node_vars(ub_, eq, ii, 2)
+                ubd, ubu = get_node_vars(ub_, eq, ii, 3),
+                           get_node_vars(ub_, eq, ii, 4)
+                x = xc - 0.5 * dx + xg[ii] * dx
+                y = yc - 0.5 * dy + xg[ii] * dy
+                fbl, fbr = flux(xl, y, ubl, eq, 1), flux(xr, y, ubr, eq, 1)
+                fbd, fbu = flux(x, yd, ubd, eq, 2), flux(x, yu, ubu, eq, 2)
+                set_node_vars!(Fb_, fbl, eq, ii, 1)
+                set_node_vars!(Fb_, fbr, eq, ii, 2)
+                set_node_vars!(Fb_, fbd, eq, ii, 3)
+                set_node_vars!(Fb_, fbu, eq, ii, 4)
+            end
+        end
+    end
+    return nothing
+    end # timer
+end
