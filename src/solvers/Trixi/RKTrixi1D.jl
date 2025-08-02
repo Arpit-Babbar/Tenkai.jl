@@ -1,5 +1,14 @@
 # Exactly the same as in Trixi.jl, but kept here because it is not in the API.
 # https://github.com/trixi-framework/Trixi.jl/blob/3ce203318eb1c13427d145f8a7609db32481bc9a/src/solvers/dgsem_tree/dg_1d.jl#L146
+
+function get_element_alpha(blend::NamedTuple, element)
+    return 0.0
+end
+
+function get_element_alpha(blend::Blend1D, element)
+    return blend.alpha[element]
+end
+
 @inline function weak_form_kernel!(du, u,
                                    element, mesh::Union{TreeMesh{1}, StructuredMesh{1}},
                                    nonconservative_terms::False, equations,
@@ -47,10 +56,12 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
         lamx = dt / dx
         xl, xr = grid.xf[cell], grid.xf[cell + 1]
 
+        alpha = get_element_alpha(blend, cell)
+
         weak_form_kernel!(res, u1, cell, semi.mesh,
                           Trixi.have_nonconservative_terms(semi.equations),
                           semi.equations, semi.solver, semi.cache,
-                          2.0 * lamx)
+                          2.0 * lamx * (1.0 - alpha))
 
         for ix in Base.OneTo(nd)
             # Solution points
@@ -79,9 +90,36 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
         r = @view res[:, :, cell]
         blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt,
                                    dx,
-                                   grid.xf[cell], op, u1, u, cache.ua, f, r)
+                                   grid.xf[cell], op, u1, u, cache.ua, cache, res)
     end
     end # timer
     return nothing
+    end # timer
+end
+
+@inbounds @inline function blend_cell_residual_fo!(cell, eq::AbstractEquations{1},
+                                                   problem, scheme::Scheme{<:TrixiRKSolver},
+                                                   aux, lamx,
+                                                   t, dt, dx, xf, op, u1, u, ua, cache, r,
+                                                   scaling_factor = 1.0)
+    @timeit aux.timer "Blending limiter" begin # TOTHINK - Check the overhead, it's supposed
+    #! format: noindent
+    # to be 0.25 microseconds
+    @unpack blend = aux
+    @unpack source_terms = problem
+    @unpack Vl, Vr, xg, wg = op
+
+    @unpack trixi_ode = cache
+    semi = trixi_ode.p
+    @unpack volume_integral = semi.solver
+
+    alpha = get_element_alpha(blend, cell)
+
+    Trixi.fv_kernel!(r, u1, semi.mesh,
+                     Trixi.have_nonconservative_terms(semi.equations),
+                     semi.equations,
+                     volume_integral.volume_flux_fv, semi.solver,
+                     semi.cache, cell,
+                     2.0 * lamx * alpha)
     end # timer
 end
