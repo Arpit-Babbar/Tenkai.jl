@@ -13,7 +13,6 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
     @unpack trixi_ode = cache
     semi = trixi_ode.p
 
-
     refresh!.((ub, Fb, res))
     nvar = nvariables(eq)
     f = zeros(nvar, nd)
@@ -26,7 +25,9 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
         xl, xr = grid.xf[cell], grid.xf[cell + 1]
 
         # TODO - keep a copied version of weak_form_kernel because it is not API
-        Trixi.weak_form_kernel!(res, u1, cell, semi.mesh, Trixi.have_nonconservative_terms(semi.equations), semi.equations, semi.solver, semi.cache)
+        Trixi.weak_form_kernel!(res, u1, cell, semi.mesh,
+                                Trixi.have_nonconservative_terms(semi.equations),
+                                semi.equations, semi.solver, semi.cache)
 
         # res .*= -semi.cache.elements.inverse_jacobian[1]
 
@@ -60,7 +61,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
             end
         end
 
-        res[:,:,cell] .*= 2.0 * lamx
+        res[:, :, cell] .*= 2.0 * lamx
         u = @view u1[:, :, cell]
         r = @view res[:, :, cell]
         blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt,

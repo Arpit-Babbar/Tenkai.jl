@@ -69,18 +69,18 @@ end
 
 @testset "MHD 1D alfven" begin
     trixi_include(joinpath(examples_dir(), "1d", "run_mhd_alfven_wave.jl"),
-                    save_time_interval = 0.0, save_iter_interval = 0,
-                    compute_error_interval = 0,
-                    animate = false, final_time = 0.01, nx = 5,
-                    solver = cRK44())
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.01, nx = 5,
+                  solver = cRK44())
     data_name = "alfven_mhd.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 
     trixi_include(joinpath(examples_dir(), "1d", "run_mhd_alfven_wave_trixirk.jl"),
-                    save_time_interval = 0.0, save_iter_interval = 0,
-                    compute_error_interval = 0,
-                    animate = false, final_time = 1.0, nx = 8,
-                    solver = TrixiRKSolver(nothing))
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 1.0, nx = 8,
+                  solver = TrixiRKSolver(nothing))
 
     data_name = "alfven_mhd_trixirk.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
