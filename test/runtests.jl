@@ -166,3 +166,16 @@ end
     data_name = "shuosher_1d_trixi_rkfr_3.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
+
+# Density wave 2D
+@testset "Density wave 2D" begin
+    trixi_include(joinpath(examples_dir(), "2d", "run_dwave2d.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.1, nx = 16, ny = 16,
+                  solver = TrixiRKSolver(nothing), degree = 3,
+                  solution_points = "gll", correction_function = "g2",
+                  limiter = setup_limiter_none())
+    data_name = "dwave_2d_trixi_rkfr_3.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+end
