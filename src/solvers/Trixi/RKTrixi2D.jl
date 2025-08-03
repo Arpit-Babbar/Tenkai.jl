@@ -15,13 +15,13 @@ using .EqEuler1D: tenkai2trixiequation
         flux1 = Trixi.flux(u_node, 1, equations)
         for ii in eachnode(dg)
             Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], flux1,
-                                       equations, dg, ii, j, element...)
+                                             equations, dg, ii, j, element...)
         end
 
         flux2 = Trixi.flux(u_node, 2, equations)
         for jj in eachnode(dg)
             Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], flux2,
-                                       equations, dg, i, jj, element...)
+                                             equations, dg, i, jj, element...)
         end
     end
 
@@ -114,9 +114,9 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
         dx, dy = grid.dx[el_x], grid.dy[el_y]
         for ii in 1:nd
             ubl, ubr = get_node_vars(ub_, eq, ii, 1),
-                        get_node_vars(ub_, eq, ii, 2)
+                       get_node_vars(ub_, eq, ii, 2)
             ubd, ubu = get_node_vars(ub_, eq, ii, 3),
-                        get_node_vars(ub_, eq, ii, 4)
+                       get_node_vars(ub_, eq, ii, 4)
             x = xc - 0.5 * dx + xg[ii] * dx
             y = yc - 0.5 * dy + xg[ii] * dy
             fbl, fbr = flux(xl, y, ubl, eq, 1), flux(xr, y, ubr, eq, 1)
