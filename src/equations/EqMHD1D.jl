@@ -33,6 +33,8 @@ import Tenkai: admissibility_tolerance
 
 import Trixi
 
+import Tenkai.EqEuler1D: tenkai2trixiequation
+
 using MuladdMacro
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
@@ -45,6 +47,10 @@ using MuladdMacro
 struct MHD1D{TrixiEquations} <: AbstractEquations{1, 8}
     trixi_equations::TrixiEquations
     name::String
+end
+
+function tenkai2trixiequation(equations::EqMHD1D.MHD1D)
+    equations.trixi_equations
 end
 
 @inbounds @inline function flux(x, u, eq::MHD1D)
