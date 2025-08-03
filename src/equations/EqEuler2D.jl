@@ -39,6 +39,9 @@ using Tenkai
 
 using Tenkai: correct_variable!
 
+using Trixi: Trixi
+import Tenkai.EqEuler1D: tenkai2trixiequation
+
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
@@ -55,6 +58,8 @@ struct Euler2D{HLLSpeeds <: Function} <: AbstractEquations{2, 4}
     initial_values::Dict{String, Function}
     numfluxes::Dict{String, Function}
 end
+
+tenkai2trixiequation(eq::Euler2D) = Trixi.CompressibleEulerEquations2D(eq.γ)
 
 #------------------------------------------------------------------------------
 

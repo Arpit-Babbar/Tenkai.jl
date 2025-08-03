@@ -1,3 +1,5 @@
+using .EqEuler1D: tenkai2trixiequation
+
 @inline function weak_form_kernel!(du, u,
                                    element, mesh::TreeMesh{2},
                                    nonconservative_terms::False, equations,
@@ -8,22 +10,45 @@
 
     # Calculate volume terms in one element
     for j in eachnode(dg), i in eachnode(dg)
-        u_node = get_node_vars(u, equations, dg, i, j, element)
+        u_node = Trixi.get_node_vars(u, equations, dg, i, j, element...)
 
-        flux1 = flux(u_node, 1, equations)
+        flux1 = Trixi.flux(u_node, 1, equations)
         for ii in eachnode(dg)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], flux1,
-                                       equations, dg, ii, j, element)
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], flux1,
+                                       equations, dg, ii, j, element...)
         end
 
-        flux2 = flux(u_node, 2, equations)
+        flux2 = Trixi.flux(u_node, 2, equations)
         for jj in eachnode(dg)
-            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], flux2,
-                                       equations, dg, i, jj, element)
+            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], flux2,
+                                       equations, dg, i, jj, element...)
         end
     end
 
     return nothing
+end
+
+function tenkai2trixiode(solver::TrixiRKSolver, equation::AbstractEquations{2},
+                         problem, scheme, param)
+    @unpack grid_size = param
+    @assert *(ispow2.(grid_size)...) "Grid size must be a power of 2 for TreeMesh."
+    @assert scheme.solution_points=="gll" "Only GLL solution points are supported for Trixi."
+    @assert scheme.correction_function=="g2" "Only G2 correction function is supported for Trixi."
+    trixi_equations = tenkai2trixiequation(equation)
+    initial_condition(x, t, equations) = problem.exact_solution(x..., t)
+    dg_solver = Trixi.DGSEM(polydeg = scheme.degree,
+                            surface_flux = Trixi.flux_lax_friedrichs,
+                            volume_integral = Trixi.VolumeIntegralShockCapturingHG(nothing))
+    xmin, xmax, ymin, ymax = problem.domain
+    coordinates_min = (xmin, ymin)
+    coordinates_max = (xmax, ymax)
+    mesh = Trixi.TreeMesh(coordinates_min, coordinates_max,
+                          initial_refinement_level = Int(log2(grid_size[1])),
+                          n_cells_max = 10000000)
+    semi = Trixi.SemidiscretizationHyperbolic(mesh, trixi_equations, initial_condition,
+                                              dg_solver)
+    tspan = (0.0, problem.final_time)
+    ode = Trixi.semidiscretize(semi, tspan)
 end
 
 function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem,
@@ -42,35 +67,30 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
     @unpack source_terms = problem
     refresh!(u) = fill!(u, zero(eltype(u)))
 
+    @unpack trixi_ode = cache
+    semi = trixi_ode.p
+
     refresh!.((ub, Fb, res))
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # element loop
         el_x, el_y = element[1], element[2]
         dx, dy = grid.dx[el_x], grid.dy[el_y]
         xc, yc = grid.xc[el_x], grid.yc[el_y]
-        lamx, lamy = dt / dx, dt / dy
+        lamx = dt / dx # = dt / dy
         u = @view u1[:, :, :, el_x, el_y]
         r1 = @view res[:, :, :, el_x, el_y]
         ub_ = @view ub[:, :, :, el_x, el_y]
         Fb_ = @view Fb[:, :, :, el_x, el_y]
+
+        weak_form_kernel!(res, u1, (el_x, el_y), semi.mesh,
+                          Trixi.have_nonconservative_terms(semi.equations),
+                          semi.equations, semi.solver, semi.cache,
+                          2.0 * lamx)
+
         for j in Base.OneTo(nd), i in Base.OneTo(nd) # solution points loop
             x = xc - 0.5 * dx + xg[i] * dx
             y = yc - 0.5 * dy + xg[j] * dy
             X = SVector(x, y)
             u_node = get_node_vars(u, eq, i, j)
-
-            f_node, g_node = flux(x, y, u_node, eq)
-            # @show el_x, i, el_y, j, x, y
-            for ii in Base.OneTo(nd)
-                # res = D * f for each variable
-                # res[ii,j] = ∑_i D[ii,i] * f[i,j] for each variable
-                multiply_add_to_node_vars!(r1, lamx * D1[ii, i], f_node, eq, ii, j)
-            end
-
-            for jj in Base.OneTo(nd)
-                # res = g * D' for each variable
-                # res[i,jj] = ∑_j g[i,j] * D1[jj,j] for each variable
-                multiply_add_to_node_vars!(r1, lamy * D1[jj, j], g_node, eq, i, jj)
-            end
 
             s_node = calc_source(u_node, X, t, source_terms, eq)
             multiply_add_to_node_vars!(r1, -dt, s_node, eq, i, j)
@@ -89,43 +109,22 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
                              dy,
                              grid.xf[el_x], grid.yf[el_y], op, u1, u,
                              nothing, res)
-
-        if bflux_ind == extrapolate
-            # Very inefficient, not meant to be used.
-            for j in Base.OneTo(nd), i in Base.OneTo(nd) # solution points loop
-                x = xc - 0.5 * dx + xg[i] * dx
-                y = yc - 0.5 * dy + xg[j] * dy
-                u_node = get_node_vars(u, eq, i, j)
-                f_node, g_node = flux(x, y, u_node, eq)
-
-                # Ub = UT * V
-                # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
-                multiply_add_to_node_vars!(Fb_, Vl[i], f_node, eq, j, 1)
-                multiply_add_to_node_vars!(Fb_, Vr[i], f_node, eq, j, 2)
-
-                # Ub = U * V
-                # Ub[i] += ∑_j U[i,j]*V[j]
-                multiply_add_to_node_vars!(Fb_, Vl[j], g_node, eq, i, 3)
-                multiply_add_to_node_vars!(Fb_, Vr[j], g_node, eq, i, 4)
-            end
-        else
-            xl, xr = grid.xf[el_x], grid.xf[el_x + 1]
-            yd, yu = grid.yf[el_y], grid.yf[el_y + 1]
-            dx, dy = grid.dx[el_x], grid.dy[el_y]
-            for ii in 1:nd
-                ubl, ubr = get_node_vars(ub_, eq, ii, 1),
-                           get_node_vars(ub_, eq, ii, 2)
-                ubd, ubu = get_node_vars(ub_, eq, ii, 3),
-                           get_node_vars(ub_, eq, ii, 4)
-                x = xc - 0.5 * dx + xg[ii] * dx
-                y = yc - 0.5 * dy + xg[ii] * dy
-                fbl, fbr = flux(xl, y, ubl, eq, 1), flux(xr, y, ubr, eq, 1)
-                fbd, fbu = flux(x, yd, ubd, eq, 2), flux(x, yu, ubu, eq, 2)
-                set_node_vars!(Fb_, fbl, eq, ii, 1)
-                set_node_vars!(Fb_, fbr, eq, ii, 2)
-                set_node_vars!(Fb_, fbd, eq, ii, 3)
-                set_node_vars!(Fb_, fbu, eq, ii, 4)
-            end
+        xl, xr = grid.xf[el_x], grid.xf[el_x + 1]
+        yd, yu = grid.yf[el_y], grid.yf[el_y + 1]
+        dx, dy = grid.dx[el_x], grid.dy[el_y]
+        for ii in 1:nd
+            ubl, ubr = get_node_vars(ub_, eq, ii, 1),
+                        get_node_vars(ub_, eq, ii, 2)
+            ubd, ubu = get_node_vars(ub_, eq, ii, 3),
+                        get_node_vars(ub_, eq, ii, 4)
+            x = xc - 0.5 * dx + xg[ii] * dx
+            y = yc - 0.5 * dy + xg[ii] * dy
+            fbl, fbr = flux(xl, y, ubl, eq, 1), flux(xr, y, ubr, eq, 1)
+            fbd, fbu = flux(x, yd, ubd, eq, 2), flux(x, yu, ubu, eq, 2)
+            set_node_vars!(Fb_, fbl, eq, ii, 1)
+            set_node_vars!(Fb_, fbr, eq, ii, 2)
+            set_node_vars!(Fb_, fbd, eq, ii, 3)
+            set_node_vars!(Fb_, fbu, eq, ii, 4)
         end
     end
     return nothing
