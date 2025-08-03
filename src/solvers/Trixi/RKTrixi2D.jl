@@ -1,3 +1,31 @@
+@inline function weak_form_kernel!(du, u,
+                                   element, mesh::TreeMesh{2},
+                                   nonconservative_terms::False, equations,
+                                   dg::DGSEM, cache, alpha = true)
+    # true * [some floating point value] == [exactly the same floating point value]
+    # This can (hopefully) be optimized away due to constant propagation.
+    @unpack derivative_dhat = dg.basis
+
+    # Calculate volume terms in one element
+    for j in eachnode(dg), i in eachnode(dg)
+        u_node = get_node_vars(u, equations, dg, i, j, element)
+
+        flux1 = flux(u_node, 1, equations)
+        for ii in eachnode(dg)
+            multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], flux1,
+                                       equations, dg, ii, j, element)
+        end
+
+        flux2 = flux(u_node, 2, equations)
+        for jj in eachnode(dg)
+            multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], flux2,
+                                       equations, dg, i, jj, element)
+        end
+    end
+
+    return nothing
+end
+
 function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem,
                                      scheme::Scheme{<:TrixiRKSolver},
                                      aux, t, dt, u1, res, Fb, ub, cache)

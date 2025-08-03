@@ -12,6 +12,8 @@ using Polyester
 using LoopVectorization
 using JSON3
 
+using Trixi: Trixi
+
 using Tenkai
 using Tenkai.Basis
 
@@ -48,17 +50,8 @@ struct Euler1D{HLLSpeeds <: Function} <: AbstractEquations{1, 3}
     numfluxes::Dict{String, Function}
 end
 
-#-------------------------------------------------------------------------------
-# Kernels
-#-------------------------------------------------------------------------------
-function mygemmavx!(C, A, B)
-    for m in axes(A, 1), n in axes(B, 2)
-        Cmn = zero(eltype(C))
-        for k in axes(A, 2)
-            Cmn += A[m, k] * B[k, n]
-        end
-        C[m, n] = Cmn
-    end
+function tenkai2trixiequation(equation::EqEuler1D.Euler1D)
+    Trixi.CompressibleEulerEquations1D(equation.γ)
 end
 
 #-------------------------------------------------------------------------------

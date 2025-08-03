@@ -1,5 +1,24 @@
-# Exactly the same as in Trixi.jl, but kept here because it is not in the API.
-# https://github.com/trixi-framework/Trixi.jl/blob/3ce203318eb1c13427d145f8a7609db32481bc9a/src/solvers/dgsem_tree/dg_1d.jl#L146
+using .EqEuler1D: tenkai2trixiequation
+
+function tenkai2trixiode(solver::TrixiRKSolver, equation::AbstractEquations{1},
+                         problem, scheme, param)
+    @unpack grid_size = param
+    @assert *(ispow2.(grid_size)...) "Grid size must be a power of 2 for TreeMesh."
+    @assert scheme.solution_points=="gll" "Only GLL solution points are supported for Trixi."
+    @assert scheme.correction_function=="g2" "Only G2 correction function is supported for Trixi."
+    trixi_equations = tenkai2trixiequation(equation)
+    initial_condition(x, t, equations) = problem.exact_solution(x..., t)
+    dg_solver = Trixi.DGSEM(polydeg = scheme.degree,
+                            surface_flux = Trixi.flux_lax_friedrichs,
+                            volume_integral = Trixi.VolumeIntegralShockCapturingHG(nothing))
+    mesh = Trixi.TreeMesh(problem.domain[1], problem.domain[2],
+                          initial_refinement_level = Int(log2(grid_size)),
+                          n_cells_max = 10000000)
+    semi = Trixi.SemidiscretizationHyperbolic(mesh, trixi_equations, initial_condition,
+                                              dg_solver)
+    tspan = (0.0, problem.final_time)
+    ode = Trixi.semidiscretize(semi, tspan)
+end
 
 function get_element_alpha(blend::NamedTuple, element)
     return 0.0
@@ -9,6 +28,8 @@ function get_element_alpha(blend::Blend1D, element)
     return blend.alpha[element]
 end
 
+# Exactly the same as in Trixi.jl, but kept here because it is not in the API.
+# https://github.com/trixi-framework/Trixi.jl/blob/3ce203318eb1c13427d145f8a7609db32481bc9a/src/solvers/dgsem_tree/dg_1d.jl#L146
 @inline function weak_form_kernel!(du, u,
                                    element, mesh::Union{TreeMesh{1}, StructuredMesh{1}},
                                    nonconservative_terms::False, equations,
@@ -87,7 +108,6 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
         end
 
         u = @view u1[:, :, cell]
-        r = @view res[:, :, cell]
         blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt,
                                    dx,
                                    grid.xf[cell], op, u1, u, cache.ua, cache, res)
