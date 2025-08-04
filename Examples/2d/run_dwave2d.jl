@@ -1,4 +1,5 @@
 using Tenkai
+using Tenkai.StaticArrays
 Eq = Tenkai.EqEuler2D
 
 #------------------------------------------------------------------------------

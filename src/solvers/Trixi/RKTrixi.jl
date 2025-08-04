@@ -1,4 +1,6 @@
-using Trixi: Trixi, TreeMesh, StructuredMesh, True, False, DGSEM, eachnode
+using Trixi: Trixi, TreeMesh, StructuredMesh, UnstructuredMesh2D, P4estMesh, T8codeMesh,
+             True,
+             False, DGSEM, eachnode, nnodes
 abstract type AbstractTrixiSolver <: AbstractRKSolver end
 
 struct TrixiRKSolver{RKSolver} <: AbstractTrixiSolver
