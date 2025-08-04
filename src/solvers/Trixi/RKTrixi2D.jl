@@ -28,6 +28,71 @@ using .EqEuler1D: tenkai2trixiequation
     return nothing
 end
 
+@inline function fv_kernel!(du, u,
+                            mesh::Union{TreeMesh{2}, StructuredMesh{2},
+                                        UnstructuredMesh2D, P4estMesh{2},
+                                        T8codeMesh{2}},
+                            nonconservative_terms, equations,
+                            volume_flux_fv, dg::DGSEM, cache, element, alpha = true)
+    @unpack fstar1_L_threaded, fstar1_R_threaded, fstar2_L_threaded, fstar2_R_threaded = cache
+    @unpack inverse_weights = dg.basis
+
+    # Calculate FV two-point fluxes
+    fstar1_L = fstar1_L_threaded[Threads.threadid()]
+    fstar2_L = fstar2_L_threaded[Threads.threadid()]
+    fstar1_R = fstar1_R_threaded[Threads.threadid()]
+    fstar2_R = fstar2_R_threaded[Threads.threadid()]
+    calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R, u, mesh,
+                 nonconservative_terms, equations, volume_flux_fv, dg, element, cache)
+
+    # Calculate FV volume integral contribution
+    for j in Trixi.eachnode(dg), i in Trixi.eachnode(dg)
+        for v in Trixi.eachvariable(equations)
+            du[v, i, j, element...] += (alpha *
+                                        (inverse_weights[i] *
+                                         (fstar1_L[v, i + 1, j] - fstar1_R[v, i, j]) +
+                                         inverse_weights[j] *
+                                         (fstar2_L[v, i, j + 1] - fstar2_R[v, i, j])))
+        end
+    end
+
+    return nothing
+end
+
+@inline function calcflux_fv!(fstar1_L, fstar1_R, fstar2_L, fstar2_R,
+                              u::AbstractArray{<:Any, 5},
+                              mesh::TreeMesh{2}, nonconservative_terms::False,
+                              equations,
+                              volume_flux_fv, dg::DGSEM, element, cache)
+    fstar1_L[:, 1, :] .= zero(eltype(fstar1_L))
+    fstar1_L[:, nnodes(dg) + 1, :] .= zero(eltype(fstar1_L))
+    fstar1_R[:, 1, :] .= zero(eltype(fstar1_R))
+    fstar1_R[:, nnodes(dg) + 1, :] .= zero(eltype(fstar1_R))
+
+    for j in eachnode(dg), i in 2:nnodes(dg)
+        u_ll = Trixi.get_node_vars(u, equations, dg, i - 1, j, element...)
+        u_rr = Trixi.get_node_vars(u, equations, dg, i, j, element...)
+        flux = volume_flux_fv(u_ll, u_rr, 1, equations) # orientation 1: x direction
+        Trixi.set_node_vars!(fstar1_L, flux, equations, dg, i, j)
+        Trixi.set_node_vars!(fstar1_R, flux, equations, dg, i, j)
+    end
+
+    fstar2_L[:, :, 1] .= zero(eltype(fstar2_L))
+    fstar2_L[:, :, nnodes(dg) + 1] .= zero(eltype(fstar2_L))
+    fstar2_R[:, :, 1] .= zero(eltype(fstar2_R))
+    fstar2_R[:, :, nnodes(dg) + 1] .= zero(eltype(fstar2_R))
+
+    for j in 2:nnodes(dg), i in eachnode(dg)
+        u_ll = Trixi.get_node_vars(u, equations, dg, i, j - 1, element...)
+        u_rr = Trixi.get_node_vars(u, equations, dg, i, j, element...)
+        flux = volume_flux_fv(u_ll, u_rr, 2, equations) # orientation 2: y direction
+        Trixi.set_node_vars!(fstar2_L, flux, equations, dg, i, j)
+        Trixi.set_node_vars!(fstar2_R, flux, equations, dg, i, j)
+    end
+
+    return nothing
+end
+
 function tenkai2trixiode(solver::TrixiRKSolver, equation::AbstractEquations{2},
                          problem, scheme, param)
     @unpack grid_size = param
@@ -86,6 +151,11 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
                           semi.equations, semi.solver, semi.cache,
                           2.0 * lamx)
 
+        blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
+                             dy,
+                             grid.xf[el_x], grid.yf[el_y], op, u1, u,
+                             cache, res)
+
         for j in Base.OneTo(nd), i in Base.OneTo(nd) # solution points loop
             x = xc - 0.5 * dx + xg[i] * dx
             y = yc - 0.5 * dy + xg[j] * dy
@@ -105,10 +175,6 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
             multiply_add_to_node_vars!(ub_, Vl[j], u_node, eq, i, 3)
             multiply_add_to_node_vars!(ub_, Vr[j], u_node, eq, i, 4)
         end
-        blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
-                             dy,
-                             grid.xf[el_x], grid.yf[el_y], op, u1, u,
-                             nothing, res)
         xl, xr = grid.xf[el_x], grid.xf[el_x + 1]
         yd, yu = grid.yf[el_y], grid.yf[el_y + 1]
         dx, dy = grid.dx[el_x], grid.dy[el_y]
@@ -127,6 +193,42 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
             set_node_vars!(Fb_, fbu, eq, ii, 4)
         end
     end
+    return nothing
+    end # timer
+end
+
+function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem,
+                                 scheme::Scheme{<:TrixiRKSolver},
+                                 aux, t, dt, grid, dx, dy, xf, yf, op, u1, u_, cache, res,
+                                 scaling_factor = 1.0)
+    @timeit_debug aux.timer "Blending limiter" begin
+    #! format: noindent
+    @unpack blend = aux
+
+    alpha = blend.cache.alpha[el_x, el_y]
+
+    r = @view res[:, :, :, el_x, el_y]
+
+    @unpack trixi_ode = cache
+    semi = trixi_ode.p
+    @unpack volume_integral = semi.solver
+
+    if alpha < 1e-12
+        return nothing
+    end
+
+    lamx = dt / dx
+
+    # limit the higher order part
+    lmul!(1.0 - alpha, r)
+
+    fv_kernel!(res, u1, semi.mesh,
+               Trixi.have_nonconservative_terms(semi.equations),
+               semi.equations,
+               volume_integral.volume_flux_fv, semi.solver,
+               semi.cache, (el_x, el_y),
+               2.0 * lamx * alpha)
+
     return nothing
     end # timer
 end

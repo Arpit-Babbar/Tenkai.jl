@@ -135,6 +135,7 @@ end
 
     alpha = get_element_alpha(blend, cell)
 
+    # TODO - Use your own fv_kernel! 
     Trixi.fv_kernel!(r, u1, semi.mesh,
                      Trixi.have_nonconservative_terms(semi.equations),
                      semi.equations,
