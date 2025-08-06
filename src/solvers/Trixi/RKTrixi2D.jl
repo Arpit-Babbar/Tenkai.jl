@@ -2,7 +2,7 @@ using .EqEuler1D: tenkai2trixiequation
 
 @inline function calc_volume_integral_local!(volume_integral::VolumeIntegralWeakForm, du, u,
                                              element, mesh::TreeMesh{2},
-                                             nonconservative_terms::False, equations,
+                                             nonconservative_terms, equations,
                                              dg::DGSEM, cache, alpha = true)
     weak_form_kernel!(du, u, element, mesh, nonconservative_terms, equations, dg, cache,
                       alpha)
@@ -12,7 +12,7 @@ end
 @inline function calc_volume_integral_local!(volume_integral::VolumeIntegralFluxDifferencing,
                                              du, u,
                                              element, mesh::TreeMesh{2},
-                                             nonconservative_terms::False, equations,
+                                             nonconservative_terms, equations,
                                              dg::DGSEM, cache, alpha = true)
     @unpack volume_flux = volume_integral
     flux_differencing_kernel!(du, u, element, mesh, nonconservative_terms, equations,
