@@ -51,6 +51,15 @@ end
     return nothing
 end
 
+@inline function calc_volume_integral_local!(volume_integral::VolumeIntegralWeakForm, du, u,
+                                             element,
+                                             mesh::Union{TreeMesh{1}, StructuredMesh{1}},
+                                             nonconservative_terms::False, equations,
+                                             dg::DGSEM, cache, alpha = true)
+    weak_form_kernel!(du, u, element, mesh, nonconservative_terms, equations, dg, cache,
+                      alpha)
+end
+
 function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem,
                                      scheme::Scheme{<:TrixiRKSolver}, aux, t, dt, u1, res,
                                      Fb, ub, cache)
@@ -79,10 +88,11 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
 
         alpha = get_element_alpha(blend, cell)
 
-        weak_form_kernel!(res, u1, cell, semi.mesh,
-                          Trixi.have_nonconservative_terms(semi.equations),
-                          semi.equations, semi.solver, semi.cache,
-                          2.0 * lamx * (1.0 - alpha))
+        calc_volume_integral_local!(scheme.solver.volume_integral, res, u1,
+                                    cell, semi.mesh,
+                                    Trixi.have_nonconservative_terms(semi.equations),
+                                    semi.equations, semi.solver, semi.cache,
+                                    2.0 * lamx * (1.0 - alpha))
 
         for ix in Base.OneTo(nd)
             # Solution points
