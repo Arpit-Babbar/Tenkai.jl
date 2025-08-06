@@ -197,6 +197,132 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
     end # timer
 end
 
+@inline function eachinterface_x(dg::DGSEM, tenkai_grid)
+    nx, ny = tenkai_grid.size
+    return CartesianIndices((1:(nx + 1), 1:ny))
+end
+
+@inline function eachinterface_y(dg::DGSEM, tenkai_grid)
+    nx, ny = tenkai_grid.size
+    return CartesianIndices((1:nx, 1:(ny + 1)))
+end
+
+function calc_interface_flux!(surface_flux_values,
+                              mesh::TreeMesh{2},
+                              nonconservative_terms::False, equations,
+                              surface_integral, ub, dg::DG, tenkai_grid, cache)
+    @unpack surface_flux = surface_integral
+    @unpack u, neighbor_ids, orientations = cache.interfaces
+
+    @threaded for interface in eachinterface_x(dg, tenkai_grid)
+        int_x = interface[1]
+        int_y = interface[2]
+        # Get neighboring elements
+        # left_id = neighbor_ids[1, interface]
+        # right_id = neighbor_ids[2, interface]
+        left_id = (int_x - 1, int_y)
+        right_id = (int_x, int_y)
+
+        # Determine interface direction with respect to elements:
+        # orientation = 1: left -> 2, right -> 1
+        # orientation = 2: left -> 4, right -> 3
+        left_direction = 2
+        right_direction = 1
+
+        for i in eachnode(dg)
+            # Call pointwise Riemann solver
+            # u_ll, u_rr = get_surface_node_vars(u, equations, dg, i, interface)
+            u_ll, u_rr = Trixi.get_node_vars(ub, equations, dg, i, left_direction,
+                                             left_id...),
+                         Trixi.get_node_vars(ub, equations, dg, i, right_direction,
+                                             right_id...)
+            flux = surface_flux(u_ll, u_rr, 1, equations)
+
+            # Copy flux to left and right element storage
+            for v in Trixi.eachvariable(equations)
+                surface_flux_values[v, i, left_direction, left_id...] = flux[v]
+                surface_flux_values[v, i, right_direction, right_id...] = flux[v]
+            end
+        end
+    end
+
+    @threaded for interface in eachinterface_y(dg, tenkai_grid)
+        # Get neighboring elements
+        left_id = (interface[1], interface[2] - 1)
+        right_id = (interface[1], interface[2])
+
+        # Determine interface direction with respect to elements:
+        # orientation = 1: left -> 2, right -> 1
+        # orientation = 2: left -> 4, right -> 3
+        left_direction = 4
+        right_direction = 3
+
+        for i in eachnode(dg)
+            # Call pointwise Riemann solver
+            u_ll, u_rr = Trixi.get_node_vars(ub, equations, dg, i, left_direction,
+                                             left_id...),
+                         Trixi.get_node_vars(ub, equations, dg, i, right_direction,
+                                             right_id...)
+            flux = surface_flux(u_ll, u_rr, 2, equations)
+
+            # Copy flux to left and right element storage
+            for v in Trixi.eachvariable(equations)
+                surface_flux_values[v, i, left_direction, left_id...] = flux[v]
+                surface_flux_values[v, i, right_direction, right_id...] = flux[v]
+            end
+        end
+    end
+
+    return nothing
+end
+
+function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, problem,
+                                scheme::Scheme{<:TrixiRKSolver},
+                                param, aux, t, dt, u1,
+                                fb, Ub, ua, res, scaling_factor = 1.0)
+    @timeit aux.timer "Face residual" begin
+    #! format: noindent
+    @unpack bl, br, xg, wg, degree = op
+    nd = degree + 1
+    nx, ny = grid.size
+    @unpack dx, dy, xf, yf = grid
+    @unpack numerical_flux = scheme
+    @unpack blend = aux
+    @unpack blend_face_residual_x!, blend_face_residual_y!, get_element_alpha = blend.subroutines
+
+    @unpack trixi_ode = cache
+    semi = trixi_ode.p
+    @unpack cache = semi
+    surface_flux_values = fb
+
+    calc_interface_flux!(surface_flux_values, semi.mesh,
+                         Trixi.have_nonconservative_terms(semi.equations),
+                         semi.equations, semi.solver.surface_integral, Ub, semi.solver,
+                         grid, cache)
+
+    # This loop is slow with Threads.@threads so we use Polyster.jl threads
+    @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
+        el_x, el_y = element[1], element[2]
+        for ix in Base.OneTo(nd)
+            for jy in Base.OneTo(nd)
+                fl = get_node_vars(fb, eq, jy, 1, el_x, el_y)
+                fr = get_node_vars(fb, eq, jy, 2, el_x, el_y)
+                fd = get_node_vars(fb, eq, ix, 3, el_x, el_y)
+                fu = get_node_vars(fb, eq, ix, 4, el_x, el_y)
+                for n in eachvariable(eq)
+                    res[n, ix, jy, el_x, el_y] += dt / dy[el_y] * br[jy] * fu[n]
+                    res[n, ix, jy, el_x, el_y] += dt / dy[el_y] * bl[jy] * fd[n]
+                    res[n, ix, jy, el_x, el_y] += dt / dx[el_x] * br[ix] * fr[n]
+                    res[n, ix, jy, el_x, el_y] += dt / dx[el_x] * bl[ix] * fl[n]
+                end
+            end
+        end
+    end
+
+    return nothing
+    end # timer
+end
+
 function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem,
                                  scheme::Scheme{<:TrixiRKSolver},
                                  aux, t, dt, grid, dx, dy, xf, yf, op, u1, u_, cache, res,
