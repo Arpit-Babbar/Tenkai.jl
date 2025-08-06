@@ -1,6 +1,7 @@
 using Trixi: Trixi, TreeMesh, StructuredMesh, UnstructuredMesh2D, P4estMesh, T8codeMesh,
              True,
-             False, DGSEM, eachnode, nnodes, AbstractVolumeIntegral, VolumeIntegralWeakForm
+             False, DGSEM, eachnode, nnodes, AbstractVolumeIntegral, VolumeIntegralWeakForm,
+             DG
 abstract type AbstractTrixiSolver <: AbstractRKSolver end
 
 struct TrixiRKSolver{VolumeIntegral <: AbstractVolumeIntegral} <: AbstractTrixiSolver
