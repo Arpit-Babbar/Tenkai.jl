@@ -461,27 +461,6 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
             # These quantities won't be used so we can store numerical flux here
             set_node_vars!(Fb, Fn, eq, jy, 2, el_x - 1, el_y)
             set_node_vars!(Fb, Fn, eq, jy, 1, el_x, el_y)
-            # for ix in Base.OneTo(nd)
-            #    multiply_add_to_node_vars!(res,
-            #                               blend_factors[1] * dt/dx[el_x-1] * br[ix], Fn,
-            #                               eq,
-            #                               ix, jy, el_x-1, el_y )
-
-            #    multiply_add_to_node_vars!(res,
-            #                               blend_factors[2] * dt/dx[el_x]   * bl[ix], Fn,
-            #                               eq,
-            #                               ix, jy, el_x, el_y )
-            # end
-
-            # r = @view res[:, :, jy, el_x-1, el_y]
-            # multiply_add_to_node_vars!(r, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
-            #                            alpha[el_x-1,el_y]*dt/(dx[el_x-1]*wg[nd]), Fn,
-            #                            eq, nd)
-
-            # r = @view res[:, :, jy, el_x, el_y]
-            # multiply_add_to_node_vars!(r, # r[1] -= alpha*dt/(dy*wg[1])*Fn
-            #                            - alpha[el_x,el_y]*dt/(dx[el_x]*wg[1]), Fn,
-            #                            eq, 1)
         end
     end
 
@@ -507,31 +486,6 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
             # These quantities won't be used so we can store numerical flux here
             set_node_vars!(Fb, Fn, eq, ix, 4, el_x, el_y - 1)
             set_node_vars!(Fb, Fn, eq, ix, 3, el_x, el_y)
-            # for jy in Base.OneTo(nd)
-            #    multiply_add_to_node_vars!(res,
-            #                               blend_factors[1] * dt/dy[el_y-1] * br[jy], Fn,
-            #                               eq,
-            #                               ix, jy, el_x, el_y-1 )
-            #    multiply_add_to_node_vars!(res,
-            #                               blend_factors[2] * dt/dy[el_y]   * bl[jy], Fn,
-            #                               eq,
-            #                               ix, jy, el_x, el_y   )
-            # end
-
-            # r = @view res[:,ix,:,el_x,el_y-1]
-
-            # multiply_add_to_node_vars!(r, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
-            #                            alpha[el_x,el_y-1] * dt/(dy[el_y-1]*wg[nd]),
-            #                            Fn,
-            #                            eq, nd
-            #                            )
-
-            # r = @view res[:,ix,:,el_x,el_y]
-
-            # multiply_add_to_node_vars!(r, # r[1] -= alpha*dt/(dy*wg[1])*Fn
-            #                            - alpha[el_x,el_y] * dt/(dy[el_y]*wg[1]),
-            #                            Fn,
-            #                            eq, 1)
         end
     end
 
@@ -546,23 +500,6 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
                 Fr = get_node_vars(Fb, eq, jy, 2, el_x, el_y)
                 Fd = get_node_vars(Fb, eq, ix, 3, el_x, el_y)
                 Fu = get_node_vars(Fb, eq, ix, 4, el_x, el_y)
-                # multiply_add_to_node_vars!(res,
-                #                            one_m_alp * dt/dy[el_y] * br[jy], Fu,
-                #                            eq,
-                #                            ix, jy, el_x, el_y)
-                # multiply_add_to_node_vars!(res,
-                #                            one_m_alp * dt/dy[el_y] * bl[jy], Fd,
-                #                            eq,
-                #                            ix, jy, el_x, el_y)
-
-                # multiply_add_to_node_vars!(res,
-                #                            one_m_alp * dt/dx[el_x] * br[ix], Fr,
-                #                            eq,
-                #                            ix, jy, el_x, el_y )
-                # multiply_add_to_node_vars!(res,
-                #                            one_m_alp * dt/dx[el_x] * bl[ix], Fl,
-                #                            eq,
-                #                            ix, jy, el_x, el_y )
                 for n in eachvariable(eq)
                     res[n, ix, jy, el_x, el_y] += one_m_alp * dt / dy[el_y] *
                                                   br[jy] * Fu[n]
@@ -600,7 +537,6 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
 
             Fl = get_node_vars(Fb, eq, ix, 1, el_x, el_y)
             Fr = get_node_vars(Fb, eq, ix, 2, el_x, el_y)
-            # r = @view res[:, :, ix, el_x, el_y]
             multiply_add_to_node_vars!(res, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
                                        -alpha * dt / (dx[el_x] * wg[1]), Fl,
                                        eq, 1, ix, el_x, el_y)
