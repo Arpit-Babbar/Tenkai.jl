@@ -2,6 +2,7 @@ using TrixiBase
 using Tenkai
 using DelimitedFiles
 using Test
+import Tenkai.Trixi
 
 overwrite_errors = false
 
@@ -83,6 +84,15 @@ end
                   solver = TrixiRKSolver())
 
     data_name = "alfven_mhd_trixirk.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(examples_dir(), "1d", "run_mhd_alfven_wave_trixirk.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 1.0, nx = 8,
+                  solver = TrixiRKSolver(VolumeIntegralFluxDifferencing(Trixi.flux_derigs_etal)))
+
+    data_name = "alfven_mhd_trixirk_flux_diff.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
 
