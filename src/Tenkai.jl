@@ -136,6 +136,8 @@ include("$solvers_dir/cRK/cRK2D.jl")
 # RKTrixi methods
 include("$solvers_dir/Trixi/RKTrixi.jl")
 
+export VolumeIntegralWeakForm, VolumeIntegralFluxDifferencing
+
 # Standard cRK solvers
 export cRK11, cRK22, cRK33, cRK44, cRK65
 
