@@ -279,7 +279,7 @@ end
 function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, problem,
                                 scheme::Scheme{<:TrixiRKSolver},
                                 param, aux, t, dt, u1,
-                                Fb, Ub, ua, res, scaling_factor = 1.0)
+                                fb, Ub, ua, res, scaling_factor = 1.0)
     @timeit aux.timer "Face residual" begin
     #! format: noindent
     @unpack bl, br, xg, wg, degree = op
@@ -293,7 +293,7 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
     @unpack trixi_ode = cache
     semi = trixi_ode.p
     @unpack cache = semi
-    surface_flux_values = Fb
+    surface_flux_values = fb
 
     calc_interface_flux!(surface_flux_values, semi.mesh,
                          Trixi.have_nonconservative_terms(semi.equations),
@@ -303,59 +303,22 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
     # This loop is slow with Threads.@threads so we use Polyster.jl threads
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
-        alpha = get_element_alpha(blend, el_x, el_y) # TODO - Use a function to get this
-        one_m_alp = 1.0 - alpha
         for ix in Base.OneTo(nd)
             for jy in Base.OneTo(nd)
-                Fl = get_node_vars(Fb, eq, jy, 1, el_x, el_y)
-                Fr = get_node_vars(Fb, eq, jy, 2, el_x, el_y)
-                Fd = get_node_vars(Fb, eq, ix, 3, el_x, el_y)
-                Fu = get_node_vars(Fb, eq, ix, 4, el_x, el_y)
+                fl = get_node_vars(fb, eq, jy, 1, el_x, el_y)
+                fr = get_node_vars(fb, eq, jy, 2, el_x, el_y)
+                fd = get_node_vars(fb, eq, ix, 3, el_x, el_y)
+                fu = get_node_vars(fb, eq, ix, 4, el_x, el_y)
                 for n in eachvariable(eq)
-                    res[n, ix, jy, el_x, el_y] += one_m_alp * dt / dy[el_y] *
-                                                  br[jy] * Fu[n]
-                    res[n, ix, jy, el_x, el_y] += one_m_alp * dt / dy[el_y] *
-                                                  bl[jy] * Fd[n]
-                    res[n, ix, jy, el_x, el_y] += one_m_alp * dt / dx[el_x] *
-                                                  br[ix] * Fr[n]
-                    res[n, ix, jy, el_x, el_y] += one_m_alp * dt / dx[el_x] *
-                                                  bl[ix] * Fl[n]
+                    res[n, ix, jy, el_x, el_y] += dt / dy[el_y] * br[jy] * fu[n]
+                    res[n, ix, jy, el_x, el_y] += dt / dy[el_y] * bl[jy] * fd[n]
+                    res[n, ix, jy, el_x, el_y] += dt / dx[el_x] * br[ix] * fr[n]
+                    res[n, ix, jy, el_x, el_y] += dt / dx[el_x] * bl[ix] * fl[n]
                 end
             end
         end
     end
 
-    # This loop is slow with Threads.@threads so we use Polyster.jl threads
-    @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
-        el_x, el_y = element[1], element[2]
-        alpha = get_element_alpha(blend, el_x, el_y) # TODO - Use a function to get this
-        one_m_alp = 1.0 - alpha
-        for ix in Base.OneTo(nd)
-            Fd = get_node_vars(Fb, eq, ix, 3, el_x, el_y)
-            Fu = get_node_vars(Fb, eq, ix, 4, el_x, el_y)
-
-            # r = @view res[:,ix,:,el_x,el_y]
-
-            multiply_add_to_node_vars!(res, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
-                                       -alpha * dt / (dy[el_y] * wg[1]),
-                                       Fd,
-                                       eq, ix, 1, el_x, el_y)
-
-            multiply_add_to_node_vars!(res, # r[1] -= alpha*dt/(dy*wg[1])*Fn
-                                       alpha * dt / (dy[el_y] * wg[nd]),
-                                       Fu,
-                                       eq, ix, nd, el_x, el_y)
-
-            Fl = get_node_vars(Fb, eq, ix, 1, el_x, el_y)
-            Fr = get_node_vars(Fb, eq, ix, 2, el_x, el_y)
-            multiply_add_to_node_vars!(res, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
-                                       -alpha * dt / (dx[el_x] * wg[1]), Fl,
-                                       eq, 1, ix, el_x, el_y)
-            multiply_add_to_node_vars!(res, # r[1] -= alpha*dt/(dy*wg[1])*Fn
-                                       alpha * dt / (dx[el_x] * wg[nd]), Fr,
-                                       eq, nd, ix, el_x, el_y)
-        end
-    end
     return nothing
     end # timer
 end
