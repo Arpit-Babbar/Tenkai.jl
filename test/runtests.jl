@@ -2,7 +2,7 @@ using TrixiBase
 using Tenkai
 using DelimitedFiles
 using Test
-import Trixi
+import Tenkai.Trixi
 
 overwrite_errors = false
 
