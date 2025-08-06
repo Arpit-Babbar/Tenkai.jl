@@ -131,6 +131,22 @@ end
         data_name = "isentropic_2d_rkfr_4_$(time_scheme).txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
     end
+
+    solvers = (TrixiRKSolver(),
+               TrixiRKSolver(Trixi.VolumeIntegralFluxDifferencing(Trixi.flux_ranocha)))
+    solver_names = ("trixirk", "trixirk_flux_diff")
+    for i in 1:2
+        trixi_include(joinpath(examples_dir(), "2d", "run_isentropic_trixirk.jl"),
+                      save_time_interval = 0.0, save_iter_interval = 0,
+                      compute_error_interval = 0,
+                      solver = solvers[i], degree = 4,
+                      limiter = setup_limiter_none(),
+                      solution_points = "gll",
+                      correction_function = "g2",
+                      animate = false, final_time = 1.0, nx = 8, ny = 8)
+        data_name = "isentropic_2d_$(solver_names[i])_4.txt"
+        compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+    end
 end
 
 @testset "Ten Moment 2D" begin
