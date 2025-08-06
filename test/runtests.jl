@@ -80,7 +80,7 @@ end
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,
                   animate = false, final_time = 1.0, nx = 8,
-                  solver = TrixiRKSolver(nothing))
+                  solver = TrixiRKSolver())
 
     data_name = "alfven_mhd_trixirk.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
@@ -155,7 +155,7 @@ end
                   compute_error_interval = 0,
                   animate = false, final_time = 1.8, nx = 16,
                   γ = γ,
-                  solver = TrixiRKSolver(nothing), degree = 3,
+                  solver = TrixiRKSolver(), degree = 3,
                   solution_points = "gll", correction_function = "g2",
                   limiter = setup_limiter_blend(blend_type = fo_blend(Eq.get_equation(γ)),
                                                 indicating_variables = Eq.rho_p_indicator!,
@@ -186,7 +186,7 @@ end
                       save_time_interval = 0.0, save_iter_interval = 0,
                       compute_error_interval = 0,
                       animate = false, final_time = 0.1, nx = 16, ny = 16,
-                      solver = TrixiRKSolver(nothing), degree = 3,
+                      solver = TrixiRKSolver(), degree = 3,
                       solution_points = "gll", correction_function = "g2",
                       limiter = limiters[i],
                       cfl_safety_factor = cfl_safety_factors[i])

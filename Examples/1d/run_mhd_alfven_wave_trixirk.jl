@@ -17,7 +17,7 @@ exact_solution_alfven_wave = Eq.ExactSolutionAlfvenWave(equation)
 initial_value_alfven_wave(x) = exact_solution_alfven_wave(x, 0.0)
 
 degree = 3
-solver = TrixiRKSolver(nothing)
+solver = TrixiRKSolver()
 solution_points = "gll"
 correction_function = "g2"
 numerical_flux = Eq.rusanov

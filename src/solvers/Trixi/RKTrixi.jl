@@ -1,11 +1,13 @@
 using Trixi: Trixi, TreeMesh, StructuredMesh, UnstructuredMesh2D, P4estMesh, T8codeMesh,
              True,
-             False, DGSEM, eachnode, nnodes
+             False, DGSEM, eachnode, nnodes, AbstractVolumeIntegral, VolumeIntegralWeakForm
 abstract type AbstractTrixiSolver <: AbstractRKSolver end
 
-struct TrixiRKSolver{RKSolver} <: AbstractTrixiSolver
-    RKSolver::RKSolver
+struct TrixiRKSolver{VolumeIntegral <: AbstractVolumeIntegral} <: AbstractTrixiSolver
+    volume_integral::VolumeIntegral
 end
+
+TrixiRKSolver() = TrixiRKSolver(VolumeIntegralWeakForm())
 
 solver2enum(solver::TrixiRKSolver) = rktrixi # solver type enum
 
