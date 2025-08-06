@@ -123,8 +123,7 @@ end
 function calc_interface_flux!(surface_flux_values,
                               mesh::TreeMesh{1},
                               nonconservative_terms::False, equations,
-                              surface_integral, ub, tenkai_surface_flux, tenkai_equations,
-                              dg::DG, cache)
+                              surface_integral, ub, dg::DG, cache)
     @unpack surface_flux = surface_integral
     @unpack neighbor_ids, orientations = cache.interfaces
 
@@ -146,12 +145,7 @@ function calc_interface_flux!(surface_flux_values,
         u_ll, u_rr = Trixi.get_node_vars(ub, equations, dg, left_direction, left_id),
                      Trixi.get_node_vars(ub, equations, dg, right_direction, right_id)
         orientation = 1
-        # flux = surface_flux(u_ll, u_rr, orientation, equations)
-
-        f_ll, f_rr = flux(nothing, u_ll, tenkai_equations),
-                     flux(nothing, u_rr, tenkai_equations)
-        flux_ = tenkai_surface_flux(nothing, u_ll, u_rr, f_ll, f_rr, u_ll, u_rr,
-                                    tenkai_equations, 1)
+        flux_ = surface_flux(u_ll, u_rr, orientation, equations)
 
         # Copy flux to left and right element storage
         for v in Trixi.eachvariable(equations)
@@ -172,7 +166,6 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
     nd = op.degree + 1
     nx = grid.size
     @unpack dx, xf = grid
-    num_flux = scheme.numerical_flux
     @unpack blend = aux
 
     @unpack trixi_ode = cache
@@ -182,9 +175,8 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
 
     calc_interface_flux!(surface_flux_values, semi.mesh,
                          Trixi.have_nonconservative_terms(semi.equations),
-                         semi.equations, semi.solver.surface_integral, ub, num_flux, eq,
-                         semi.solver,
-                         cache)
+                         semi.equations, semi.solver.surface_integral, ub,
+                         semi.solver, cache)
 
     for i in 1:nx
         Fl, Fr = get_node_vars(Fb, eq, 1, i), get_node_vars(Fb, eq, 2, i)
