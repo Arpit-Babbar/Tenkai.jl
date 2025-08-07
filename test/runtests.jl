@@ -143,7 +143,8 @@ end
                       limiter = setup_limiter_none(),
                       solution_points = "gll",
                       correction_function = "g2",
-                      animate = false, final_time = 1.0, nx = 8, ny = 8)
+                      animate = false, final_time = 1.0, nx = 8, ny = 8,
+                      cfl_safety_factor = 0.98)
         data_name = "isentropic_2d_$(solver_names[i])_4.txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
     end

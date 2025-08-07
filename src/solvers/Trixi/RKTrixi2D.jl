@@ -3,9 +3,9 @@ using .EqEuler1D: tenkai2trixiequation
 @inline function calc_volume_integral_local!(volume_integral::VolumeIntegralWeakForm, du, u,
                                              element, mesh::TreeMesh{2},
                                              nonconservative_terms, equations,
-                                             dg::DGSEM, cache, alpha = true)
+                                             dg::DGSEM, cache, tenkai_op, alpha = true)
     weak_form_kernel!(du, u, element, mesh, nonconservative_terms, equations, dg, cache,
-                      alpha)
+                      tenkai_op, alpha)
     return nothing
 end
 
@@ -13,17 +13,17 @@ end
                                              du, u,
                                              element, mesh::TreeMesh{2},
                                              nonconservative_terms, equations,
-                                             dg::DGSEM, cache, alpha = true)
+                                             dg::DGSEM, cache, tenkai_op, alpha = true)
     @unpack volume_flux = volume_integral
     flux_differencing_kernel!(du, u, element, mesh, nonconservative_terms, equations,
-                              volume_flux, dg, cache, alpha)
+                              volume_flux, dg, cache, tenkai_op, alpha)
     return nothing
 end
 
 @inline function weak_form_kernel!(du, u,
                                    element, mesh::TreeMesh{2},
                                    nonconservative_terms::False, equations,
-                                   dg::DGSEM, cache, alpha = true)
+                                   dg::DGSEM, cache, tenkai_op, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
     @unpack derivative_dhat = dg.basis
@@ -51,7 +51,8 @@ end
 @inline function flux_differencing_kernel!(du, u,
                                            element, mesh::TreeMesh{2},
                                            nonconservative_terms::False, equations,
-                                           volume_flux, dg::DGSEM, cache, alpha = true)
+                                           volume_flux, dg::DGSEM, cache, tenkai_op,
+                                           alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
     @unpack derivative_split = dg.basis
@@ -208,7 +209,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
         calc_volume_integral_local!(scheme.solver.volume_integral, res, u1,
                                     (el_x, el_y), semi.mesh,
                                     Trixi.have_nonconservative_terms(semi.equations),
-                                    semi.equations, semi.solver, semi.cache,
+                                    semi.equations, semi.solver, semi.cache, op,
                                     2.0 * lamx)
 
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,

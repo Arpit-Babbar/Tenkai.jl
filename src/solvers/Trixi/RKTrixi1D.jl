@@ -33,7 +33,7 @@ end
 @inline function weak_form_kernel!(du, u,
                                    element, mesh::Union{TreeMesh{1}, StructuredMesh{1}},
                                    nonconservative_terms::False, equations,
-                                   dg::DGSEM, cache, alpha = true)
+                                   dg::DGSEM, cache, tenkai_op, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
     @unpack derivative_dhat = dg.basis
@@ -55,7 +55,8 @@ end
                                            element,
                                            mesh::Union{TreeMesh{1}, StructuredMesh{1}},
                                            nonconservative_terms::False, equations,
-                                           volume_flux, dg::DGSEM, cache, alpha = true)
+                                           volume_flux, dg::DGSEM, cache, tenkai_op,
+                                           alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
     @unpack derivative_split = dg.basis
@@ -85,9 +86,9 @@ end
                                              element,
                                              mesh::Union{TreeMesh{1}, StructuredMesh{1}},
                                              nonconservative_terms::False, equations,
-                                             dg::DGSEM, cache, alpha = true)
+                                             dg::DGSEM, cache, tenkai_op, alpha = true)
     weak_form_kernel!(du, u, element, mesh, nonconservative_terms, equations, dg, cache,
-                      alpha)
+                      tenkai_op, alpha)
 end
 
 @inline function calc_volume_integral_local!(volume_integral::VolumeIntegralFluxDifferencing,
@@ -95,10 +96,10 @@ end
                                              element,
                                              mesh::Union{TreeMesh{1}, StructuredMesh{1}},
                                              nonconservative_terms::False, equations,
-                                             dg::DGSEM, cache, alpha = true)
+                                             dg::DGSEM, cache, tenkai_op, alpha = true)
     @unpack volume_flux = volume_integral
     flux_differencing_kernel!(du, u, element, mesh, nonconservative_terms, equations,
-                              volume_flux, dg, cache, alpha)
+                              volume_flux, dg, cache, tenkai_op, alpha)
 end
 
 function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem,
@@ -132,7 +133,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
         calc_volume_integral_local!(scheme.solver.volume_integral, res, u1,
                                     cell, semi.mesh,
                                     Trixi.have_nonconservative_terms(semi.equations),
-                                    semi.equations, semi.solver, semi.cache,
+                                    semi.equations, semi.solver, semi.cache, op,
                                     2.0 * lamx * (1.0 - alpha))
 
         for ix in Base.OneTo(nd)
