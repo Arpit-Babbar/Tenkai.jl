@@ -242,6 +242,56 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
     end # timer
 end
 
+@inline function calcflux_fv!(fstar1_L, fstar1_R, u::AbstractArray{<:Any, 3},
+                              mesh::Union{TreeMesh{1}, StructuredMesh{1}},
+                              nonconservative_terms::False,
+                              equations, volume_flux_fv, dg::DGSEM, element, cache)
+    fstar1_L[:, 1] .= zero(eltype(fstar1_L))
+    fstar1_L[:, nnodes(dg) + 1] .= zero(eltype(fstar1_L))
+    fstar1_R[:, 1] .= zero(eltype(fstar1_R))
+    fstar1_R[:, nnodes(dg) + 1] .= zero(eltype(fstar1_R))
+
+    for i in 2:nnodes(dg)
+        u_ll = Trixi.get_node_vars(u, equations, dg, i - 1, element)
+        u_rr = Trixi.get_node_vars(u, equations, dg, i, element)
+        flux = volume_flux_fv(u_ll, u_rr, 1, equations) # orientation 1: x direction
+        Trixi.set_node_vars!(fstar1_L, flux, equations, dg, i)
+        Trixi.set_node_vars!(fstar1_R, flux, equations, dg, i)
+    end
+
+    return nothing
+end
+
+@inline function fv_kernel!(du, u,
+                            mesh::Union{TreeMesh{1}, StructuredMesh{1}},
+                            nonconservative_terms, equations,
+                            volume_flux_fv, dg::DGSEM, cache, element, tenkai_op,
+                            alpha = true)
+    @unpack fstar1_L_threaded, fstar1_R_threaded = cache
+    @unpack inverse_weights = dg.basis
+    # TODO - This only works for GLL + g2. Because for any other combination,
+    # the interface fluxe has to be treated differently.
+    @unpack wg_inv = tenkai_op
+
+    # Calculate FV two-point fluxes
+    fstar1_L = fstar1_L_threaded[Threads.threadid()]
+    fstar1_R = fstar1_R_threaded[Threads.threadid()]
+    calcflux_fv!(fstar1_L, fstar1_R, u, mesh, nonconservative_terms, equations,
+                 volume_flux_fv,
+                 dg, element, cache)
+
+    # Calculate FV volume integral contribution
+    for i in eachnode(dg)
+        for v in Trixi.eachvariable(equations)
+            du[v, i, element] += (alpha *
+                                  (wg_inv[i] *
+                                   (fstar1_L[v, i + 1] - fstar1_R[v, i])))
+        end
+    end
+
+    return nothing
+end
+
 @inbounds @inline function blend_cell_residual_fo!(cell, eq::AbstractEquations{1},
                                                    problem, scheme::Scheme{<:TrixiRKSolver},
                                                    aux, lamx,
@@ -261,11 +311,11 @@ end
     alpha = get_element_alpha(blend, cell)
 
     # TODO - Use your own fv_kernel!
-    Trixi.fv_kernel!(r, u1, semi.mesh,
-                     Trixi.have_nonconservative_terms(semi.equations),
-                     semi.equations,
-                     volume_integral.volume_flux_fv, semi.solver,
-                     semi.cache, cell,
-                     2.0 * lamx * alpha)
+    fv_kernel!(r, u1, semi.mesh,
+               Trixi.have_nonconservative_terms(semi.equations),
+               semi.equations,
+               volume_integral.volume_flux_fv, semi.solver,
+               semi.cache, cell, op,
+               lamx * alpha)
     end # timer
 end
