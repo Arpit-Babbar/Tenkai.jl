@@ -361,7 +361,10 @@ function fr_operators(N, sol_pts, cor_fun)
         Vgll = SMatrix{nd, nd}(Vgll)
     end
 
-    op = (; degree = N, xg, wg, Vl, Vr, bl, br, Dm, DmT, bV, D1, D1T, Dsplit, Vgll)
+    wg_inv = 1.0 ./ wg
+
+    op = (; degree = N, xg, wg, wg_inv, Vl, Vr, bl, br, Dm, DmT, bV, D1, D1T, Dsplit,
+          Vgll)
     return op
 end
 

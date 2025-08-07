@@ -95,9 +95,11 @@ end
                                         UnstructuredMesh2D, P4estMesh{2},
                                         T8codeMesh{2}},
                             nonconservative_terms, equations,
-                            volume_flux_fv, dg::DGSEM, cache, element, alpha = true)
+                            volume_flux_fv, dg::DGSEM, cache, element, tenkai_op,
+                            alpha = true)
     @unpack fstar1_L_threaded, fstar1_R_threaded, fstar2_L_threaded, fstar2_R_threaded = cache
     @unpack inverse_weights = dg.basis
+    @unpack wg_inv = tenkai_op
 
     # Calculate FV two-point fluxes
     fstar1_L = fstar1_L_threaded[Threads.threadid()]
@@ -111,9 +113,9 @@ end
     for j in Trixi.eachnode(dg), i in Trixi.eachnode(dg)
         for v in Trixi.eachvariable(equations)
             du[v, i, j, element...] += (alpha *
-                                        (inverse_weights[i] *
+                                        (wg_inv[i] *
                                          (fstar1_L[v, i + 1, j] - fstar1_R[v, i, j]) +
-                                         inverse_weights[j] *
+                                         wg_inv[j] *
                                          (fstar2_L[v, i, j + 1] - fstar2_R[v, i, j])))
         end
     end
@@ -413,8 +415,8 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem,
                Trixi.have_nonconservative_terms(semi.equations),
                semi.equations,
                volume_integral.volume_flux_fv, semi.solver,
-               semi.cache, (el_x, el_y),
-               2.0 * lamx * alpha)
+               semi.cache, (el_x, el_y), op,
+               lamx * alpha)
 
     return nothing
     end # timer
