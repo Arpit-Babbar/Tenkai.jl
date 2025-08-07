@@ -4,8 +4,8 @@ function tenkai2trixiode(solver::TrixiRKSolver, equation::AbstractEquations{1},
                          problem, scheme, param)
     @unpack grid_size = param
     @assert *(ispow2.(grid_size)...) "Grid size must be a power of 2 for TreeMesh."
-    @assert scheme.solution_points=="gll" "Only GLL solution points are supported for Trixi."
-    @assert scheme.correction_function=="g2" "Only G2 correction function is supported for Trixi."
+    # @assert scheme.solution_points=="gll" "Only GLL solution points are supported for Trixi."
+    # @assert scheme.correction_function=="g2" "Only G2 correction function is supported for Trixi."
     trixi_equations = tenkai2trixiequation(equation)
     initial_condition(x, t, equations) = problem.exact_solution(x..., t)
     dg_solver = Trixi.DGSEM(polydeg = scheme.degree,
@@ -37,13 +37,14 @@ end
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
     @unpack derivative_dhat = dg.basis
+    @unpack D1 = tenkai_op
 
     for i in eachnode(dg)
         u_node = Trixi.get_node_vars(u, equations, dg, i, element)
 
         flux1 = Trixi.flux(u_node, 1, equations)
         for ii in eachnode(dg)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], flux1,
+            Trixi.multiply_add_to_node_vars!(du, alpha * D1[ii, i], flux1,
                                              equations, dg, ii, element)
         end
     end
@@ -60,7 +61,7 @@ end
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
     @unpack derivative_split = dg.basis
-
+    @unpack Dsplit = tenkai_op
     # Calculate volume integral in one element
     for i in eachnode(dg)
         u_node = Trixi.get_node_vars(u, equations, dg, i, element)
@@ -74,9 +75,9 @@ end
         for ii in (i + 1):nnodes(dg)
             u_node_ii = Trixi.get_node_vars(u, equations, dg, ii, element)
             flux1 = volume_flux(u_node, u_node_ii, 1, equations)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_split[i, ii], flux1,
+            Trixi.multiply_add_to_node_vars!(du, alpha * Dsplit[i, ii], flux1,
                                              equations, dg, i, element)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_split[ii, i], flux1,
+            Trixi.multiply_add_to_node_vars!(du, alpha * Dsplit[ii, i], flux1,
                                              equations, dg, ii, element)
         end
     end
@@ -134,7 +135,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
                                     cell, semi.mesh,
                                     Trixi.have_nonconservative_terms(semi.equations),
                                     semi.equations, semi.solver, semi.cache, op,
-                                    2.0 * lamx * (1.0 - alpha))
+                                    lamx * (1.0 - alpha))
 
         for ix in Base.OneTo(nd)
             # Solution points

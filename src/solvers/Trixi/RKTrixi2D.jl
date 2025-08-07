@@ -27,6 +27,7 @@ end
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
     @unpack derivative_dhat = dg.basis
+    @unpack D1 = tenkai_op
 
     # Calculate volume terms in one element
     for j in eachnode(dg), i in eachnode(dg)
@@ -34,13 +35,13 @@ end
 
         flux1 = Trixi.flux(u_node, 1, equations)
         for ii in eachnode(dg)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[ii, i], flux1,
+            Trixi.multiply_add_to_node_vars!(du, alpha * D1[ii, i], flux1,
                                              equations, dg, ii, j, element...)
         end
 
         flux2 = Trixi.flux(u_node, 2, equations)
         for jj in eachnode(dg)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_dhat[jj, j], flux2,
+            Trixi.multiply_add_to_node_vars!(du, alpha * D1[jj, j], flux2,
                                              equations, dg, i, jj, element...)
         end
     end
@@ -56,6 +57,7 @@ end
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
     @unpack derivative_split = dg.basis
+    @unpack Dsplit = tenkai_op
 
     # Calculate volume integral in one element
     for j in eachnode(dg), i in eachnode(dg)
@@ -70,9 +72,9 @@ end
         for ii in (i + 1):nnodes(dg)
             u_node_ii = Trixi.get_node_vars(u, equations, dg, ii, j, element...)
             flux1 = volume_flux(u_node, u_node_ii, 1, equations)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_split[i, ii], flux1,
+            Trixi.multiply_add_to_node_vars!(du, alpha * Dsplit[i, ii], flux1,
                                              equations, dg, i, j, element...)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_split[ii, i], flux1,
+            Trixi.multiply_add_to_node_vars!(du, alpha * Dsplit[ii, i], flux1,
                                              equations, dg, ii, j, element...)
         end
 
@@ -80,9 +82,9 @@ end
         for jj in (j + 1):nnodes(dg)
             u_node_jj = Trixi.get_node_vars(u, equations, dg, i, jj, element...)
             flux2 = volume_flux(u_node, u_node_jj, 2, equations)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_split[j, jj], flux2,
+            Trixi.multiply_add_to_node_vars!(du, alpha * Dsplit[j, jj], flux2,
                                              equations, dg, i, j, element...)
-            Trixi.multiply_add_to_node_vars!(du, alpha * derivative_split[jj, j], flux2,
+            Trixi.multiply_add_to_node_vars!(du, alpha * Dsplit[jj, j], flux2,
                                              equations, dg, i, jj, element...)
         end
     end
@@ -157,8 +159,8 @@ function tenkai2trixiode(solver::TrixiRKSolver, equation::AbstractEquations{2},
                          problem, scheme, param)
     @unpack grid_size = param
     @assert *(ispow2.(grid_size)...) "Grid size must be a power of 2 for TreeMesh."
-    @assert scheme.solution_points=="gll" "Only GLL solution points are supported for Trixi."
-    @assert scheme.correction_function=="g2" "Only G2 correction function is supported for Trixi."
+    # @assert scheme.solution_points=="gll" "Only GLL solution points are supported for Trixi."
+    # @assert scheme.correction_function=="g2" "Only G2 correction function is supported for Trixi."
     trixi_equations = tenkai2trixiequation(equation)
     initial_condition(x, t, equations) = problem.exact_solution(x..., t)
     dg_solver = Trixi.DGSEM(polydeg = scheme.degree,
@@ -210,7 +212,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
                                     (el_x, el_y), semi.mesh,
                                     Trixi.have_nonconservative_terms(semi.equations),
                                     semi.equations, semi.solver, semi.cache, op,
-                                    2.0 * lamx)
+                                    lamx)
 
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
                              dy,

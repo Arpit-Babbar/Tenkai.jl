@@ -347,6 +347,7 @@ function fr_operators(N, sol_pts, cor_fun)
     Dm = diff_mat(xg)
     bV = -bl * Vl' - br * Vr'
     D1 = Dm + bV
+    Dsplit = 2 * Dm + bV
 
     DmT = SMatrix{nd, nd}(Dm')
     D1T = SMatrix{nd, nd}(D1')
@@ -360,7 +361,7 @@ function fr_operators(N, sol_pts, cor_fun)
         Vgll = SMatrix{nd, nd}(Vgll)
     end
 
-    op = (; degree = N, xg, wg, Vl, Vr, bl, br, Dm, DmT, bV, D1, D1T, Vgll)
+    op = (; degree = N, xg, wg, Vl, Vr, bl, br, Dm, DmT, bV, D1, D1T, Dsplit, Vgll)
     return op
 end
 
