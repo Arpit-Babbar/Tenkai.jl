@@ -90,6 +90,17 @@ end
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,
                   animate = false, final_time = 1.0, nx = 8,
+                  solution_points = "gl",
+                  correction_function = "radau",
+                  solver = TrixiRKSolver())
+
+    data_name = "alfven_mhd_trixirk_gl.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(examples_dir(), "1d", "run_mhd_alfven_wave_trixirk.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 1.0, nx = 8,
                   solver = TrixiRKSolver(VolumeIntegralFluxDifferencing(Trixi.flux_derigs_etal)))
 
     data_name = "alfven_mhd_trixirk_flux_diff.txt"
@@ -143,7 +154,8 @@ end
                       limiter = setup_limiter_none(),
                       solution_points = "gll",
                       correction_function = "g2",
-                      animate = false, final_time = 1.0, nx = 8, ny = 8)
+                      animate = false, final_time = 1.0, nx = 8, ny = 8,
+                      cfl_safety_factor = 0.98)
         data_name = "isentropic_2d_$(solver_names[i])_4.txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
     end
@@ -219,4 +231,16 @@ end
         data_name = filenames[i]
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
     end
+
+    # Test with GL points and Radau correction function
+    trixi_include(joinpath(examples_dir(), "2d", "run_dwave2d.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.1, nx = 16, ny = 16,
+                  solver = TrixiRKSolver(), degree = 3,
+                  solution_points = "gl", correction_function = "radau",
+                  limiter = setup_limiter_none(),
+                  cfl_safety_factor = 0.98)
+    data_name = "dwave_2d_trixi_rkfr_3_gl.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
