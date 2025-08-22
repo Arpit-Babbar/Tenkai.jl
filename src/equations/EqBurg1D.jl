@@ -59,6 +59,7 @@ function initial_value_burger_sin(x)
 end
 
 function exact_solution_burger_sin(x, t)
+    t = min(t, 5.0)
     implicit_eqn(u) = u - initial_value_burger_sin(x - t * u)
     seed = initial_value_burger_sin(x)
     value = find_zero(implicit_eqn, seed)
