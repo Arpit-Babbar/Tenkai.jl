@@ -1046,8 +1046,8 @@ function Tenkai.update_ghost_values_lwfr!(problem, scheme, eq::TenMoment2D,
 
                 # Purely upwind at boundary
                 # if abs(y1) < 0.055
-                set_node_vars!(Ub, ub_node, eq, k, 1, 1, j)
-                set_node_vars!(Fb, fb_node, eq, k, 1, 1, j)
+                # set_node_vars!(Ub, ub_node, eq, k, 1, 1, j)
+                # set_node_vars!(Fb, fb_node, eq, k, 1, 1, j)
                 # end
             end
         end
