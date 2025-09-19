@@ -30,7 +30,7 @@ jobs:
           - ubuntu-latest
         arch:
           - x64
-        include:
+        # include:
         #  - os: macOS-latest
         #    arch: aarch64
         #    version: '1.10'
