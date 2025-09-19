@@ -44,3 +44,5 @@ end
 if TENKAI_TEST == "crk_imex_paper" || TENKAI_TEST == "all"
     include("test_crk_imex_paper.jl")
 end
+
+include("runtests_tenkaicrk.jl")

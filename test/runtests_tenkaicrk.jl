@@ -9,13 +9,12 @@ using Tenkai.DelimitedFiles
 
 overwrite_errors = false
 
-test_data_dir = joinpath(@__DIR__, "data_tenkaicrk")
-
 function get_errors(sol)
     return sol["errors"]["l1_error"], sol["errors"]["l2_error"], sol["errors"]["energy"]
 end
 
-function compare_errors_txt(sol, testname; tol = 1e-14, overwrite_errors = false)
+function compare_errors_txt(sol, testname; tol = 1e-14,
+                            overwrite_errors = false)
     datafile = joinpath(test_data_dir, testname)
     if overwrite_errors == true
         println("Overwriting $datafile, this should not be triggered in actual testing.")
