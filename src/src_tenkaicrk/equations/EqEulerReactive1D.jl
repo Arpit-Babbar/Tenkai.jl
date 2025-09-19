@@ -63,6 +63,16 @@ end
     return (eq.gamma - 1.0) * (E - 0.5 * rho_v1 * v1 - rho_z * eq.q0)
 end
 
+@inbounds @inline function rho_p_indicator!(un, eq::EulerReactive1D)
+    for ix in 1:size(un, 2) # loop over dofs and faces
+        u_node = get_node_vars(un, eq, ix)
+        p = pressure(eq, u_node)
+        un[1, ix] *= p # ρ * p
+    end
+    n_ind_var = 1
+    return n_ind_var
+end
+
 @inbounds @inline function flux(x, u, eq::EulerReactive1D)
     rho, rho_v1, E, rho_z = u
     v1 = rho_v1 / rho
