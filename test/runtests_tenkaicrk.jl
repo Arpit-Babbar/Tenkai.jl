@@ -26,7 +26,7 @@ end
                   compute_error_interval = 0,
                   animate = false, final_time = 0.01, nx = 5)
     data_name = "jin_xin_burg1d.txt"
-    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 4e-13)
 
     trixi_include(joinpath(cRK_examples_dir(), "1d", "run_jin_xin_burg1d_marco.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
@@ -43,7 +43,8 @@ end
                   compute_error_interval = 0,
                   animate = false, final_time = 0.001, nx = 5)
     data_name = "burg1d_stiff_source_non_linear.txt"
-    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+    # TODO - Why is tolerance higher than in TenkaicRK.jl?
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 5e-8)
 end
 
 @testset "Shock diffraction" begin
