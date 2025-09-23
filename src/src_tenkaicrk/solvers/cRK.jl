@@ -56,7 +56,7 @@ function picard_solver(func, y0, tol = 1e-12)
     return y
 end
 
-function newton_solver(func, y0, tol = 1e-8, maxiters = 1e2)
+function newton_solver(func, y0, tol = 1e-14, maxiters = 1e3)
     p = nothing # The func doesn't have any parameters
     f = (x, p) -> func(x)
     prob = NonlinearProblem{false}(f, y0, p)

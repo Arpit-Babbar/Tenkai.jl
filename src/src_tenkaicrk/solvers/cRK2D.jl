@@ -175,4 +175,145 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
     end
     end # timer
 end
+
+function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
+                                    problem, scheme::Scheme{<:cAGSA343}, aux, t, dt,
+                                    cache)
+    @timeit aux.timer "Cell residual" begin
+    #! format: noindent
+    @unpack source_terms = problem
+    @unpack xg, wg, Dm, D1, Vl, Vr = op
+    nd = length(xg)
+    nx, ny = grid.size
+    @unpack compute_bflux! = scheme.bflux
+    @unpack solver = scheme
+    @unpack volume_integral = solver
+    @unpack implicit_solver = solver
+    @unpack blend = aux
+    @unpack bl, br = op
+    get_dissipation_node_vars = scheme.dissipation
+    @unpack blend_cell_residual! = aux.blend.subroutines
+
+    @unpack cell_arrays, eval_data, ua, u1, res, Fb, Ub = cache
+
+    refresh!.((res, Ub, Fb)) # Reset previously used variables to zero
+
+    a_tilde_21 = (-139833537) / 38613965
+    c1 = a11 = 168999711 / 74248304
+    gamma = a22 = 202439144 / 118586105
+    a_tilde_31 = 85870407 / 49798258
+    a_tilde_32 = (-121251843) / 1756367063
+    b_tilde_2 = 1 / 6
+    b_tilde_3 = 2 / 3
+    b_tilde_1 = 1 - b_tilde_2 - b_tilde_3
+    a_tilde_41 = b_tilde_1
+    a_tilde_42 = b_tilde_2
+    a_tilde_43 = b_tilde_3
+
+    a21 = 44004295 / 24775207
+    a31 = (-6418119) / 169001713
+    a32 = (-748951821) / 1043823139
+    a33 = 12015439 / 183058594
+    a42 = b2 = 1 / 3
+    a43 = b3 = 0
+    a41 = b1 = 1 - gamma - b2 - b3
+    a44 = gamma
+
+    c2 = a21 + a22
+    c3 = a31 + a32 + a33
+    c4 = 1.0
+
+    z0 = MyZero()
+    tA_rk = ((z0, z0, z0, z0),
+             (a_tilde_21, z0, z0, z0),
+             (a_tilde_31, a_tilde_32, z0, z0),
+             (a_tilde_41, a_tilde_42, a_tilde_43, z0))
+    tb_rk = (b_tilde_1, b_tilde_2, b_tilde_3, z0)
+    # tc_rk = (z0, 1.0)
+
+    A_rk = ((a11, z0, z0, z0),
+            (a21, a22, z0, z0),
+            (a31, a32, a33, z0),
+            (a41, a42, a43, a44))
+    b_rk = (b1, b2, b3, gamma)
+    c_rk = (c1, c2, c3, c4)
+
+    @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
+        el_x, el_y = element[1], element[2]
+        dx, dy = grid.dx[el_x], grid.dy[el_y]
+        xc, yc = grid.xc[el_x], grid.yc[el_y]
+        lamx, lamy = dt / dx, dt / dy
+        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt)
+
+        id = Threads.threadid()
+        u1_, u2, u3, u4, F, G, U, S = cell_arrays[id]
+        F_G_U_S = (F, G, U, S)
+        refresh!.(F_G_U_S)
+
+        # TODO - FIX THIS HARDCODING!!
+        u = @view u1[:, :, :, el_x, el_y]
+        u1_ .= u
+        u2 .= u1_
+        u3 .= u1_
+        u4 .= u1_
+        r1 = @view res[:, :, :, el_x, el_y]
+        Ub_ = @view Ub[:, :, :, el_x, el_y]
+
+        # Stage 1
+        source_term_implicit!((u1_, u2, u3, u4), F_G_U_S,
+                              (A_rk[1][1], A_rk[2][1], A_rk[3][1], A_rk[4][1]),
+                              b_rk[1],
+                              c_rk[1],
+                              u, op,
+                              local_grid,
+                              problem, scheme, implicit_solver, source_terms, aux,
+                              eq)
+
+        # Stage 2
+        flux_der!(volume_integral, r1, (u2, u3, u4), F_G_U_S,
+                  (tA_rk[2][1], tA_rk[3][1], tA_rk[4][1]),
+                  tb_rk[1], u1_, op, local_grid, eq)
+        source_term_implicit!((u2, u3, u4), F_G_U_S,
+                              (A_rk[2][2], A_rk[3][2], A_rk[4][2]), b_rk[2],
+                              c_rk[2], u1_, op,
+                              local_grid,
+                              problem, scheme, implicit_solver, source_terms, aux,
+                              eq)
+
+        # Stage 3
+        flux_der!(volume_integral, r1, (u3, u4), F_G_U_S,
+                  (tA_rk[3][2], tA_rk[4][2]),
+                  tb_rk[2], u2, op,
+                  local_grid, eq)
+        source_term_implicit!((u3, u4), F_G_U_S, (A_rk[3][3], A_rk[4][3]), b_rk[3],
+                              c_rk[3], u2, op,
+                              local_grid,
+                              problem, scheme, implicit_solver, source_terms, aux,
+                              eq)
+
+        # Stage 4
+        flux_der!(volume_integral, r1, (u4,), F_G_U_S, (tA_rk[4][3],), tb_rk[3], u3,
+                  op,
+                  local_grid, eq)
+        source_term_implicit!((u4,), F_G_U_S, (A_rk[4][4]), b_rk[4],
+                              c_rk[4], u3, op,
+                              local_grid,
+                              problem, scheme, implicit_solver, source_terms, aux,
+                              eq)
+
+        F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid,
+                         scheme,
+                         eq)
+
+        u = @view u1[:, :, :, el_x, el_y]
+        blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
+                             dy,
+                             grid.xf[el_x], grid.yf[el_y], op, u1, u, nothing, res)
+        # Interpolate to faces
+        @views cell_data = (u, u2, el_x, el_y)
+        @views compute_bflux!(eq, scheme, grid, cell_data, eval_data, xg, Vl, Vr,
+                              F, G, Fb[:, :, :, el_x, el_y], aux)
+    end
+    end # timer
+end
 end # muladd
