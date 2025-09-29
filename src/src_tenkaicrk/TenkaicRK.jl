@@ -25,6 +25,8 @@ include("solvers/RKFR1D_non_conservative.jl")
 include("solvers/RKFR2D_non_conservative.jl")
 include("solvers/RKTrixi2D_non_conservative.jl")
 
+include("equations/EqVarAdv.jl")
+
 cRK_examples_dir() = joinpath(dirname(pathof(Tenkai)), "..", "Examples/examples_crk")
 cRK_elixirs_dir() = joinpath(dirname(pathof(Tenkai)), "..", "elixirs")
 
