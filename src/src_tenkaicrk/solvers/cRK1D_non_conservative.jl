@@ -134,6 +134,7 @@ function compute_face_residual!(eq::AbstractNonConservativeEquations{1}, grid, o
                                                    scheme, param, Fn, aux, nothing,
                                                    res, scaling_factor)
 
+        # TODO - Bul, Bur are not being limited. Fix this and make it as in the 2-D version!
         Fl = Fn + Bul
         Fr = Fn + Bur
         for ix in 1:nd
