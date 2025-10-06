@@ -89,7 +89,7 @@ scheme = Scheme(solver, degree, solution_points, correction_function,
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
                    compute_error_interval, animate = animate,
                    cfl_safety_factor = cfl_safety_factor,
-                   saveto = joinpath(@__DIR__, "reactive_rp1_results"))
+                   saveto = "none")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 
