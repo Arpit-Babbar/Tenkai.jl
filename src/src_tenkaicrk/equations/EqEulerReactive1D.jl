@@ -30,7 +30,7 @@ import Tenkai: admissibility_tolerance
                set_node_vars!,
                nvariables, eachvariable,
                add_to_node_vars!, subtract_from_node_vars!,
-               multiply_add_to_node_vars!, calc_source)
+               multiply_add_to_node_vars!, calc_source, cRKSolver)
 
 using ..TenkaicRK: newton_solver, picard_solver
 
@@ -689,6 +689,52 @@ function implicit_source_solve(lhs, eq, x, t, coefficient, source_terms::SourceT
     # @show u_new, lhs
 
     return u_new
+end
+
+function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
+                                problem, scheme::Scheme{<:cRKSolver}, param, aux, t, dt,
+                                u1, Fb,
+                                Ub, ua, res, scaling_factor = 1.0)
+    @timeit aux.timer "Face residual" begin
+    #! format: noindent
+    @unpack xg, wg, bl, br = op
+    nd = op.degree + 1
+    nx = grid.size
+    @unpack dx, xf = grid
+    num_flux = scheme.numerical_flux
+    @unpack blend = aux
+    @unpack u1_b = cache
+
+    # Vertical faces, x flux
+    for i in 1:(nx + 1)
+        alp = 0.5 * (blend.alpha[i-1] + blend.alpha[i])
+        x = xf[i]
+        local ul, ur
+        if alp ≈ 1.0 # This doesn't matter because it is multiplied by zero later
+            # this is just to avoid the positivity error
+            # Face between i-1 and i
+            ul = get_node_vars(u1, eq, nd, i - 1)  # Right of cell i-1
+            ur = get_node_vars(u1, eq, 1, i)       # Left of cell i
+        else
+            ul = get_node_vars(u1_b, eq, nd, i - 1)  # Right of cell i-1
+            ur = get_node_vars(u1_b, eq, 1, i)       # Left of cell i
+        end
+        @views Fn = num_flux(x, ul, ur, Fb[:, 2, i - 1], Fb[:, 1, i],
+                            Ub[:, 2, i - 1], Ub[:, 1, i], eq, 1)
+
+        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid,
+                                                   op, problem,
+                                                   scheme, param, Fn, aux, nothing,
+                                                   res, scaling_factor)
+        for ix in 1:nd
+            for n in 1:nvariables(eq)
+                res[n, ix, i - 1] += dt / dx[i - 1] * blend_fac[1] * Fn[n] * br[ix]
+                res[n, ix, i] += dt / dx[i] * blend_fac[2] * Fn[n] * bl[ix]
+            end
+        end
+    end
+    return nothing
+    end # timer
 end
 
 function get_equation(gamma, q0)

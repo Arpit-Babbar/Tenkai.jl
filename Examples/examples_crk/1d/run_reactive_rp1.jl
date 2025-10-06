@@ -15,7 +15,7 @@ boundary_condition = (neumann, neumann)
 function reactive_rp1(x)
     if x < 0.0
         rho = 1.6812
-    v1 = 2.8867
+        v1 = 2.8867
         p = 21.5672
         z = 0.0
     else
@@ -42,10 +42,10 @@ exact_solution = exact_solution_reactive_rp1
 
 boundary_value = exact_solution # dummy function
 
-degree = 0
-# solver = cHT112()
+degree = 1
+solver = cHT112()
 # solver = cRK11()
-solver = cIMEX111()
+# solver = cIMEX111()
 # solver = cRK22()
 solution_points = "gl"
 correction_function = "radau"
@@ -54,7 +54,7 @@ bound_limit = "yes"
 bflux = evaluate
 final_time = 1.0
 
-nx = ceil(Int64, 1000 / (degree + 1))
+nx = ceil(Int64, 4000 / (degree + 1))
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
@@ -86,8 +86,8 @@ limiter_blend = setup_limiter_blend(blend_type = FO,
                                     pure_fv = true,
                                     numflux = Eq.rusanov)
 limiter_tvb = setup_limiter_tvb(equation; tvbM = tvbM)
-limiter = setup_limiter_none()
-# limiter = limiter_blend
+# limiter = setup_limiter_none()
+limiter = limiter_blend
 # limiter = limiter_tvb
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
