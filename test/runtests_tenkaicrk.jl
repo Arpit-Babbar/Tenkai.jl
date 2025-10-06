@@ -9,6 +9,95 @@ using Tenkai.DelimitedFiles
 
 overwrite_errors = false
 
+# Reactive Euler 1D
+
+@testset "Reactive Euler 1D" begin
+    # Pure FV blending test
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_reactive_rp1.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  degree = 4,
+                  solver = cSSP2IMEX433(),
+                  bound_limit = "yes",
+                  pure_fv = true,
+                  bflux = extrapolate,
+                  cfl_safety_factor = 0.9,
+                  animate = false, final_time = 1.0, nx = 4)
+    data_name = "reactive_rp1_pure_fv.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
+
+    # First order IMEX test without subcells
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_reactive_rp1.jl"),
+                  compute_error_interval = 0,
+                  degree = 0,
+                  solver = cIMEX111(),
+                  bound_limit = "no",
+                  limiter = setup_limiter_none(),
+                  bflux = extrapolate,
+                  cfl_safety_factor = 0.9,
+                  save_iter_interval = 0, save_time_interval = 0.0,
+                  animate = false, final_time = 1.0, nx = 4)
+    data_name = "reactive_rp1_first_order.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
+
+    # cHT112 test, requiring lower CFL
+    EqReactive = Tenkai.TenkaicRK.EqEulerReactive1D
+    equation = Eq.get_equation(1.4, 25.0)
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_reactive_rp1.jl"),
+                  compute_error_interval = 0,
+                  degree = 3,
+                  solver = cHT112(),
+                  bound_limit = "yes",
+                  pure_fv = false,
+                  bflux = extrapolate,
+                  cfl_safety_factor = 0.1,
+                  save_iter_interval = 0, save_time_interval = 0.0,
+                  animate = false, final_time = 1.0, nx = 4)
+    data_name = "reactive_rp1_ht112.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
+
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_reactive_rp1.jl"),
+                  compute_error_interval = 0,
+                  degree = 4,
+                  solver = cSSP2IMEX433(),
+                  bound_limit = "yes",
+                  pure_fv = false,
+                  bflux = extrapolate,
+                  cfl_safety_factor = 0.9,
+                  save_iter_interval = 0, save_time_interval = 0.0,
+                  final_time = 1.0, nx = 4)
+    data_name = "reactive_rp1_ssp433.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
+
+    # IMEXSSP433 test (used in the paper)
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_reactive_rp1.jl"),
+                  compute_error_interval = 0,
+                  degree = 4,
+                  solver = cSSP2IMEX433(),
+                  bound_limit = "yes",
+                  pure_fv = false,
+                  bflux = extrapolate,
+                  cfl_safety_factor = 0.9,
+                  save_iter_interval = 0, save_time_interval = 0.0,
+                  final_time = 1.0, nx = 4)
+    data_name = "reactive_rp1_ssp433.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
+
+    # TVB limiter test
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_reactive_rp1.jl"),
+                  compute_error_interval = 0,
+                  degree = 4,
+                  solver = cSSP2IMEX433(),
+                  bound_limit = "yes",
+                  limiter = setup_limiter_tvb(equation; tvbM = 0.0),
+                  bflux = extrapolate,
+                  cfl_safety_factor = 0.9,
+                  save_iter_interval = 0, save_time_interval = 0.0,
+                  final_time = 1.0, nx = 4)
+    data_name = "reactive_rp1_tvb.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
+end
+
 @testset "Burg sin cHT112" begin
     trixi_include(joinpath(cRK_examples_dir(), "1d", "run_burg1d_sin_source_smooth.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
