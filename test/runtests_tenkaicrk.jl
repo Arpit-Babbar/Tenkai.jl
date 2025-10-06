@@ -16,7 +16,7 @@ overwrite_errors = false
     trixi_include(joinpath(cRK_examples_dir(), "1d", "run_reactive_rp1.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,
-                  degree = 4,
+                  degree = 1, # Because of extrapolations, pure_fv need not work for all degrees
                   solver = cSSP2IMEX433(),
                   bound_limit = "yes",
                   pure_fv = true,
@@ -91,7 +91,7 @@ overwrite_errors = false
                   bound_limit = "yes",
                   limiter = setup_limiter_tvb(equation; tvbM = 0.0),
                   bflux = extrapolate,
-                  cfl_safety_factor = 0.9,
+                  cfl_safety_factor = 0.8, # TVB needs a lower CFL for some reason
                   save_iter_interval = 0, save_time_interval = 0.0,
                   final_time = 1.0, nx = 4)
     data_name = "reactive_rp1_tvb.txt"
