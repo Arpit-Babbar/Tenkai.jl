@@ -400,7 +400,6 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             set_node_vars!(Fb, 0.5 * (fr + f2r), eq, 2, cell)
         end
     end
-    println("PASS!!")
 end
 
 function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,

@@ -42,8 +42,8 @@ exact_solution = exact_solution_reactive_rp1
 
 boundary_value = exact_solution # dummy function
 
-degree = 3
-solver = cHT112()
+degree = 4
+solver = cSSP2IMEX433()
 # solver = cRK11()
 # solver = cIMEX111()
 # solver = cRK22()
@@ -51,10 +51,10 @@ solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "yes"
-bflux = evaluate
+bflux = extrapolate
 final_time = 1.0
 
-nx = ceil(Int64, 1000 / (degree + 1))
+nx = ceil(Int64, 20 / (degree + 1))
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
@@ -83,7 +83,7 @@ limiter_blend = setup_limiter_blend(blend_type = FO,
                                     # indicator_model = "model1",
                                     indicator_model = "gassner",
                                     debug_blend = false,
-                                    pure_fv = true,
+                                    pure_fv = false,
                                     numflux = Eq.rusanov)
 limiter_tvb = setup_limiter_tvb(equation; tvbM = tvbM)
 # limiter = setup_limiter_none()
