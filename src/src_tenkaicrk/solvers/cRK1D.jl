@@ -126,14 +126,9 @@ end
         # the other points, the explicit terms are not fully computed yet!
 
         res_node = get_node_vars(resl, eq, j)
-        local u_new
-        try
-            u_new = implicit_source_solve(dt / dx * res_node, eq, x, t, dt,
-                                        source_terms, u_node)
-        catch e
-            @show res_node, resl[:, 2:nd-1]
-            rethrow(e)
-        end
+        lhs = u_node - dt / dx * res_node
+        u_new = implicit_source_solve(lhs, eq, x, t, dt,
+                                    source_terms, u_node)
         s_node = calc_source(u_new, x, t, source_terms, eq)
         # s_node = calc_source(u_node, x, t, source_terms, eq)
         for n in 1:nvar
@@ -366,8 +361,10 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
         end
         u = @view u1[:, :, cell]
         r = @view res[:, :, cell]
+        @assert isnan(norm(r)) == false "NaN in residual at cell $cell"
         blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
                                    grid.xf[cell], op, u1, u, cache.ua, f, r)
+        @assert isnan(norm(r)) == false "NaN in residual at cell $cell"
         # Interpolate to faces
         for i in Base.OneTo(nd)
             U_node = get_node_vars(U, eq, i)
@@ -403,6 +400,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             set_node_vars!(Fb, 0.5 * (fr + f2r), eq, 2, cell)
         end
     end
+    println("PASS!!")
 end
 
 function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,

@@ -686,12 +686,14 @@ function implicit_source_solve(lhs, eq, x, t, coefficient, source_terms::SourceT
     u4 = min(u4, 1.0) # Ensure Z remains below 1
     u_new = SVector(lhs[1], lhs[2], lhs[3], u4)
 
+    @assert isnan(norm(u_new)) == false "NaN in u_new", pressure(eq, lhs)
+
     # @show u_new, lhs
 
     return u_new
 end
 
-function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
+function compute_face_residual!(eq::EulerReactive1D, grid, op, cache,
                                 problem, scheme::Scheme{<:cRKSolver}, param, aux, t, dt,
                                 u1, Fb,
                                 Ub, ua, res, scaling_factor = 1.0)
@@ -716,8 +718,10 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
             ul = get_node_vars(u1, eq, nd, i - 1)  # Right of cell i-1
             ur = get_node_vars(u1, eq, 1, i)       # Left of cell i
         else
-            ul = get_node_vars(u1_b, eq, nd, i - 1)  # Right of cell i-1
-            ur = get_node_vars(u1_b, eq, 1, i)       # Left of cell i
+            # ul = get_node_vars(u1_b, eq, nd, i - 1)  # Right of cell i-1
+            # ur = get_node_vars(u1_b, eq, 1, i)       # Left of cell i
+            ul = get_node_vars(ua, eq, i - 1)  # Right of cell i-1
+            ur = get_node_vars(ua, eq, i)       # Left of cell i
         end
         @views Fn = num_flux(x, ul, ur, Fb[:, 2, i - 1], Fb[:, 1, i],
                             Ub[:, 2, i - 1], Ub[:, 1, i], eq, 1)

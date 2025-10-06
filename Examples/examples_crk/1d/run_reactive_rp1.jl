@@ -42,7 +42,7 @@ exact_solution = exact_solution_reactive_rp1
 
 boundary_value = exact_solution # dummy function
 
-degree = 1
+degree = 3
 solver = cHT112()
 # solver = cRK11()
 # solver = cIMEX111()
@@ -54,7 +54,7 @@ bound_limit = "yes"
 bflux = evaluate
 final_time = 1.0
 
-nx = ceil(Int64, 4000 / (degree + 1))
+nx = ceil(Int64, 1000 / (degree + 1))
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
