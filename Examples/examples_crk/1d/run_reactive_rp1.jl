@@ -50,11 +50,11 @@ solver = cSSP2IMEX433()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
-bound_limit = "yes"
+bound_limit = "no"
 bflux = extrapolate
 final_time = 1.0
 
-nx = ceil(Int64, 20 / (degree + 1))
+nx = ceil(Int64, 4000 / (degree + 1))
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
@@ -72,8 +72,7 @@ q0 = 25.0
 equation = Eq.get_equation(gamma, q0)
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution,
-                  source_terms = source_terms
-                  )
+                  source_terms = source_terms)
 MH = mh_blend(equation)
 FO = fo_blend_imex(equation)
 limiter_blend = setup_limiter_blend(blend_type = FO,
@@ -85,10 +84,10 @@ limiter_blend = setup_limiter_blend(blend_type = FO,
                                     debug_blend = false,
                                     pure_fv = false,
                                     numflux = Eq.rusanov)
-limiter_tvb = setup_limiter_tvb(equation; tvbM = tvbM)
+# limiter_tvb = setup_limiter_tvb(equation; tvbM = tvbM)
 # limiter = setup_limiter_none()
-limiter = limiter_blend
-# limiter = limiter_tvb
+# limiter = limiter_blend
+limiter = limiter_tvb
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
