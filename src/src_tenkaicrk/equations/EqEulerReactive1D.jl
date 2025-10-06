@@ -30,7 +30,7 @@ import Tenkai: admissibility_tolerance
                set_node_vars!,
                nvariables, eachvariable,
                add_to_node_vars!, subtract_from_node_vars!,
-               multiply_add_to_node_vars!, calc_source, cRKSolver)
+               multiply_add_to_node_vars!, calc_source, cRKSolver, sum_node_vars_1d)
 
 import ..TenkaicRK: calc_non_cons_gradient, calc_non_cons_Bu, non_conservative_equation,
                     implicit_source_solve
@@ -171,6 +171,14 @@ function correct_variable_bound_limiter!(variable, eq::EulerReactive1D, grid, op
             var_min = min(var_min, var)
         end
         var_min = min(var_min, var_ll, var_rr)
+
+        # In order to correct the solution at the faces, we need to extrapolate it to faces
+        # and then correct it.
+        ul = sum_node_vars_1d(Vl, u1, eq, 1:nd, element) # ul = ∑ Vl*u
+        ur = sum_node_vars_1d(Vr, u1, eq, 1:nd, element) # ur = ∑ Vr*u
+        var_u_ll, var_u_rr = variable(eq, ul), variable(eq, ur)
+        var_min = min(var_min, var_u_ll, var_u_rr)
+
         ua_ = get_node_vars(ua, eq, element)
         var_avg = variable(eq, ua_)
         @assert var_avg>0.0 "Failed at element $element", var_avg
@@ -628,6 +636,7 @@ function implicit_source_solve(lhs, eq, x, t, coefficient,
     T = p / lhs[1]
     KT = A * exp(-TA / T)
     u4 = lhs[4] / (1.0 - coefficient * (-KT))
+
     u_new = SVector(lhs[1], lhs[2], lhs[3], u4)
 
     return u_new
