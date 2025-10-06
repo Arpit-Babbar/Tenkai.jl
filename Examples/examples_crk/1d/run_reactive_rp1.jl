@@ -51,7 +51,7 @@ bound_limit = "yes"
 bflux = extrapolate
 final_time = 1.0
 
-nx = ceil(Int64, 10 / (degree + 1))
+nx = ceil(Int64, 4000 / (degree + 1))
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
