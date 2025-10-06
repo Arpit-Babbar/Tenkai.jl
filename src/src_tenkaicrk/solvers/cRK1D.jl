@@ -126,8 +126,14 @@ end
         # the other points, the explicit terms are not fully computed yet!
 
         res_node = get_node_vars(resl, eq, j)
-        u_new = implicit_source_solve(dt / dx * res_node, eq, x, t, dt,
-                                      source_terms, u_node)
+        local u_new
+        try
+            u_new = implicit_source_solve(dt / dx * res_node, eq, x, t, dt,
+                                        source_terms, u_node)
+        catch e
+            @show res_node, resl[:, 2:nd-1]
+            rethrow(e)
+        end
         s_node = calc_source(u_new, x, t, source_terms, eq)
         # s_node = calc_source(u_node, x, t, source_terms, eq)
         for n in 1:nvar
@@ -249,18 +255,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
     @inbounds for cell in Base.OneTo(nx) # Loop over cells
         xc = grid.xc[cell]
         u_node = get_node_vars(u1, eq, 1, cell)
-        # get_cache_node_vars(aux, u1, problem, scheme, eq, 1, cell)
-        # s_node = calc_source(u_node, xc, t, source_terms, eq)
 
-        # x_ = xc - 0.5 * dx + xg[i] * dx
-        # lhs = get_node_vars(u2, eq, i) # lhs in the implicit source solver
-        # u2_node_implicit = implicit_source_solve(lhs, eq, xc, t, dt, source_terms,
-        #                                          u_node)
-        # set_node_vars!(u2, u2_node_implicit, eq, i)
-        # s_node = calc_source(u2_node_implicit, x_, t, source_terms, eq)
-        # set_node_vars!(S, 0.5 * s_node, eq, i)
-
-        # set_node_vars!(res, -dt * s_node, eq, 1, cell)
         flux1 = flux(xc, u_node, eq)
 
         # Add source term contribution to ut and some to S

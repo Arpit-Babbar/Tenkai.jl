@@ -267,7 +267,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
     @inbounds for cell in Base.OneTo(nx) # Loop over cells
         xc = grid.xc[cell]
         u_node = get_node_vars(u1, eq, 1, cell)
-        get_cache_node_vars(aux, problem, scheme, eq, 1, cell)
+        # get_cache_node_vars(aux, problem, scheme, eq, 1, cell)
+        # TODO - Undo this change
         s_node = calc_source(u_node, xc, t, source_terms, eq)
         set_node_vars!(res, -dt * s_node, eq, 1, cell)
         flux1 = flux(xc, u_node, eq)

@@ -30,9 +30,11 @@ import Tenkai: admissibility_tolerance
                set_node_vars!,
                nvariables, eachvariable,
                add_to_node_vars!, subtract_from_node_vars!,
-               multiply_add_to_node_vars!)
+               multiply_add_to_node_vars!, calc_source)
 
-import ..TenkaicRK: calc_non_cons_gradient, calc_non_cons_Bu, non_conservative_equation
+using ..TenkaicRK: newton_solver, picard_solver
+
+import ..TenkaicRK: calc_non_cons_gradient, calc_non_cons_Bu, non_conservative_equation, implicit_source_solve
 
 using MuladdMacro
 
@@ -460,7 +462,7 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::EulerReactive
         @printf(avg_file, "%e %e %e %e %e \n", xc[i], up_...)
         # TOTHINK - Check efficiency of printf
         for n in eachvariable(eq)
-            p_ua[n + 1][1][:y][i] = @views up_[n]    # Update y-series
+            p_ua[n + 1][1][:y][i] = @views up_[n]  # Update y-series
             ylims[n][1] = min(ylims[n][1], up_[n]) # Compute ymin
             ylims[n][2] = max(ylims[n][2], up_[n]) # Compute ymax
         end
@@ -547,11 +549,9 @@ function post_process_soln(eq::EulerReactive1D, aux, problem, param, scheme)
     if exact_data !== nothing
         for n in eachvariable(eq)
             @views plot!(p_ua[n + 1], exact_data[:, 1], exact_data[:, n + 1],
-                         label = "Exact",
-                         color = :black)
+                         label = "Exact", color = :black)
             @views plot!(p_u1[n + 1], exact_data[:, 1], exact_data[:, n + 1],
-                         label = "Exact",
-                         color = :black, legend = true)
+                         label = "Exact", color = :black, legend = true)
             ymin = min(minimum(p_ua[n + 1][1][:y]), minimum(exact_data[:, n + 1]))
             ymax = max(maximum(p_ua[n + 1][1][:y]), maximum(exact_data[:, n + 1]))
             ylims!(p_ua[n + 1], (ymin - 0.1, ymax + 0.1))
@@ -618,6 +618,77 @@ function (source::SourceTermReactive)(u, x, t, eq::EulerReactive1D)
     #     @assert false
     # end
     return SVector(0.0, 0.0, 0.0, z_source)
+end
+
+
+function implicit_source_solve(lhs, eq, x, t, coefficient, source_terms::SourceTermReactive, u_node,
+                               implicit_solver = picard_solver)
+    # TODO - Make sure that the final source computation is used after the implicit solve
+    # function implicit_F(u_new)
+    #     # u_new_ = SVector(lhs[1], lhs[2], lhs[3], u_new[4])
+    #     z = u_new[4] / u_new[1]
+    #     z_ = max(z, 0.0)
+    #     z_ = min(z, 1.0)
+    #     if !(z ≈ z_)
+    #         z_u = u_node[4] / u_node[1]
+    #         @show z, z_, z_u
+    #     end
+    #     u_new_ = SVector(u_new[1], u_new[2], u_new[3], z * u_new[1])
+    #     return u_new_ - lhs - coefficient * calc_source(u_new_, x, t, source_terms, eq)
+    # end
+
+    # u_new = implicit_solver(implicit_F, u_node)
+
+    # if any(isnan, u_new)
+    #     @show u_node, lhs, coefficient, x, t
+    # end
+
+    # @assert !any(isnan, u_new) "NaN in implicit source solve"
+
+    # @unpack A, TA = source
+    # rho = u[1]
+    # p = pressure(eq, u)
+    # T = p / rho
+    # KT = A * exp(-TA / T)
+
+    # @unpack A, TA = source_terms
+    # p = pressure(eq, lhs)
+    # T = p / lhs[1]
+    # KT = A * exp(-TA / T)
+    # u4 = lhs[4] / (1.0 - coefficient * (-KT))
+    # # u4 = max(u4, 0.0) # Ensure Z remains positive
+    # # u4 = min(u4, 1.0) # Ensure Z remains below one
+    # u_new = SVector(lhs[1], lhs[2], lhs[3], u4)
+
+    # # Check whether the u_new satisfies the implicit equation
+    # rho = lhs[1]
+    # R = 287.1
+    # p = pressure(eq, lhs)
+    # T = p / rho
+    # KT = A * exp(-TA / T)
+    # # u4_test = lhs + coefficient * calc_source(u_new, x, t, source_terms, eq)
+    # u4_test = lhs + coefficient * (-KT) * u_new[4] * SVector(0.0, 0.0, 0.0, 1.0)
+    # if norm(u4_test - u_new) > 1e-8
+    #     @show norm(u4_test - u_new)
+    #     @show lhs
+    #     @show u_new, u4_test
+    #     @assert false "Implicit solve failed, norm = $(norm(u4_test - u_new))"
+    # end
+    # @assert norm(u4_test - u_new) < 1e-8 "Implicit solve failed, norm = $(norm(u4_test - u_new))", u_new, lhs, u4_test
+
+    @unpack A, TA = source_terms
+    @unpack gamma = eq
+    p = pressure(eq, lhs)
+    T = p / lhs[1]
+    KT = A * exp(-TA / T)
+    u4 = lhs[4] / (1.0 - coefficient * (-KT))
+    u4 = max(u4, 0.0) # Ensure Z remains positive
+    u4 = min(u4, 1.0) # Ensure Z remains below 1
+    u_new = SVector(lhs[1], lhs[2], lhs[3], u4)
+
+    # @show u_new, lhs
+
+    return u_new
 end
 
 function get_equation(gamma, q0)

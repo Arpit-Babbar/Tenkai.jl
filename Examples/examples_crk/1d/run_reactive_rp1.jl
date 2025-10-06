@@ -1,10 +1,10 @@
-# For Riemann problems in domain [0.0,1.0]
+# For Riemann problems in domain [0.0, 1.0]
 using StaticArrays
 using Tenkai
 
 using Tenkai.TenkaicRK
 # Submodules
-Eq = TenkaicRK.EqEulerReactive1D
+Eq = Tenkai.TenkaicRK.EqEulerReactive1D
 # Set backend
 
 #------------------------------------------------------------------------------
@@ -15,7 +15,7 @@ boundary_condition = (neumann, neumann)
 function reactive_rp1(x)
     if x < 0.0
         rho = 1.6812
-        v1 = 2.8867
+    v1 = 2.8867
         p = 21.5672
         z = 0.0
     else
@@ -42,16 +42,19 @@ exact_solution = exact_solution_reactive_rp1
 
 boundary_value = exact_solution # dummy function
 
-degree = 1
-solver = cHT112()
+degree = 0
+# solver = cHT112()
+# solver = cRK11()
+solver = cIMEX111()
+# solver = cRK22()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
-bound_limit = "no"
+bound_limit = "yes"
 bflux = evaluate
 final_time = 1.0
 
-nx = ceil(Int64, 2000 / (degree + 1))
+nx = ceil(Int64, 1000 / (degree + 1))
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
@@ -69,26 +72,29 @@ q0 = 25.0
 equation = Eq.get_equation(gamma, q0)
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution,
-                  source_terms = source_terms)
+                  source_terms = source_terms
+                  )
 MH = mh_blend(equation)
-FO = fo_blend(equation)
+FO = fo_blend_imex(equation)
 limiter_blend = setup_limiter_blend(blend_type = FO,
-                                    # indicating_variables = Eq.rho_p_indicator!,
-                                    indicating_variables = Eq.conservative_indicator!,
+                                    indicating_variables = Eq.rho_p_indicator!,
+                                    # indicating_variables = Eq.conservative_indicator!,
                                     reconstruction_variables = conservative_reconstruction,
-                                    indicator_model = "model1",
+                                    # indicator_model = "model1",
+                                    indicator_model = "gassner",
                                     debug_blend = false,
-                                    pure_fv = false,
+                                    pure_fv = true,
                                     numflux = Eq.rusanov)
 limiter_tvb = setup_limiter_tvb(equation; tvbM = tvbM)
-# limiter = setup_limiter_none()
+limiter = setup_limiter_none()
 # limiter = limiter_blend
-limiter = limiter_tvb
+# limiter = limiter_tvb
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
                    compute_error_interval, animate = animate,
-                   cfl_safety_factor = cfl_safety_factor)
+                   cfl_safety_factor = cfl_safety_factor,
+                   saveto = joinpath(@__DIR__, "reactive_rp1_results"))
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 
@@ -96,4 +102,4 @@ println(sol["errors"])
 
 return sol;
 
-sol["plot_data"].p_u1
+sol["plot_data"].p_ua

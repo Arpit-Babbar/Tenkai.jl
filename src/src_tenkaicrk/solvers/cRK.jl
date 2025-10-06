@@ -285,7 +285,7 @@ function evolve_solution!(eq, grid, op, problem,
     return nothing
 end
 
-@inbounds @inline function update_solution_cRK!(u1, eq, grid, problem::Problem{<:Function},
+@inbounds @inline function update_solution_cRK!(u1, eq, grid, problem::Problem{<:Any},
                                                 scheme::Scheme{<:cIMEX111}, res, aux,
                                                 t, dt)
     @timeit aux.timer "Update solution" begin
