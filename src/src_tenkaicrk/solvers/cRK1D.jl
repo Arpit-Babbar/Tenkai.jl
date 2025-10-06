@@ -361,10 +361,10 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
         end
         u = @view u1[:, :, cell]
         r = @view res[:, :, cell]
-        @assert isnan(norm(r))==false "NaN in residual at cell $cell"
+
         blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
                                    grid.xf[cell], op, u1, u, cache.ua, f, r)
-        @assert isnan(norm(r))==false "NaN in residual at cell $cell"
+
         # Interpolate to faces
         for i in Base.OneTo(nd)
             U_node = get_node_vars(U, eq, i)

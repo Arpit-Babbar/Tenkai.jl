@@ -32,8 +32,6 @@ import Tenkai: admissibility_tolerance
                add_to_node_vars!, subtract_from_node_vars!,
                multiply_add_to_node_vars!, calc_source, cRKSolver)
 
-using ..TenkaicRK: newton_solver, picard_solver
-
 import ..TenkaicRK: calc_non_cons_gradient, calc_non_cons_Bu, non_conservative_equation,
                     implicit_source_solve
 
@@ -623,124 +621,17 @@ end
 
 function implicit_source_solve(lhs, eq, x, t, coefficient,
                                source_terms::SourceTermReactive, u_node,
-                               implicit_solver = picard_solver)
-    # TODO - Make sure that the final source computation is used after the implicit solve
-    # function implicit_F(u_new)
-    #     # u_new_ = SVector(lhs[1], lhs[2], lhs[3], u_new[4])
-    #     z = u_new[4] / u_new[1]
-    #     z_ = max(z, 0.0)
-    #     z_ = min(z, 1.0)
-    #     if !(z ≈ z_)
-    #         z_u = u_node[4] / u_node[1]
-    #         @show z, z_, z_u
-    #     end
-    #     u_new_ = SVector(u_new[1], u_new[2], u_new[3], z * u_new[1])
-    #     return u_new_ - lhs - coefficient * calc_source(u_new_, x, t, source_terms, eq)
-    # end
-
-    # u_new = implicit_solver(implicit_F, u_node)
-
-    # if any(isnan, u_new)
-    #     @show u_node, lhs, coefficient, x, t
-    # end
-
-    # @assert !any(isnan, u_new) "NaN in implicit source solve"
-
-    # @unpack A, TA = source
-    # rho = u[1]
-    # p = pressure(eq, u)
-    # T = p / rho
-    # KT = A * exp(-TA / T)
-
-    # @unpack A, TA = source_terms
-    # p = pressure(eq, lhs)
-    # T = p / lhs[1]
-    # KT = A * exp(-TA / T)
-    # u4 = lhs[4] / (1.0 - coefficient * (-KT))
-    # # u4 = max(u4, 0.0) # Ensure Z remains positive
-    # # u4 = min(u4, 1.0) # Ensure Z remains below one
-    # u_new = SVector(lhs[1], lhs[2], lhs[3], u4)
-
-    # # Check whether the u_new satisfies the implicit equation
-    # rho = lhs[1]
-    # R = 287.1
-    # p = pressure(eq, lhs)
-    # T = p / rho
-    # KT = A * exp(-TA / T)
-    # # u4_test = lhs + coefficient * calc_source(u_new, x, t, source_terms, eq)
-    # u4_test = lhs + coefficient * (-KT) * u_new[4] * SVector(0.0, 0.0, 0.0, 1.0)
-    # if norm(u4_test - u_new) > 1e-8
-    #     @show norm(u4_test - u_new)
-    #     @show lhs
-    #     @show u_new, u4_test
-    #     @assert false "Implicit solve failed, norm = $(norm(u4_test - u_new))"
-    # end
-    # @assert norm(u4_test - u_new) < 1e-8 "Implicit solve failed, norm = $(norm(u4_test - u_new))", u_new, lhs, u4_test
-
+                               implicit_solver = nothing)
     @unpack A, TA = source_terms
     @unpack gamma = eq
     p = pressure(eq, lhs)
     T = p / lhs[1]
     KT = A * exp(-TA / T)
     u4 = lhs[4] / (1.0 - coefficient * (-KT))
-    u4 = max(u4, 0.0) # Ensure Z remains positive
-    u4 = min(u4, 1.0) # Ensure Z remains below 1
     u_new = SVector(lhs[1], lhs[2], lhs[3], u4)
-
-    @assert isnan(norm(u_new))==false "NaN in u_new", pressure(eq, lhs)
-
-    # @show u_new, lhs
 
     return u_new
 end
-
-# function compute_face_residual!(eq::EulerReactive1D, grid, op, cache,
-#                                 problem, scheme::Scheme{<:cRKSolver}, param, aux, t, dt,
-#                                 u1, Fb,
-#                                 Ub, ua, res, scaling_factor = 1.0)
-#     @timeit aux.timer "Face residual" begin
-#     #! format: noindent
-#     @unpack xg, wg, bl, br = op
-#     nd = op.degree + 1
-#     nx = grid.size
-#     @unpack dx, xf = grid
-#     num_flux = scheme.numerical_flux
-#     @unpack blend = aux
-#     @unpack u1_b = cache
-
-#     # Vertical faces, x flux
-#     for i in 1:(nx + 1)
-#         alp = 0.5 * (blend.alpha[i-1] + blend.alpha[i])
-#         x = xf[i]
-#         local ul, ur
-#         if alp ≈ 1.0 # This doesn't matter because it is multiplied by zero later
-#             # this is just to avoid the positivity error
-#             # Face between i-1 and i
-#             ul = get_node_vars(u1, eq, nd, i - 1)  # Right of cell i-1
-#             ur = get_node_vars(u1, eq, 1, i)       # Left of cell i
-#         else
-#             ul = get_node_vars(u1_b, eq, nd, i - 1)  # Right of cell i-1
-#             ur = get_node_vars(u1_b, eq, 1, i)       # Left of cell i
-#             # ul = get_node_vars(ua, eq, i - 1)  # Right of cell i-1
-#             # ur = get_node_vars(ua, eq, i)       # Left of cell i
-#         end
-#         @views Fn = num_flux(x, ul, ur, Fb[:, 2, i - 1], Fb[:, 1, i],
-#                             Ub[:, 2, i - 1], Ub[:, 1, i], eq, 1)
-
-#         Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid,
-#                                                    op, problem,
-#                                                    scheme, param, Fn, aux, nothing,
-#                                                    res, scaling_factor)
-#         for ix in 1:nd
-#             for n in 1:nvariables(eq)
-#                 res[n, ix, i - 1] += dt / dx[i - 1] * blend_fac[1] * Fn[n] * br[ix]
-#                 res[n, ix, i] += dt / dx[i] * blend_fac[2] * Fn[n] * bl[ix]
-#             end
-#         end
-#     end
-#     return nothing
-#     end # timer
-# end
 
 function get_equation(gamma, q0)
     numfluxes = Dict{String, Function}("rusanov" => rusanov)

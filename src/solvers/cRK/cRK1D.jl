@@ -358,6 +358,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
         # Add Bu_x and source terms contribution to u2
         for i in 1:nd
             x_ = xc - 0.5 * dx + xg[i] * dx
+            # TODO - implement cache_node_vars (for Svärd's Burgers' test?)
             # cache_node = get_cache_node(cache, i, cell)
             u_node = get_node_vars(u1, eq, i, cell)
             s_node = calc_source(u_node, x_, t, source_terms, eq)
