@@ -18,6 +18,7 @@ using DelimitedFiles
 using LoopVectorization
 using MuladdMacro
 using JSON3
+using SimpleNonlinearSolve
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -343,6 +344,16 @@ end
     mul!(C, A1, B1)         # C = A1 * B1
     mul!(C, A2, B2, a2, a1) # C = a1 * C + a2 * A2 * B2
     return nothing
+end
+
+function newton_solver_tenkai(func, y0, tol = 1e-14, maxiters = 1e3)
+    p = nothing # The func doesn't have any parameters
+    f = (x, p) -> func(x)
+    prob = NonlinearProblem{false}(f, y0, p)
+    sol = SimpleNonlinearSolve.solve(prob, SimpleNewtonRaphson(), abstol = tol,
+                                     reltol = tol, verbose = true,
+                                     maxiters = maxiters)
+    return sol.u
 end
 
 #------------------------------------------------------------------------------

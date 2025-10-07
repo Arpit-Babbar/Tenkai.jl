@@ -12,12 +12,13 @@ using DelimitedFiles
 
 using Tenkai
 using Tenkai.Basis
-using Tenkai: correct_variable_bound_limiter!, test_variable_bound_limiter!
-using Tenkai: limit_variable_slope
+using Tenkai: test_variable_bound_limiter!
+using Tenkai: limit_variable_slope, newton_solver_tenkai, sum_node_vars_1d
 
 (import Tenkai: flux, prim2con, con2prim, limit_slope, zhang_shu_flux_fix,
                 apply_bound_limiter!, initialize_plot,
-                write_soln!, compute_time_step, post_process_soln)
+                write_soln!, compute_time_step, post_process_soln,
+                correct_variable_bound_limiter!)
 
 using Tenkai: eachvariable, PlotData, get_filename
 
@@ -315,7 +316,6 @@ function iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
     remaining_variables = Base.tail(variables)
 
     correct_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
-    correct_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
 
     # test_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
     iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
@@ -326,6 +326,75 @@ end
 function iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
                                           u1, aux, variables::Tuple{})
     return nothing
+end
+
+function correct_variable_bound_limiter!(variable::typeof(det_constraint),
+                                         eq::AbstractEquations{1}, grid, op, ua, u1)
+    @unpack Vl, Vr = op
+    nx = grid.size
+    nd = op.degree + 1
+    eps = 1e-10 # TODO - Get a better one
+    # Loop to find var_avg_min
+    var_avg_min = 1e20
+    for element in 1:nx
+        ua_ = get_node_vars(ua, eq, element)
+        var = variable(eq, ua_)
+        var_avg_min = min(var_avg_min, var)
+    end
+    @assert var_avg_min>0.0 "The average value of the variable is non-positive"
+    eps = min(eps, 0.1 * var_avg_min)
+    for element in 1:nx
+        var_ll = var_rr = 0.0
+        var_min = 1e20
+        local theta = 1.0
+        ua_node = get_node_vars(ua, eq, element)
+        for i in Base.OneTo(nd)
+            u_node = get_node_vars(u1, eq, i, element)
+            func1(theta) = variable(eq, theta * u_node + (1 - theta) * ua_node) - eps
+            var = variable(eq, u_node)
+            if var < eps
+                theta_ = newton_solver_tenkai(func1, 1.0)
+                theta = min(theta, theta_)
+            end
+            var_min = min(var_min, var)
+        end
+        var_min = min(var_min, var_ll, var_rr)
+
+        # In order to correct the solution at the faces, we need to extrapolate it to faces
+        # and then correct it.
+        ul = sum_node_vars_1d(Vl, u1, eq, 1:nd, element) # ul = ∑ Vl*u
+        ur = sum_node_vars_1d(Vr, u1, eq, 1:nd, element) # ur = ∑ Vr*u
+
+        func2(theta) = variable(eq, theta * ul + (1 - theta) * ua_node) - eps
+        var = variable(eq, ul)
+        if var < eps
+            theta_ = newton_solver_tenkai(func2, 1.0)
+            theta = min(theta, theta_)
+        end
+        func3(theta) = variable(eq, theta * ur + (1 - theta) * ua_node) - eps
+        var = variable(eq, ur)
+        if var < eps
+            theta_ = newton_solver_tenkai(func3, 1.0)
+            theta = min(theta, theta_)
+        end
+
+        # theta = max(theta, 0.0)
+        theta = min(theta, 1.0)
+        if theta < 0.0
+            @warn "Negative theta = $theta"
+            theta = 0.0
+        end
+        # @show theta
+        if theta < 1.0
+            for i in 1:nd
+                u_node = get_node_vars(u1, eq, i, element)
+                multiply_add_set_node_vars!(u1,
+                                            theta, u_node,
+                                            1 - theta, ua_node,
+                                            eq, i, element)
+            end
+        end
+    end
 end
 
 function Tenkai.apply_bound_limiter!(eq::TenMoment1D, grid, scheme, param, op, ua,
