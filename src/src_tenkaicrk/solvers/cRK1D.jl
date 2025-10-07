@@ -238,7 +238,7 @@ end
     end # timer
 end
 
-import Tenkai: compute_cell_residual_cRK!
+import Tenkai: compute_cell_residual_cRK!, update_solution_cRK!
 function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
                                     problem, scheme::Scheme{<:cIMEX111}, aux, t, dt,
                                     cache)
@@ -261,6 +261,48 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
         end
     end
     return nothing
+end
+
+@inbounds @inline function update_solution_cRK!(u1, eq::AbstractEquations{1}, grid,
+                                                problem::Problem{<:Any},
+                                                scheme::Scheme{<:cIMEX111}, res, aux,
+                                                t, dt)
+    @timeit aux.timer "Update solution" begin
+    #! format: noindent
+    @unpack source_terms = problem
+    nx = grid.size
+
+    for cell in Base.OneTo(nx)
+        xc = grid.xc[cell]
+
+        # To be used as initial guess for the implicit solve
+        # The numerical flux has already been added to it. Is that okay?
+        u_node = get_node_vars(u1, eq, 1, cell)
+
+        res_node = get_node_vars(res, eq, 1, cell)
+
+        lhs = u_node - res_node # lhs in the implicit source solver
+
+        # lhs = u_node
+
+        aux_node = get_cache_node_vars(aux, u1, problem, scheme, eq, 1, cell)
+
+        # Implicit solver evolution
+        u_node_implicit = implicit_source_solve(lhs, eq, xc, t, dt, source_terms,
+                                                aux_node)
+
+        s_node_implicit = calc_source(u_node_implicit, xc, t, source_terms, eq)
+        multiply_add_to_node_vars!(u1, dt, s_node_implicit, eq, 1, cell)
+        multiply_add_to_node_vars!(u1, -1.0, res_node, eq, 1, cell)
+
+        # set_node_vars!(u1, u_node_implicit - res_node + dt*s_node_implicit, eq, 1, cell)
+        # @assert maximum(u_node_implicit - lhs - dt*s_node_implicit) < 1e-12 u_node_implicit, lhs + dt*s_node_implicit, u_node_implicit - lhs - dt*s_node_implicit
+        # set_node_vars!(u1, lhs + dt*s_node_implicit, eq, 1, cell)
+        set_node_vars!(u1, u_node_implicit, eq, 1, cell)
+    end
+
+    return nothing
+    end # timer
 end
 
 function implicit_source_solve(lhs, eq, x, t, coefficient, source_terms, u_node,

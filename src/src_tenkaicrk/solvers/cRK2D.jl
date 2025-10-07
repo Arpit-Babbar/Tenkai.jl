@@ -17,7 +17,7 @@ using Tenkai.Equations: nvariables, eachvariable
 using Tenkai: refresh!
 
 import Tenkai: extrap_bflux!, get_bflux_function, setup_arrays,
-               compute_cell_residual_cRK!
+               compute_cell_residual_cRK!, update_solution_cRK!
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -32,6 +32,44 @@ function update_ghost_values_ub_N!(problem, scheme, eq::AbstractEquations{2}, gr
                                    op,
                                    cache, t, dt)
     return nothing # To be implemented
+end
+
+function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
+                                    problem, scheme::Scheme{<:cIMEX111}, aux, t, dt,
+                                    cache)
+    @timeit aux.timer "Cell Residual" begin
+    #! format: noindent
+    nx, ny = grid.size
+    refresh!(u) = fill!(u, zero(eltype(u)))
+
+    @unpack u1, res, Fb, Ub, = cache
+
+    refresh!.((res, Ub, Fb)) # Reset previously used variables to zero
+
+    @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
+        el_x, el_y = element[1], element[2]
+        x, y = grid.xc[el_x], grid.yc[el_y]
+
+        id = Threads.threadid()
+
+        u1_ = @view u1[:, :, :, el_x, el_y]
+        Ub_ = @view Ub[:, :, :, el_x, el_y]
+        Fb_ = @view Fb[:, :, :, el_x, el_y]
+
+        u_node = get_node_vars(u1_, eq, 1, 1)
+        flux1, flux2 = flux(x, y, u_node, eq)
+
+        for face in 1:2
+            set_node_vars!(Ub_, u_node, eq, 1, face)
+            set_node_vars!(Fb_, flux1, eq, 1, face)
+        end
+
+        for face in 3:4
+            set_node_vars!(Ub_, u_node, eq, 1, face)
+            set_node_vars!(Fb_, flux2, eq, 1, face)
+        end
+    end
+    end # timer
 end
 
 function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
@@ -314,6 +352,48 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
         @views compute_bflux!(eq, scheme, grid, cell_data, eval_data, xg, Vl, Vr,
                               F, G, Fb[:, :, :, el_x, el_y], aux)
     end
+    end # timer
+end
+
+@inbounds @inline function update_solution_cRK!(u1, eq::AbstractEquations{2}, grid,
+                                                problem::Problem{<:Any},
+                                                scheme::Scheme{<:cIMEX111}, res, aux,
+                                                t, dt)
+    @timeit aux.timer "Update solution" begin
+    #! format: noindent
+    nx, ny = grid.size
+
+    @unpack source_terms = problem
+
+    @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
+        el_x, el_y = element[1], element[2]
+        x, y = grid.xc[el_x], grid.yc[el_y]
+        X = SVector(x, y)
+
+        id = Threads.threadid()
+
+        u1_ = @view u1[:, :, :, el_x, el_y]
+
+        u_node = get_node_vars(u1_, eq, 1, 1)
+        res_node = get_node_vars(res, eq, 1, 1, el_x, el_y)
+
+        lhs = u_node - res_node # lhs in the implicit source solver
+
+        # Implicit solver evolution
+        u_node_implicit = implicit_source_solve(lhs, eq, X, t, dt, source_terms,
+                                                u_node) # u_node used as initial guess
+
+        s_node_implicit = calc_source(u_node_implicit, X, t, source_terms, eq)
+        multiply_add_to_node_vars!(u1, dt, s_node_implicit, eq, 1, 1, el_x, el_y)
+        multiply_add_to_node_vars!(u1, -1.0, res_node, eq, 1, 1, el_x, el_y)
+
+        # set_node_vars!(u1, u_node_implicit - res_node + dt*s_node_implicit, eq, 1, cell)
+        # @assert maximum(u_node_implicit - lhs - dt*s_node_implicit) < 1e-12 u_node_implicit, lhs + dt*s_node_implicit, u_node_implicit - lhs - dt*s_node_implicit
+        # set_node_vars!(u1, lhs + dt*s_node_implicit, eq, 1, cell)
+        set_node_vars!(u1, u_node_implicit, eq, 1, 1, el_x, el_y)
+    end
+
+    return nothing
     end # timer
 end
 end # muladd
