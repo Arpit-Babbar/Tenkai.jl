@@ -203,6 +203,18 @@ end
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
 end
 
+@testset "Ten Moment super stiff 2D" begin
+    trixi_include(joinpath(cRK_examples_dir(), "2d",
+                           "run_tenmom_two_rare_source_super_stiff.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.02, nx = 5, ny = 5,
+                  degree = 0, bound_limit = "no", limiter = setup_limiter_none(),
+                  solver = cIMEX111())
+    data_name = "tenmom_two_rare_source_super_stiff_2d_cimex111.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+end
+
 @testset "Shock diffraction reactive" begin
     trixi_include(joinpath(cRK_examples_dir(), "2d",
                            "run_reactive_euler_shock_diffraction.jl"),
