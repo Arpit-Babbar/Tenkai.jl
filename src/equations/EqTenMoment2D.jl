@@ -13,17 +13,15 @@ using WriteVTK
 
 using Tenkai
 using Tenkai.Basis
-using Tenkai: correct_variable!
-using Tenkai: limit_variable_slope
 
 using Tenkai.CartesianGrids: CartesianGrid2D, save_mesh_file
 
 import Tenkai: flux, prim2con, con2prim, limit_slope, zhang_shu_flux_fix,
                apply_bound_limiter!, initialize_plot,
                write_soln!, compute_time_step, post_process_soln,
-               eigmatrix
+               eigmatrix, correct_variable!, limit_variable_slope
 
-using Tenkai: eachvariable, PlotData, get_filename
+using Tenkai: eachvariable, PlotData, get_filename, find_theta, admissibility_tolerance
 
 using MuladdMacro
 
@@ -370,6 +368,86 @@ function Tenkai.apply_bound_limiter!(eq::TenMoment2D, grid, scheme, param, op, u
     iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua, u1, aux,
                                      variables)
     return nothing
+end
+
+function correct_variable!(eq::TenMoment2D, variable::typeof(det_constraint), op, aux,
+                           grid,
+                           u1, ua, eps_ = 1e-12)
+    @unpack Vl, Vr = op
+    @unpack aux_cache = aux
+    @unpack bound_limiter_cache = aux_cache
+    @unpack xc, yc = grid
+    nx, ny = grid.size
+    nd = op.degree + 1
+
+    # Very awkward way to fix type instability
+    # Source - https://discourse.julialang.org/t/type-instability-of-nested-function/57007
+    var_min_avg = Ref(1e-10)
+    @threaded for element in CartesianIndices((1:nx, 1:ny))
+        el_x, el_y = element[1], element[2]
+        ua_ = get_node_vars(ua, eq, el_x, el_y)
+        var_min_avg[] = min(var_min_avg[], variable(eq, ua_))
+        if var_min_avg[] < admissibility_tolerance(eq)
+            @show variable
+            println("Positivity limiter failed in element ", el_x, " ", el_y,
+                    "with centre ", xc[el_x], ", ", yc[el_y])
+            println("Value = ", variable(eq, ua_), " tolerance = ",
+                    admissibility_tolerance(eq))
+            throw(DomainError((var_min_avg[])))
+        end
+    end
+
+    eps = min(var_min_avg[], eps_)
+
+    variable_(u_) = variable(eq, u_)
+
+    refresh!(u) = fill!(u, zero(eltype(u)))
+    @threaded for element in CartesianIndices((1:nx, 1:ny))
+        el_x, el_y = element[1], element[2]
+        # var_ll, var_rr, var_dd, var_uu = aux_cache.bound_limiter_cache[Threads.threadid()]
+        # @views var_ll, var_rr, var_dd, var_uu = (a[1,:] for a in
+        #                                           bound_limiter_cache[Threads.threadid()])
+        u_ll, u_rr, u_dd, u_uu = aux_cache.bound_limiter_cache[Threads.threadid()]
+        u1_ = @view u1[:, :, :, el_x, el_y]
+
+        ua_ = get_node_vars(ua, eq, el_x, el_y)
+
+        local theta = 1.0
+        refresh!.((u_ll, u_rr, u_dd, u_uu))
+        # refresh!.((var_ll, var_rr, var_dd, var_uu))
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            u_node = get_node_vars(u1_, eq, i, j)
+            theta = min(theta, find_theta(eq, variable, u_node, ua_, eps))
+
+            # Perform extrapolations to face
+            multiply_add_to_node_vars!(u_ll, Vl[i], u_node, eq, j)
+            multiply_add_to_node_vars!(u_rr, Vr[i], u_node, eq, j)
+            multiply_add_to_node_vars!(u_dd, Vl[j], u_node, eq, i)
+            multiply_add_to_node_vars!(u_uu, Vr[j], u_node, eq, i)
+        end
+
+        # Now to get the complete minimum, compute var_min at face values as well
+        for k in Base.OneTo(nd)
+            u_ll_node = get_node_vars(u_ll, eq, k)
+            u_rr_node = get_node_vars(u_rr, eq, k)
+            u_dd_node = get_node_vars(u_dd, eq, k)
+            u_uu_node = get_node_vars(u_uu, eq, k)
+            theta = min(theta, find_theta(eq, variable, u_ll_node, ua_, eps))
+            theta = min(theta, find_theta(eq, variable, u_rr_node, ua_, eps))
+            theta = min(theta, find_theta(eq, variable, u_dd_node, ua_, eps))
+            theta = min(theta, find_theta(eq, variable, u_uu_node, ua_, eps))
+        end
+
+        if theta < 1.0
+            for j in Base.OneTo(nd), i in Base.OneTo(nd)
+                u_node = get_node_vars(u1_, eq, i, j)
+                multiply_add_set_node_vars!(u1_,
+                                            theta, u_node,
+                                            1.0 - theta, ua_,
+                                            eq, i, j)
+            end
+        end
+    end
 end
 
 function eigmatrix(eq::TenMoment2D, u)
@@ -939,13 +1017,30 @@ function Tenkai.zhang_shu_flux_fix(eq::TenMoment2D,
     uhigh = uprev - c * (Fn - fn_inner) # Second candidate for uhigh
     p_low, p_high = det_constraint(eq, ulow), det_constraint(eq, uhigh)
     eps = 0.1 * p_low
-    ratio = abs(eps - p_low) / (abs(p_high - p_low) + 1e-13)
-    theta = min(ratio, 1.0)
+    theta = find_theta(eq, uhigh, ulow, det_constraint, eps)
     if theta < 1.0
         Fn = theta * Fn + (1.0 - theta) * fn # Final flux
     end
 
     return Fn
+end
+
+function limit_variable_slope(eq::TenMoment2D, variable::typeof(det_constraint), slope,
+                              u_star_ll, u_star_rr, ue, xl, xr)
+    # By Jensen's inequality, we can find theta's directly for the primitives
+    var_star_ll, var_star_rr = variable(eq, u_star_ll), variable(eq, u_star_rr)
+    var_low = variable(eq, ue)
+    threshold = 0.1 * var_low
+    eps = 1e-10
+    if var_star_ll < eps || var_star_rr < eps
+        theta_ll = find_theta(eq, variable, u_star_ll, ue, threshold)
+        theta_rr = find_theta(eq, variable, u_star_rr, ue, threshold)
+        theta = min(theta_ll, theta_rr, 1.0)
+        slope *= theta
+        u_star_ll = ue + 2.0 * xl * slope
+        u_star_rr = ue + 2.0 * xr * slope
+    end
+    return slope, u_star_ll, u_star_rr
 end
 
 function Tenkai.limit_slope(eq::TenMoment2D, slope, ufl, u_star_ll, ufr, u_star_rr,

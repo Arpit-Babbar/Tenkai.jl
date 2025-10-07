@@ -13,12 +13,12 @@ using DelimitedFiles
 using Tenkai
 using Tenkai.Basis
 using Tenkai: test_variable_bound_limiter!
-using Tenkai: limit_variable_slope, newton_solver_tenkai, sum_node_vars_1d
+using Tenkai: newton_solver_tenkai, sum_node_vars_1d, find_theta
 
 (import Tenkai: flux, prim2con, con2prim, limit_slope, zhang_shu_flux_fix,
                 apply_bound_limiter!, initialize_plot,
                 write_soln!, compute_time_step, post_process_soln,
-                correct_variable_bound_limiter!)
+                correct_variable_bound_limiter!, limit_variable_slope)
 
 using Tenkai: eachvariable, PlotData, get_filename
 
@@ -344,47 +344,27 @@ function correct_variable_bound_limiter!(variable::typeof(det_constraint),
     @assert var_avg_min>0.0 "The average value of the variable is non-positive"
     eps = min(eps, 0.1 * var_avg_min)
     for element in 1:nx
-        var_ll = var_rr = 0.0
-        var_min = 1e20
         local theta = 1.0
         ua_node = get_node_vars(ua, eq, element)
         for i in Base.OneTo(nd)
             u_node = get_node_vars(u1, eq, i, element)
-            func1(theta) = variable(eq, theta * u_node + (1 - theta) * ua_node) - eps
-            var = variable(eq, u_node)
-            if var < eps
-                theta_ = newton_solver_tenkai(func1, 1.0)
-                theta = min(theta, theta_)
-            end
-            var_min = min(var_min, var)
+            theta = min(theta, find_theta(eq, variable, u_node, ua_node, eps))
         end
-        var_min = min(var_min, var_ll, var_rr)
 
         # In order to correct the solution at the faces, we need to extrapolate it to faces
         # and then correct it.
         ul = sum_node_vars_1d(Vl, u1, eq, 1:nd, element) # ul = ∑ Vl*u
         ur = sum_node_vars_1d(Vr, u1, eq, 1:nd, element) # ur = ∑ Vr*u
 
-        func2(theta) = variable(eq, theta * ul + (1 - theta) * ua_node) - eps
-        var = variable(eq, ul)
-        if var < eps
-            theta_ = newton_solver_tenkai(func2, 1.0)
-            theta = min(theta, theta_)
-        end
-        func3(theta) = variable(eq, theta * ur + (1 - theta) * ua_node) - eps
-        var = variable(eq, ur)
-        if var < eps
-            theta_ = newton_solver_tenkai(func3, 1.0)
-            theta = min(theta, theta_)
-        end
+        theta = min(theta, find_theta(eq, variable, ul, ua_node, eps))
+        theta = min(theta, find_theta(eq, variable, ur, ua_node, eps))
 
-        # theta = max(theta, 0.0)
         theta = min(theta, 1.0)
         if theta < 0.0
             @warn "Negative theta = $theta"
             theta = 0.0
         end
-        # @show theta
+
         if theta < 1.0
             for i in 1:nd
                 u_node = get_node_vars(u1, eq, i, element)
@@ -450,14 +430,29 @@ function Tenkai.zhang_shu_flux_fix(eq::TenMoment1D,
 
     uhigh = uprev - c * (Fn - fn_inner) # Second candidate for uhigh
     p_low, p_high = det_constraint(eq, ulow), det_constraint(eq, uhigh)
-    eps = 0.1 * p_low
-    ratio = abs(eps - p_low) / (abs(p_high - p_low) + 1e-13)
-    theta = min(ratio, 1.0)
-    if theta < 1.0
-        Fn = theta * Fn + (1.0 - theta) * fn # Final flux
-    end
+    eps = min(0.1 * p_low, 1e-10)
+    theta = find_theta(eq, det_constraint, uhigh, ulow, eps)
+    Fn = theta * Fn + (1.0 - theta) * fn # Final flux
 
     return Fn
+end
+
+function limit_variable_slope(eq::TenMoment1D, variable::typeof(det_constraint), slope,
+                              u_star_ll, u_star_rr, ue, xl, xr)
+    # By Jensen's inequality, we can find theta's directly for the primitives
+    var_star_ll, var_star_rr = variable(eq, u_star_ll), variable(eq, u_star_rr)
+    var_low = variable(eq, ue)
+    threshold = 0.1 * var_low
+    eps = 1e-10
+    if var_star_ll < eps || var_star_rr < eps
+        theta_ll = find_theta(eq, variable, u_star_ll, ue, threshold)
+        theta_rr = find_theta(eq, variable, u_star_rr, ue, threshold)
+        theta = min(theta_ll, theta_rr, 1.0)
+        slope *= theta
+        u_star_ll = ue + 2.0 * xl * slope
+        u_star_rr = ue + 2.0 * xr * slope
+    end
+    return slope, u_star_ll, u_star_rr
 end
 
 function Tenkai.limit_slope(eq::TenMoment1D, slope, ufl, u_star_ll, ufr, u_star_rr,

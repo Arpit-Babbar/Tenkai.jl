@@ -356,6 +356,16 @@ function newton_solver_tenkai(func, y0, tol = 1e-14, maxiters = 1e3)
     return sol.u
 end
 
+function find_theta(eq::AbstractEquations, variable, u, ua, eps)
+    var = variable(eq, u)
+    if var >= eps
+        return 1.0
+    end
+    func(theta) = variable(eq, theta * u + (1 - theta) * ua) - eps
+    theta = newton_solver_tenkai(func, 1.0)
+    return theta
+end
+
 #------------------------------------------------------------------------------
 # Static array operations
 #-----------------------------------------------------------------------------

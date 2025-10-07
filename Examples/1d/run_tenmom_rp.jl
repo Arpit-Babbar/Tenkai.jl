@@ -13,7 +13,7 @@ boundary_value = dummy_bv
 exact_solution_rp(x, t) = initial_value(x)
 exact_solution = exact_solution_rp
 
-degree = 2
+degree = 3
 solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
@@ -45,7 +45,7 @@ limiter = setup_limiter_blend(blend_type = mh_blend(eq),
                               indicator_model = "gassner"
                               # pure_fv = true
                               )
-limiter = setup_limiter_tvb(eq; tvbM = tvbM, beta = 1.4)
+# limiter = setup_limiter_tvb(eq; tvbM = tvbM, beta = 1.4)
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
