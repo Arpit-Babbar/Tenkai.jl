@@ -50,9 +50,9 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver}, eq::AbstractEquations{2
     # Cell residual cache
 
     nt = Threads.nthreads()
-    cell_array_sizes = Dict(1 => 11, 2 => 12, 3 => 15, 4 => 16)
-    big_eval_data_sizes = Dict(1 => 12, 2 => 32, 3 => 40, 4 => 56)
-    small_eval_data_sizes = Dict(1 => 4, 2 => 4, 3 => 4, 4 => 4)
+    cell_array_sizes = Dict(0 => 0, 1 => 11, 2 => 12, 3 => 15, 4 => 16)
+    big_eval_data_sizes = Dict(0 => 0, 1 => 12, 2 => 32, 3 => 40, 4 => 56)
+    small_eval_data_sizes = Dict(0 => 0, 1 => 4, 2 => 4, 3 => 4, 4 => 4)
     if bflux_ind == extrapolate
         cell_array_size = cell_array_sizes[degree]
         big_eval_data_size = 2
