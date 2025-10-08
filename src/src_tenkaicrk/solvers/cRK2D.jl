@@ -561,10 +561,10 @@ end
     end
 end
 
-@inbounds @inline function update_solution_cRK!(u1, eq::AbstractEquations{2}, grid,
-                                                op, problem::Problem{<:Any},
-                                                scheme::Scheme{<:cIMEX111}, res, aux,
-                                                t, dt)
+@inbounds function update_solution_cRK!(u1, eq::AbstractEquations{2}, grid,
+                                        op, problem::Problem{<:Any},
+                                        scheme::Scheme{<:cIMEX111}, res, aux,
+                                        t, dt)
     @timeit aux.timer "Update solution" begin
     #! format: noindent
     nx, ny = grid.size

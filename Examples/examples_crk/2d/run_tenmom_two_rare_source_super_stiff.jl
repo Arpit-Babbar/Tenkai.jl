@@ -41,10 +41,31 @@ function gauss_source_y(x, y, t)
     return factor() * der_factor * exp(a)
 end
 
-source_term = (u, x, t, equations::Eq.TenMoment2D) -> Eq.ten_moment_source(u, x[1], x[2], t,
-                                                                           gauss_source_x,
-                                                                           gauss_source_y,
-                                                                           equations)
+struct MyTenMomentSource{WX, WY}
+    Wx::WX
+    Wy::WY
+end
+
+function (source::MyTenMomentSource)(u, x, t, equations::Eq.TenMoment2D)
+    Wx = source.Wx(x[1], x[2], t)
+    Wy = source.Wy(x[1], x[2], t)
+    rho = u[1]
+    rho_v1 = u[2]
+    rho_v2 = u[3]
+    term1 = SVector(0.0, -0.5 * rho * Wx, 0.0, -0.5 * rho_v1 * Wx, -0.25 * rho_v2 * Wx,
+                    0.0)
+    term2 = SVector(0.0, 0.0, -0.5 * rho * Wy, 0.0, -0.25 * rho_v1 * Wy,
+                    -0.5 * rho_v2 * Wy)
+    return term1 + term2
+end
+
+source_term1 = (u, x, t, equations::Eq.TenMoment2D) -> Eq.ten_moment_source(u, x[1], x[2],
+                                                                            t,
+                                                                            gauss_source_x,
+                                                                            gauss_source_y,
+                                                                            equations)
+
+source_term = MyTenMomentSource(gauss_source_x, gauss_source_y)
 
 initial_value, exact_solution, boundary_value = initial_wave, exact_wave, dummy_bv
 
