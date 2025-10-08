@@ -1283,16 +1283,18 @@ function Blend(eq::AbstractEquations{2}, op, grid,
                            get_element_alpha = get_element_alpha_other_limiter,
                            bc_x = no_upwinding_x,
                            numflux = scheme.numerical_flux)
+            parameters = (; positivity_blending = NoPositivityBlending())
             cache = (;
                      dt = MVector(1.0e20), fn_low, alpha = EmptyZeros(Float64))
             # If limiter is not blend, replace blending with 'do nothing functions'
-            return (; subroutines, cache, uEltype = Float64) # TODO - Load uEltype from aux.cache
+            return (; subroutines, cache, parameters, uEltype = Float64) # TODO - Load uEltype from aux.cache
         else
             fn_low = OffsetArray(zeros(nvar,
                                        nd, # Dofs on each face
                                        4,  # 4 faces
                                        nx + 2, ny + 2),
                                  OffsetArrays.Origin(1, 1, 1, 0, 0))
+            parameters = (; positivity_blending = NoPositivityBlending())
             subroutines = (; blend_cell_residual! = trivial_cell_residual,
                            blend_face_residual_x! = trivial_face_residual,
                            blend_face_residual_y! = trivial_face_residual,
@@ -1300,7 +1302,7 @@ function Blend(eq::AbstractEquations{2}, op, grid,
             cache = (;
                      dt = MVector(1.0e20), fn_low)
             # If limiter is not blend, replace blending with 'do nothing functions'
-            return (; subroutines, cache, uEltype = Float64) # TODO - Load uEltype from aux.cache
+            return (; subroutines, cache, parameters, uEltype = Float64) # TODO - Load uEltype from aux.cache
         end
     end
 
@@ -1310,7 +1312,7 @@ function Blend(eq::AbstractEquations{2}, op, grid,
     indicator_model, amax, constant_node_factor,
     smooth_alpha, smooth_factor,
     c, a, amin, tvbM,
-    super_debug, debug_blend, pure_fv, bc_x, numflux) = limiter
+    super_debug, debug_blend, pure_fv, bc_x, numflux, positivity_blending) = limiter
 
     @unpack xc, yc, xf, yf, dx, dy = grid
     # @assert Threads.nthreads() == 1
@@ -1327,7 +1329,7 @@ function Blend(eq::AbstractEquations{2}, op, grid,
     parameters = (; E1, E0, tolE, amax, a0, a1, constant_node_factor,
                   smooth_alpha, smooth_factor,
                   c, a, amin, tvbM, super_debug,
-                  pure_fv, debug = debug_blend)
+                  pure_fv, positivity_blending, debug = debug_blend)
 
     # Big arrays
     E = zeros(nx, ny)

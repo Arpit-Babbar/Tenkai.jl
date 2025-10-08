@@ -736,6 +736,12 @@ end
 #-------------------------------------------------------------------------------
 # Limiter functions
 #-------------------------------------------------------------------------------
+struct NoPositivityBlending end
+
+struct PositivityBlending{Variables}
+    variables::Variables
+end
+
 function setup_limiter_none()
     limiter = (; name = "none")
     return limiter
@@ -750,13 +756,15 @@ function setup_limiter_blend(; blend_type, indicating_variables,
                              debug_blend = false, super_debug = false,
                              pure_fv = false,
                              bc_x = no_upwinding_x, tvbM = 0.0,
-                             numflux = nothing)
+                             numflux = nothing,
+                             positivity_blending = NoPositivityBlending())
     limiter = (; name = "blend", blend_type, indicating_variables,
                reconstruction_variables, indicator_model,
                amax, smooth_alpha, smooth_factor,
                constant_node_factor, constant_node_factor2,
                a, c, amin,
-               super_debug, debug_blend, pure_fv, bc_x, tvbM, numflux)
+               super_debug, debug_blend, pure_fv, bc_x, tvbM, numflux,
+               positivity_blending)
     return limiter
 end
 

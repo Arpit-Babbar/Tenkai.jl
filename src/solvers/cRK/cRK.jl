@@ -72,7 +72,7 @@ function evolve_solution!(eq, grid, op, problem, scheme, param, aux, iter, t, dt
                                          dt)
     compute_face_residual!(eq, grid, op, cache, problem, scheme, param, aux, t, dt, u1,
                            Fb, Ub, ua, res)
-    update_solution_cRK!(u1, eq, grid, problem, scheme, res, aux, t, dt) # u1 = u1 - res
+    update_solution_cRK!(u1, eq, grid, op, problem, scheme, res, aux, t, dt) # u1 = u1 - res
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
 end
@@ -146,6 +146,6 @@ function solve_ssfr(eq, problem, scheme::Scheme{<:cRKSolver}, param, grid, op, a
                 "aux" => aux)
 end
 
-@inbounds @inline update_solution_cRK!(u1, eq, grid, problem, scheme, res, aux, t, dt) = update_solution_lwfr!(u1,
+@inbounds @inline update_solution_cRK!(u1, eq, grid, op, problem, scheme, res, aux, t, dt) = update_solution_lwfr!(u1,
                                                                                                                res,
                                                                                                                aux)
