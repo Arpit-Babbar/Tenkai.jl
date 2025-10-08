@@ -1017,7 +1017,7 @@ function Tenkai.zhang_shu_flux_fix(eq::TenMoment2D,
     uhigh = uprev - c * (Fn - fn_inner) # Second candidate for uhigh
     p_low, p_high = det_constraint(eq, ulow), det_constraint(eq, uhigh)
     eps = 0.1 * p_low
-    theta = find_theta(eq, uhigh, ulow, det_constraint, eps)
+    theta = find_theta(eq, det_constraint, uhigh, ulow, eps)
     if theta < 1.0
         Fn = theta * Fn + (1.0 - theta) * fn # Final flux
     end
