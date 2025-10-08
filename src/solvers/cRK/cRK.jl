@@ -147,5 +147,5 @@ function solve_ssfr(eq, problem, scheme::Scheme{<:cRKSolver}, param, grid, op, a
 end
 
 @inbounds @inline update_solution_cRK!(u1, eq, grid, op, problem, scheme, res, aux, t, dt) = update_solution_lwfr!(u1,
-                                                                                                               res,
-                                                                                                               aux)
+                                                                                                                   res,
+                                                                                                                   aux)
