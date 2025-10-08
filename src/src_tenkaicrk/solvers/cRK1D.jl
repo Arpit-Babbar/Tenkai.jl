@@ -271,7 +271,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 end
 
 @inbounds @inline function update_solution_cRK!(u1, eq::AbstractEquations{1}, grid,
-                                                problem::Problem{<:Any},
+                                                op, problem::Problem{<:Any},
                                                 scheme::Scheme{<:cIMEX111}, res, aux,
                                                 t, dt)
     @timeit aux.timer "Update solution" begin

@@ -238,14 +238,16 @@ end
 @testset "Double Mach reflection" begin
     Eq = Tenkai.EqEuler2D
     equation = Eq.get_equation(1.4)
-    filenames = ("dmr_fo_blend.txt", "dmr_mh_blend.txt")
-    blend_types = (fo_blend(equation), mh_blend(equation))
-    for i in 1:2
+    filenames = ("dmr_fo_blend.txt", "dmr_mh_blend.txt", "dmr_mh_blend_crk.txt")
+    blend_types = (fo_blend(equation), mh_blend(equation), mh_blend(equation))
+    solvers = ("lwfr", "lwfr", cRK44())
+    for i in 1:3
         trixi_include(joinpath(examples_dir(), "2d", "run_double_mach_reflection.jl"),
                       save_time_interval = 0.0, save_iter_interval = 0,
                       compute_error_interval = 0,
                       animate = false, final_time = 0.1, ny = 5,
                       degree = 3,
+                      solver = solvers[i],
                       blend_type = blend_types[i])
         data_name = filenames[i]
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)

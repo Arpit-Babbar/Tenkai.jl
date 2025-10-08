@@ -4,7 +4,8 @@ using Tenkai: periodic, dirichlet, neumann, reflect, extrapolate, evaluate,
               get_node_vars, set_node_vars!,
               add_to_node_vars!, subtract_from_node_vars!,
               multiply_add_to_node_vars!, multiply_add_set_node_vars!,
-              comp_wise_mutiply_node_vars!, flux, update_ghost_values_lwfr!
+              comp_wise_mutiply_node_vars!, flux, update_ghost_values_lwfr!,
+              PositivityBlending, NoPositivityBlending, update_solution_lwfr!
 
 using SimpleUnPack
 using TimerOutputs
@@ -27,6 +28,14 @@ import Tenkai: extrap_bflux!, get_bflux_function, setup_arrays,
 #! format: noindent
 
 import Tenkai: setup_arrays
+
+function fo_blend_imex(eq::AbstractEquations{2, <:Any})
+    (;
+     cell_residual! = blend_cell_residual_fo_imex!,
+     face_residual_x! = blend_face_residual_fo_x!,
+     face_residual_y! = blend_face_residual_fo_y!,
+     name = "fo_imex")
+end
 
 function update_ghost_values_ub_N!(problem, scheme, eq::AbstractEquations{2}, grid, aux,
                                    op,
@@ -355,8 +364,205 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
     end # timer
 end
 
+# TODO - Can we avoid this code repetetition? Example, by using the other version with the
+# source terms passed as Nothing.
+function blend_cell_residual_fo_imex!(el_x, el_y, eq::AbstractEquations{2}, problem,
+                                      scheme,
+                                      aux, t, dt, grid, dx, dy, xf, yf, op, u1, u_, f,
+                                      res,
+                                      scaling_factor = 1.0)
+    @timeit_debug aux.timer "Blending limiter" begin
+    #! format: noindent
+    @unpack blend = aux
+    @unpack Vl, Vr, xg, wg = op
+    @unpack source_terms = problem
+    num_flux = scheme.numerical_flux
+    nd = length(xg)
+
+    id = Threads.threadid()
+    xxf, yyf = blend.cache.subcell_faces[id]
+    @unpack fn_low = blend.cache
+    alpha = blend.cache.alpha[el_x, el_y]
+
+    u = @view u1[:, :, :, el_x, el_y]
+    r = @view res[:, :, :, el_x, el_y]
+    blend_resl = @view blend.cache.resl[:, :, :, el_x, el_y]
+    blend_resl .= zero(eltype(blend_resl))
+
+    if alpha < 1e-12
+        store_low_flux!(u, el_x, el_y, xf, yf, dx, dy, op, blend, eq,
+                        scaling_factor)
+        return nothing
+    end
+
+    # limit the higher order part
+    lmul!(1.0 - alpha, r)
+
+    # compute subcell faces
+    xxf[0], yyf[0] = xf, yf
+    for ii in Base.OneTo(nd)
+        xxf[ii] = xxf[ii - 1] + dx * wg[ii]
+        yyf[ii] = yyf[ii - 1] + dy * wg[ii]
+    end
+
+    # loop over vertical inner faces between (ii-1,jj) and (ii,jj)
+    for ii in 2:nd # skipping the supercell face for blend_face_residual
+        xx = xxf[ii - 1] # Face x coordinate, offset because index starts from 0
+        for jj in Base.OneTo(nd)
+            yy = yf + dy * xg[jj] # Face y coordinates picked same as soln points
+            X = SVector(xx, yy)
+            ul, ur = get_node_vars(u, eq, ii - 1, jj), get_node_vars(u, eq, ii, jj)
+            fl, fr = flux(xx, yy, ul, eq, 1), flux(xx, yy, ur, eq, 1)
+            fn = scaling_factor * num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
+            multiply_add_to_node_vars!(r, # r[ii-1,jj]+=alpha*dt/(dx*wg[ii-1])*fn
+                                       alpha * dt / (dx * wg[ii - 1]),
+                                       fn, eq, ii - 1, jj)
+            multiply_add_to_node_vars!(r, # r[ii,jj]+=alpha*dt/(dx*wg[ii])*fn
+                                       -alpha * dt / (dx * wg[ii]),
+                                       fn, eq, ii, jj)
+
+            # TODO - Maybe collect only in blend_resl and then copy to r
+            # or use multiple dispatch to do this only when needed
+            multiply_add_to_node_vars!(blend_resl, # r[ii-1,jj]+=dt/(dx*wg[ii-1])*fn
+                                       dt / (dx * wg[ii - 1]),
+                                       fn, eq, ii - 1, jj)
+            multiply_add_to_node_vars!(blend_resl, # r[ii,jj]+=dt/(dx*wg[ii])*fn
+                                       -dt / (dx * wg[ii]),
+                                       fn, eq, ii, jj)
+            # TOTHINK - Can checking this in every step of the loop be avoided
+            if ii == 2
+                set_node_vars!(fn_low, fn, eq, jj, 1, el_x, el_y)
+            elseif ii == nd
+                set_node_vars!(fn_low, fn, eq, jj, 2, el_x, el_y)
+            end
+        end
+    end
+
+    # loop over horizontal inner faces between (ii,jj-1) and (ii,jj)
+    for jj in 2:nd
+        yy = yyf[jj - 1] # face y coordinate, offset because index starts from 0
+        for ii in Base.OneTo(nd)
+            xx = xf + dx * xg[ii] # face x coordinate picked same as soln pt
+            X = SVector(xx, yy)
+            ul, ur = get_node_vars(u, eq, ii, jj - 1), get_node_vars(u, eq, ii, jj)
+            fl, fr = flux(xx, yy, ul, eq, 2), flux(xx, yy, ur, eq, 2)
+            fn = scaling_factor * num_flux(X, ul, ur, fl, fr, ul, ur, eq, 2)
+            multiply_add_to_node_vars!(r, # r[ii,jj-1]+=alpha*dt/(dy*wg[jj-1])*fn
+                                       alpha * dt / (dy * wg[jj - 1]),
+                                       fn,
+                                       eq, ii, jj - 1)
+            multiply_add_to_node_vars!(r, # r[ii,jj]+=alpha*dt/(dy*wg[jj])*fn
+                                       -alpha * dt / (dy * wg[jj]),
+                                       fn,
+                                       eq, ii, jj)
+
+            # TODO - Maybe collect only in blend_resl and then copy to r
+            # or use multiple dispatch to do this only when needed
+            multiply_add_to_node_vars!(blend_resl, # r[ii,jj-1]+=dt/(dy*wg[jj-1])*fn
+                                       dt / (dy * wg[jj - 1]),
+                                       fn,
+                                       eq, ii, jj - 1)
+
+            multiply_add_to_node_vars!(blend_resl, # r[ii,jj]+=dt/(dy*wg[jj])*fn
+                                       -dt / (dy * wg[jj]),
+                                       fn,
+                                       eq, ii, jj)
+
+            # TOTHINK - Can checking this in every step of the loop be avoided
+            if jj == 2
+                set_node_vars!(fn_low, fn, eq, ii, 3, el_x, el_y)
+            elseif jj == nd
+                set_node_vars!(fn_low, fn, eq, ii, 4, el_x, el_y)
+            end
+        end
+    end
+    end # timer
+end
+
+@inbounds @inline function blend_cell_residual_stiff!(blend_cell_residual!::typeof(blend_cell_residual_fo_imex!),
+                                                      eq,
+                                                      u1, res, grid, problem, op, t, dt,
+                                                      aux)
+    @timeit aux.timer "Update solution implicit source" begin
+    #! format: noindent
+
+    nx, ny = grid.size
+    @unpack xg = op
+    @unpack source_terms = problem
+    @unpack blend = aux
+    blend_res = blend.cache.resl
+    nd = length(xg)
+
+    @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
+        el_x, el_y = element[1], element[2]
+        alpha = blend.cache.alpha[el_x, el_y]
+        xc, yc = grid.xc[el_x], grid.yc[el_y]
+        dx, dy = grid.dx[el_x], grid.dy[el_y]
+
+        for j in 1:nd, i in 1:nd
+            x = xc - 0.5 * dx + xg[i] * dx
+            y = yc - 0.5 * dy + xg[j] * dy
+            X = SVector(x, y)
+
+            u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
+            res_node = get_node_vars(blend_res, eq, i, j, el_x, el_y)
+            lhs = u_node - res_node # lhs in the implicit source solver
+
+            u_node_implicit = implicit_source_solve(lhs, eq, X, t, dt,
+                                                    source_terms,
+                                                    u_node) # u_node used as initial guess
+
+            s_node_implicit = calc_source(u_node_implicit, X, t + dt, source_terms,
+                                          eq)
+
+            multiply_add_to_node_vars!(res, -dt * alpha, s_node_implicit, eq, i, j,
+                                       el_x, el_y)
+        end
+    end
+    end # timer
+end
+
+@inbounds @inline function blend_cell_residual_stiff!(blend_cell_residual!, eq, u1, res,
+                                                      grid,
+                                                      problem, op, t, dt, aux)
+    return nothing
+end
+
+@inbounds @inline function update_with_residuals!(positivity_blending::PositivityBlending,
+                                                  eq::AbstractEquations{2}, u1,
+                                                  res, aux)
+end
+
+@inbounds @inline function update_with_residuals!(positivity_blending::NoPositivityBlending,
+                                                  eq::AbstractEquations{2}, u1,
+                                                  res, aux)
+    update_solution_lwfr!(u1, res, aux)
+end
+
 @inbounds @inline function update_solution_cRK!(u1, eq::AbstractEquations{2}, grid,
-                                                problem::Problem{<:Any},
+                                                op, problem, scheme, res, aux, t, dt)
+    @timeit aux.timer "Update solution" begin
+    #! format: noindent
+
+    nx, ny = grid.size
+    @unpack blend = aux
+
+    # To check if the blending scheme is IMEX
+    @unpack blend_cell_residual! = blend.subroutines
+
+    # Do the source term evolution
+    blend_cell_residual_stiff!(blend_cell_residual!, eq, u1, res, grid, problem, op,
+                               t, dt,
+                               aux)
+
+    @unpack positivity_blending = blend.parameters
+
+    update_with_residuals!(positivity_blending, eq, u1, res, aux)
+    end
+end
+
+@inbounds @inline function update_solution_cRK!(u1, eq::AbstractEquations{2}, grid,
+                                                op, problem::Problem{<:Any},
                                                 scheme::Scheme{<:cIMEX111}, res, aux,
                                                 t, dt)
     @timeit aux.timer "Update solution" begin
@@ -383,7 +589,7 @@ end
         u_node_implicit = implicit_source_solve(lhs, eq, X, t, dt, source_terms,
                                                 u_node) # u_node used as initial guess
 
-        s_node_implicit = calc_source(u_node_implicit, X, t, source_terms, eq)
+        s_node_implicit = calc_source(u_node_implicit, X, t + dt, source_terms, eq)
         multiply_add_to_node_vars!(u1, dt, s_node_implicit, eq, 1, 1, el_x, el_y)
         multiply_add_to_node_vars!(u1, -1.0, res_node, eq, 1, 1, el_x, el_y)
 

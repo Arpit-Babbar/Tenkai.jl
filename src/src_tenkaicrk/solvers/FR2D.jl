@@ -56,73 +56,74 @@ end
 function compute_cell_average!(ua, u1, t, eq::AbstractEquations{2}, grid::StepGrid,
                                problem, scheme, aux, op)
     @timeit aux.timer "Cell averaging" begin
-        nx_tuple, ny_tuple = grid.size
-        @unpack limiter = scheme
-        @unpack xc = grid
-        @unpack xg, wg, Vl, Vr = op
-        @unpack periodic_x, periodic_y = problem
-        @unpack boundary_condition, boundary_value = problem
-        left, right, bottom, top = boundary_condition
-        nd = length(wg)
-        fill!(ua, zero(eltype(ua)))
-        # Compute cell averages
-        @threaded for element_index in element_iterator(grid)
-            element = element_indices(element_index, grid)
-            el_x, el_y = element[1], element[2]
-            u1_ = @view u1[:, :, :, el_x, el_y]
-            for j in Base.OneTo(nd), i in Base.OneTo(nd)
-                u_node = get_node_vars(u1_, eq, i, j)
-                multiply_add_to_node_vars!(ua, wg[i] * wg[j], u_node, eq, el_x, el_y)
-                # Maybe put w2d in op and use it here
-            end
-            # @show element
+    #! format: noindent
+    nx_tuple, ny_tuple = grid.size
+    @unpack limiter = scheme
+    @unpack xc = grid
+    @unpack xg, wg, Vl, Vr = op
+    @unpack periodic_x, periodic_y = problem
+    @unpack boundary_condition, boundary_value = problem
+    left, right, bottom, top = boundary_condition
+    nd = length(wg)
+    fill!(ua, zero(eltype(ua)))
+    # Compute cell averages
+    @threaded for element_index in element_iterator(grid)
+        element = element_indices(element_index, grid)
+        el_x, el_y = element[1], element[2]
+        u1_ = @view u1[:, :, :, el_x, el_y]
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            u_node = get_node_vars(u1_, eq, i, j)
+            multiply_add_to_node_vars!(ua, wg[i] * wg[j], u_node, eq, el_x, el_y)
+            # Maybe put w2d in op and use it here
         end
+        # @show element
+    end
 
-        # left boundary condition is Dirichlet
-        for el_y in (ny_tuple[1] + 1):ny_tuple[2]
-            x = grid.xf[1]
-            for j in Base.OneTo(nd)
-                y = grid.yf[el_y] + grid.dy[el_y] * xg[j]
-                uval = boundary_value(x, y, t)
-                for i in Base.OneTo(nd)
-                    multiply_add_to_node_vars!(ua, wg[i] * wg[j], uval, eq, 0,
-                                               el_y)
-                end
+    # left boundary condition is Dirichlet
+    for el_y in (ny_tuple[1] + 1):ny_tuple[2]
+        x = grid.xf[1]
+        for j in Base.OneTo(nd)
+            y = grid.yf[el_y] + grid.dy[el_y] * xg[j]
+            uval = boundary_value(x, y, t)
+            for i in Base.OneTo(nd)
+                multiply_add_to_node_vars!(ua, wg[i] * wg[j], uval, eq, 0,
+                                           el_y)
             end
         end
+    end
 
-        # right boundary condition is neumann
-        for el_y in 1:ny_tuple[2], n in eachvariable(eq)
-            el_x = nx_tuple[2] # right most physical element
-            ua[n, el_x + 1, el_y] = ua[n, el_x, el_y]
-        end
+    # right boundary condition is neumann
+    for el_y in 1:ny_tuple[2], n in eachvariable(eq)
+        el_x = nx_tuple[2] # right most physical element
+        ua[n, el_x + 1, el_y] = ua[n, el_x, el_y]
+    end
 
-        # Horizontal walls of bottom are reflective
-        for el_x in bottom_horizontal_iterator(grid)
-            el_y = bottom_physical_element(el_x, grid)
-            for n in eachvariable(eq)
-                ua[n, el_x, el_y - 1] = ua[n, el_x, el_y]
-            end
-            ua[3, el_x, el_y - 1] *= -1.0
+    # Horizontal walls of bottom are reflective
+    for el_x in bottom_horizontal_iterator(grid)
+        el_y = bottom_physical_element(el_x, grid)
+        for n in eachvariable(eq)
+            ua[n, el_x, el_y - 1] = ua[n, el_x, el_y]
         end
+        ua[3, el_x, el_y - 1] *= -1.0
+    end
 
-        # Vertical walls at bottom are reflective
-        for el_y in bottom_vertical_iterator(grid)
-            el_x = leftmost_physical_element(el_y, grid) # nx_tuple[1]+1
-            for n in eachvariable(eq)
-                ua[n, el_x - 1, el_y] = ua[n, el_x, el_y]
-            end
-            ua[2, el_x - 1, el_y] *= -1.0
+    # Vertical walls at bottom are reflective
+    for el_y in bottom_vertical_iterator(grid)
+        el_x = leftmost_physical_element(el_y, grid) # nx_tuple[1]+1
+        for n in eachvariable(eq)
+            ua[n, el_x - 1, el_y] = ua[n, el_x, el_y]
         end
+        ua[2, el_x - 1, el_y] *= -1.0
+    end
 
-        # Horizontal walls at top are reflective
-        for el_x in 1:nx_tuple[2]
-            el_y = ny_tuple[2] # top_physical_element
-            for n in eachvariable(eq)
-                ua[n, el_x, el_y + 1] = ua[n, el_x, el_y]
-            end
-            ua[3, el_x, el_y + 1] *= -1.0
+    # Horizontal walls at top are reflective
+    for el_x in 1:nx_tuple[2]
+        el_y = ny_tuple[2] # top_physical_element
+        for n in eachvariable(eq)
+            ua[n, el_x, el_y + 1] = ua[n, el_x, el_y]
         end
+        ua[3, el_x, el_y + 1] *= -1.0
+    end
     end # timer
     return nothing
 end
@@ -132,96 +133,97 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid::StepGrid, op,
                                 param, aux, t, dt, u1,
                                 Fb, Ub, ua, res, scaling_factor = 1)
     @timeit aux.timer "Face residual" begin
-        @unpack bl, br, xg, degree = op
-        nd = degree + 1
-        @unpack dx, dy, xf, yf = grid
-        @unpack numerical_flux = scheme
-        @unpack blend = aux
-        @unpack blend_face_residual_x!, blend_face_residual_y! = blend.subroutines
+    #! format: noindent
+    @unpack bl, br, xg, degree = op
+    nd = degree + 1
+    @unpack dx, dy, xf, yf = grid
+    @unpack numerical_flux = scheme
+    @unpack blend = aux
+    @unpack blend_face_residual_x!, blend_face_residual_y! = blend.subroutines
 
-        Fk = copy(Fb)
-        # Vertical faces, x flux
-        @threaded for element_index in face_x_iterator(grid)
-            element = face_x_indices(element_index, grid)
-            el_x, el_y = element[1], element[2]
-            # Face between (i-1,j) and (i,j)
-            x = xf[el_x]
-            ual, uar = get_node_vars(ua, eq, el_x - 1, el_y),
-                       get_node_vars(ua, eq, el_x, el_y)
+    Fk = copy(Fb)
+    # Vertical faces, x flux
+    @threaded for element_index in face_x_iterator(grid)
+        element = face_x_indices(element_index, grid)
+        el_x, el_y = element[1], element[2]
+        # Face between (i-1,j) and (i,j)
+        x = xf[el_x]
+        ual, uar = get_node_vars(ua, eq, el_x - 1, el_y),
+                   get_node_vars(ua, eq, el_x, el_y)
+        for jy in Base.OneTo(nd)
+            y = yf[el_y] + xg[jy] * dy[el_y]
+            Fl, Fr = (get_node_vars(Fb, eq, jy, 2, el_x - 1, el_y),
+                      get_node_vars(Fb, eq, jy, 1, el_x, el_y))
+            Ul, Ur = (get_node_vars(Ub, eq, jy, 2, el_x - 1, el_y),
+                      get_node_vars(Ub, eq, jy, 1, el_x, el_y))
+            X = SVector{2}(x, y)
+            Fn = numerical_flux(X, ual, uar, Fl, Fr, Ul, Ur, eq, 1)
+            Fn, blend_factors = blend_face_residual_x!(el_x, el_y, jy, x, y, u1, ua,
+                                                       eq, dt, grid, op, cache,
+                                                       scheme, param, Fn, aux,
+                                                       res)
+
+            set_node_vars!(Fb, Fn, eq, jy, 2, el_x - 1, el_y)
+            set_node_vars!(Fb, Fn, eq, jy, 1, el_x, el_y)
+        end
+    end
+
+    # Horizontal faces, y flux
+    @threaded for element_index in face_y_iterator(grid)
+        element = face_y_indices(element_index, grid)
+        el_x, el_y = element[1], element[2]
+        # Face between (i,j-1) and (i,j)
+        y = yf[el_y]
+        ual, uar = get_node_vars(ua, eq, el_x, el_y - 1),
+                   get_node_vars(ua, eq, el_x, el_y)
+        for ix in Base.OneTo(nd)
+            x = xf[el_x] + xg[ix] * dx[el_x]
+            Fl, Fr = get_node_vars(Fb, eq, ix, 4, el_x, el_y - 1),
+                     get_node_vars(Fb, eq, ix, 3, el_x, el_y)
+            Ul, Ur = get_node_vars(Ub, eq, ix, 4, el_x, el_y - 1),
+                     get_node_vars(Ub, eq, ix, 3, el_x, el_y)
+            X = SVector{2}(x, y)
+            Fn = numerical_flux(X, ual, uar, Fl, Fr, Ul, Ur, eq, 2)
+            Fn, blend_factors = blend_face_residual_y!(el_x, el_y, ix, x, y,
+                                                       u1, ua, eq, dt, grid, op, cache,
+                                                       scheme, param, Fn, aux,
+                                                       res)
+            set_node_vars!(Fb, Fn, eq, ix, 4, el_x, el_y - 1)
+            set_node_vars!(Fb, Fn, eq, ix, 3, el_x, el_y)
+        end
+    end
+
+    @threaded for element_index in element_iterator(grid)
+        element = element_indices(element_index, grid)
+        el_x, el_y = element[1], element[2]
+        blend_factor = 1.0 - blend.cache.alpha[el_x, el_y] # TODO - Gives error without blending limiter
+        for ix in Base.OneTo(nd)
             for jy in Base.OneTo(nd)
-                y = yf[el_y] + xg[jy] * dy[el_y]
-                Fl, Fr = (get_node_vars(Fb, eq, jy, 2, el_x - 1, el_y),
-                          get_node_vars(Fb, eq, jy, 1, el_x, el_y))
-                Ul, Ur = (get_node_vars(Ub, eq, jy, 2, el_x - 1, el_y),
-                          get_node_vars(Ub, eq, jy, 1, el_x, el_y))
-                X = SVector{2}(x, y)
-                Fn = numerical_flux(X, ual, uar, Fl, Fr, Ul, Ur, eq, 1)
-                Fn, blend_factors = blend_face_residual_x!(el_x, el_y, jy, x, y, u1, ua,
-                                                           eq, dt, grid, op, cache,
-                                                           scheme, param, Fn, aux,
-                                                           res)
+                Fl = get_node_vars(Fb, eq, jy, 1, el_x, el_y)
+                Fr = get_node_vars(Fb, eq, jy, 2, el_x, el_y)
+                Fd = get_node_vars(Fb, eq, ix, 3, el_x, el_y)
+                Fu = get_node_vars(Fb, eq, ix, 4, el_x, el_y)
+                multiply_add_to_node_vars!(res,
+                                           blend_factor * dt / dy[el_y] * br[jy], Fu,
+                                           eq,
+                                           ix, jy, el_x, el_y)
+                multiply_add_to_node_vars!(res,
+                                           blend_factor * dt / dy[el_y] * bl[jy], Fd,
+                                           eq,
+                                           ix, jy, el_x, el_y)
 
-                set_node_vars!(Fb, Fn, eq, jy, 2, el_x - 1, el_y)
-                set_node_vars!(Fb, Fn, eq, jy, 1, el_x, el_y)
+                multiply_add_to_node_vars!(res,
+                                           blend_factor * dt / dx[el_x] * br[ix], Fr,
+                                           eq,
+                                           ix, jy, el_x, el_y)
+                multiply_add_to_node_vars!(res,
+                                           blend_factor * dt / dx[el_x] * bl[ix], Fl,
+                                           eq,
+                                           ix, jy, el_x, el_y)
             end
         end
-
-        # Horizontal faces, y flux
-        @threaded for element_index in face_y_iterator(grid)
-            element = face_y_indices(element_index, grid)
-            el_x, el_y = element[1], element[2]
-            # Face between (i,j-1) and (i,j)
-            y = yf[el_y]
-            ual, uar = get_node_vars(ua, eq, el_x, el_y - 1),
-                       get_node_vars(ua, eq, el_x, el_y)
-            for ix in Base.OneTo(nd)
-                x = xf[el_x] + xg[ix] * dx[el_x]
-                Fl, Fr = get_node_vars(Fb, eq, ix, 4, el_x, el_y - 1),
-                         get_node_vars(Fb, eq, ix, 3, el_x, el_y)
-                Ul, Ur = get_node_vars(Ub, eq, ix, 4, el_x, el_y - 1),
-                         get_node_vars(Ub, eq, ix, 3, el_x, el_y)
-                X = SVector{2}(x, y)
-                Fn = numerical_flux(X, ual, uar, Fl, Fr, Ul, Ur, eq, 2)
-                Fn, blend_factors = blend_face_residual_y!(el_x, el_y, ix, x, y,
-                                                           u1, ua, eq, dt, grid, op, cache,
-                                                           scheme, param, Fn, aux,
-                                                           res)
-                set_node_vars!(Fb, Fn, eq, ix, 4, el_x, el_y - 1)
-                set_node_vars!(Fb, Fn, eq, ix, 3, el_x, el_y)
-            end
-        end
-
-        @threaded for element_index in element_iterator(grid)
-            element = element_indices(element_index, grid)
-            el_x, el_y = element[1], element[2]
-            blend_factor = 1.0 - blend.cache.alpha[el_x, el_y] # TODO - Gives error without blending limiter
-            for ix in Base.OneTo(nd)
-                for jy in Base.OneTo(nd)
-                    Fl = get_node_vars(Fb, eq, jy, 1, el_x, el_y)
-                    Fr = get_node_vars(Fb, eq, jy, 2, el_x, el_y)
-                    Fd = get_node_vars(Fb, eq, ix, 3, el_x, el_y)
-                    Fu = get_node_vars(Fb, eq, ix, 4, el_x, el_y)
-                    multiply_add_to_node_vars!(res,
-                                               blend_factor * dt / dy[el_y] * br[jy], Fu,
-                                               eq,
-                                               ix, jy, el_x, el_y)
-                    multiply_add_to_node_vars!(res,
-                                               blend_factor * dt / dy[el_y] * bl[jy], Fd,
-                                               eq,
-                                               ix, jy, el_x, el_y)
-
-                    multiply_add_to_node_vars!(res,
-                                               blend_factor * dt / dx[el_x] * br[ix], Fr,
-                                               eq,
-                                               ix, jy, el_x, el_y)
-                    multiply_add_to_node_vars!(res,
-                                               blend_factor * dt / dx[el_x] * bl[ix], Fl,
-                                               eq,
-                                               ix, jy, el_x, el_y)
-                end
-            end
-        end
-        return nothing
+    end
+    return nothing
     end # timer
 end
 
@@ -229,242 +231,243 @@ function blend_face_residual_muscl_x!(el_x, el_y, jy, xf, y, u1, ua,
                                       eq::AbstractEquations{2, <:Any}, dt, grid::StepGrid,
                                       op, cache, scheme, param, Fn, aux, res)
     @timeit_debug aux.timer "Blending limiter" begin
-        @unpack blend = aux
-        @unpack alpha = blend.cache
-        @unpack dx, dy = grid
-        @unpack tvbM = blend.parameters
-        @unpack bc_x = blend.subroutines
-        nvar = nvariables(eq)
-        num_flux = scheme.numerical_flux
-        nx_tuple, ny_tuple = grid.size
-        @unpack u1x, u1y = cache
+    #! format: noindent
+    @unpack blend = aux
+    @unpack alpha = blend.cache
+    @unpack dx, dy = grid
+    @unpack tvbM = blend.parameters
+    @unpack bc_x = blend.subroutines
+    nvar = nvariables(eq)
+    num_flux = scheme.numerical_flux
+    nx_tuple, ny_tuple = grid.size
+    @unpack u1x, u1y = cache
 
-        id = Threads.threadid()
+    id = Threads.threadid()
 
-        unph_, = blend.cache.unph[id][1]
-        unph = @view unph_[:, 1:2, 1, 1] # Load nvar x 2 array to save storage
+    unph_, = blend.cache.unph[id][1]
+    unph = @view unph_[:, 1:2, 1, 1] # Load nvar x 2 array to save storage
 
-        dt = blend.cache.dt[1] # For support with DiffEq
+    dt = blend.cache.dt[1] # For support with DiffEq
 
-        @unpack xg, wg = op
-        nd = length(xg)
+    @unpack xg, wg = op
+    nd = length(xg)
 
-        # The two solution points neighbouring the super face have a numerical flux
-        # which is to be obtained after blending with the time averaged flux.
-        # Thus, the evolution for those points has two be done here.
+    # The two solution points neighbouring the super face have a numerical flux
+    # which is to be obtained after blending with the time averaged flux.
+    # Thus, the evolution for those points has two be done here.
 
-        # Since there are two points, we store relevant arrays in 2-tuples and loop
-        # Those solution values, locations and corresponding (subcell) faces
-        # are all stored. The first element corresponds to last point of left array
-        # and second element corresponds to first element of right array
+    # Since there are two points, we store relevant arrays in 2-tuples and loop
+    # Those solution values, locations and corresponding (subcell) faces
+    # are all stored. The first element corresponds to last point of left array
+    # and second element corresponds to first element of right array
 
-        # |-----||-----|
-        # |     ||     |
-        # |     ||     |
-        # |-----||-----|
+    # |-----||-----|
+    # |     ||     |
+    # |     ||     |
+    # |-----||-----|
 
-        # We first find u^{n+1/2}_{±} at the face. For ±, there are two
-        # relevant iterations of loops respectively. To do everything in one loop, we stack all
-        # quantities relevant to the computation at the very beginning
+    # We first find u^{n+1/2}_{±} at the face. For ±, there are two
+    # relevant iterations of loops respectively. To do everything in one loop, we stack all
+    # quantities relevant to the computation at the very beginning
 
-        # Stack all relevant arrays (ul, u, ur) both for
-        arrays1_x = (get_node_vars(u1x, eq, nd - 1, jy, el_x - 1, el_y),
-                     get_node_vars(u1x, eq, nd, jy, el_x - 1, el_y),
-                     get_node_vars(u1x, eq, 1, jy, el_x, el_y))
-        arrays2_x = (get_node_vars(u1x, eq, nd, jy, el_x - 1, el_y),
-                     get_node_vars(u1x, eq, 1, jy, el_x, el_y),
-                     get_node_vars(u1x, eq, 2, jy, el_x, el_y))
+    # Stack all relevant arrays (ul, u, ur) both for
+    arrays1_x = (get_node_vars(u1x, eq, nd - 1, jy, el_x - 1, el_y),
+                 get_node_vars(u1x, eq, nd, jy, el_x - 1, el_y),
+                 get_node_vars(u1x, eq, 1, jy, el_x, el_y))
+    arrays2_x = (get_node_vars(u1x, eq, nd, jy, el_x - 1, el_y),
+                 get_node_vars(u1x, eq, 1, jy, el_x, el_y),
+                 get_node_vars(u1x, eq, 2, jy, el_x, el_y))
 
-        solns_x = (arrays1_x, arrays2_x)
+    solns_x = (arrays1_x, arrays2_x)
 
-        # Stack x coordinates of solution points (xl, x, xr)
-        sol_coords_x = ((xf - dx[el_x - 1] + xg[nd - 1] * dx[el_x - 1], # xl
-                         xf - dx[el_x - 1] + xg[nd] * dx[el_x - 1],   # x
-                         xf + xg[1] * dx[el_x]),                  # xr
+    # Stack x coordinates of solution points (xl, x, xr)
+    sol_coords_x = ((xf - dx[el_x - 1] + xg[nd - 1] * dx[el_x - 1], # xl
+                     xf - dx[el_x - 1] + xg[nd] * dx[el_x - 1],   # x
+                     xf + xg[1] * dx[el_x]),                  # xr
 
-                        # Corresponding to solns2_x
-                        (xf - dx[el_x - 1] + xg[nd] * dx[el_x - 1], # xl
-                         xf + xg[1] * dx[el_x],                 # x
-                         xf + xg[2] * dx[el_x]))
+                    # Corresponding to solns2_x
+                    (xf - dx[el_x - 1] + xg[nd] * dx[el_x - 1], # xl
+                     xf + xg[1] * dx[el_x],                 # x
+                     xf + xg[2] * dx[el_x]))
 
-        # For the y-direction values, the indices may go outside of the cell
-        # so we have to break into cases.
-        if jy == 1
-            ud_1 = get_node_vars(u1y, eq, nd, nd, el_x - 1, el_y - 1) # value below u from arrays1
-            ud_2 = get_node_vars(u1y, eq, 1, nd, el_x, el_y - 1) # value below u from arrays2
-            # Don't use corner values
-            if el_x - 1 == nx_tuple[1] && el_y - 1 == ny_tuple[1]
-                ud_1 = ud_2
-            end
-
-            # Solution point below y
-            yd_1 = yd_2 = grid.yf[el_y] - dy[el_y - 1] + xg[nd] * dy[el_y - 1]
-
-            # Face between y and yd
-            yfd_1 = yfd_2 = grid.yf[el_y]
-        else
-            ud_1 = get_node_vars(u1x, eq, nd, jy - 1, el_x - 1, el_y)
-            ud_2 = get_node_vars(u1x, eq, 1, jy - 1, el_x, el_y)
-
-            # Solution points
-            yd_1 = yd_2 = grid.yf[el_y] + xg[jy - 1] * dy[el_y]
-
-            # Face between y and yd
-            yfd_1 = yfd_2 = grid.yf[el_y]
-            for jjy in 1:(jy - 1)
-                yfd_1 += wg[jjy] * dy[el_y - 1]
-            end
-            yfd_2 = yfd_1
+    # For the y-direction values, the indices may go outside of the cell
+    # so we have to break into cases.
+    if jy == 1
+        ud_1 = get_node_vars(u1y, eq, nd, nd, el_x - 1, el_y - 1) # value below u from arrays1
+        ud_2 = get_node_vars(u1y, eq, 1, nd, el_x, el_y - 1) # value below u from arrays2
+        # Don't use corner values
+        if el_x - 1 == nx_tuple[1] && el_y - 1 == ny_tuple[1]
+            ud_1 = ud_2
         end
 
-        if jy == nd
-            uu_1 = get_node_vars(u1y, eq, nd, 1, el_x - 1, el_y + 1)
-            uu_2 = get_node_vars(u1y, eq, 1, 1, el_x, el_y + 1)
+        # Solution point below y
+        yd_1 = yd_2 = grid.yf[el_y] - dy[el_y - 1] + xg[nd] * dy[el_y - 1]
 
-            # Solution points
-            yu_1 = yu_2 = grid.yf[el_y + 1] + xg[1] * grid.dy[el_y + 1]
+        # Face between y and yd
+        yfd_1 = yfd_2 = grid.yf[el_y]
+    else
+        ud_1 = get_node_vars(u1x, eq, nd, jy - 1, el_x - 1, el_y)
+        ud_2 = get_node_vars(u1x, eq, 1, jy - 1, el_x, el_y)
 
-            # Faces
-            yfu_1 = yfu_2 = grid.yf[el_y + 1] # + wg[1]*grid.dy[el_y+1]
-        else
-            uu_1 = get_node_vars(u1x, eq, nd, jy + 1, el_x - 1, el_y)
-            uu_2 = get_node_vars(u1x, eq, 1, jy + 1, el_x, el_y)
+        # Solution points
+        yd_1 = yd_2 = grid.yf[el_y] + xg[jy - 1] * dy[el_y]
 
-            # Solution points
-            yu_1 = yu_2 = grid.yf[el_y] + xg[jy + 1] * grid.dy[el_y]
+        # Face between y and yd
+        yfd_1 = yfd_2 = grid.yf[el_y]
+        for jjy in 1:(jy - 1)
+            yfd_1 += wg[jjy] * dy[el_y - 1]
+        end
+        yfd_2 = yfd_1
+    end
 
-            # Faces
-            yfu_1 = yfu_2 = grid.yf[el_y]
-            for jjy in 1:jy
-                yfu_1 = yfu_2 += wg[jjy] * grid.dy[el_y]
-            end
+    if jy == nd
+        uu_1 = get_node_vars(u1y, eq, nd, 1, el_x - 1, el_y + 1)
+        uu_2 = get_node_vars(u1y, eq, 1, 1, el_x, el_y + 1)
+
+        # Solution points
+        yu_1 = yu_2 = grid.yf[el_y + 1] + xg[1] * grid.dy[el_y + 1]
+
+        # Faces
+        yfu_1 = yfu_2 = grid.yf[el_y + 1] # + wg[1]*grid.dy[el_y+1]
+    else
+        uu_1 = get_node_vars(u1x, eq, nd, jy + 1, el_x - 1, el_y)
+        uu_2 = get_node_vars(u1x, eq, 1, jy + 1, el_x, el_y)
+
+        # Solution points
+        yu_1 = yu_2 = grid.yf[el_y] + xg[jy + 1] * grid.dy[el_y]
+
+        # Faces
+        yfu_1 = yfu_2 = grid.yf[el_y]
+        for jjy in 1:jy
+            yfu_1 = yfu_2 += wg[jjy] * grid.dy[el_y]
+        end
+    end
+
+    solns_y = ((ud_1, uu_1), (ud_2, uu_2))
+
+    sol_coords_y = ((yd_1, yu_1), (yd_2, yu_2))
+
+    # Stack x coordinates of faces (xfl, xfr)
+    face_coords_x = ((xf - wg[nd] * dx[el_x - 1], xf), # (xfl, xfr)
+                     (xf, xf + wg[1] * dx[el_x]))   # (xfl, xfr)
+    face_coords_y = ((yfd_1, yfu_1), (yfd_2, yfu_2))
+
+    betas = (2.0 - alpha[el_x - 1, el_y], 2.0 - alpha[el_x, el_y])
+
+    if blend.parameters.pure_fv == true
+        betas = (2.0, 2.0)
+    end
+
+    for i in 1:2 # Loop over cells
+        ul, u_, ur = solns_x[i]
+        ud, uu = solns_y[i]
+
+        # TOTHINK - Add this feature
+        # u_, ul, ur = conservative2recon.((u_,ul,ur))
+
+        xl, x, xr = sol_coords_x[i]
+        yd, yu = sol_coords_y[i]
+        xfl, xfr = face_coords_x[i]
+        yfd, yfu = face_coords_y[i]
+
+        Δx1, Δx2 = x - xl, xr - x
+        Δy1, Δy2 = y - yd, yu - y
+        back_x, cent_x, fwd_x = finite_differences(Δx1, Δx2, ul, u_, ur)
+        back_y, cent_y, fwd_y = finite_differences(Δy1, Δy2, ud, u_, uu)
+        beta = betas[i]
+        Mdx2 = tvbM * Δx1
+        Mdy2 = tvbM * Δy1
+        slope_tuple_x = (minmod(cent_x[n], back_x[n], fwd_x[n], beta, Mdx2)
+                         for n in eachvariable(eq))
+        slope_tuple_y = (minmod(cent_y[n], back_y[n], fwd_y[n], beta, Mdy2)
+                         for n in eachvariable(eq))
+        slope_x = SVector{nvar}(slope_tuple_x)
+        slope_y = SVector{nvar}(slope_tuple_y)
+
+        ufl = u_ + slope_x * (xfl - x)
+        ufr = u_ + slope_x * (xfr - x)
+        ufd = u_ + slope_y * (yfd - y)
+        ufu = u_ + slope_y * (yfu - y)
+
+        u_star_l = u_ + 2.0 * slope_x * (xfl - x)
+        u_star_r = u_ + 2.0 * slope_x * (xfr - x)
+        u_star_d = u_ + 2.0 * slope_y * (yfd - y)
+        u_star_u = u_ + 2.0 * slope_y * (yfu - y)
+
+        ufl, ufr = limit_slope(eq, slope_x, ufl, u_star_l, ufr, u_star_r, u_,
+                               xfl - x, xfr - x)
+
+        ufd, ufu = limit_slope(eq, slope_y, ufd, u_star_d, ufu, u_star_u, u_,
+                               yfd - y, yfu - y)
+        # TOTHINK - Add this feature
+        # Convert back to conservative variables for update
+        # ufl, ufr = recon2conservative.((ufl,ufr))
+
+        fl = flux(xfl, y, ufl, eq, 1)
+        fr = flux(xfr, y, ufr, eq, 1)
+        gd = flux(x, yfd, ufd, eq, 2)
+        gu = flux(x, yfu, ufu, eq, 2)
+
+        if i == 1
+            uf = ufr # The relevant face is on the right
+        elseif i == 2
+            uf = ufl # The relevant face is on the left
         end
 
-        solns_y = ((ud_1, uu_1), (ud_2, uu_2))
+        # Use finite difference method to evolve face values to time level n+1/2
+        multiply_add_set_node_vars!(unph, # unph = uf - 0.5*dt*(fr-fl)/(xfr-xfl)
+                                    uf,
+                                    -0.5 * dt / (xfr - xfl),
+                                    fr,
+                                    0.5 * dt / (xfr - xfl),
+                                    fl,
+                                    eq,
+                                    i)
 
-        sol_coords_y = ((yd_1, yu_1), (yd_2, yu_2))
-
-        # Stack x coordinates of faces (xfl, xfr)
-        face_coords_x = ((xf - wg[nd] * dx[el_x - 1], xf), # (xfl, xfr)
-                         (xf, xf + wg[1] * dx[el_x]))   # (xfl, xfr)
-        face_coords_y = ((yfd_1, yfu_1), (yfd_2, yfu_2))
-
-        betas = (2.0 - alpha[el_x - 1, el_y], 2.0 - alpha[el_x, el_y])
-
-        if blend.parameters.pure_fv == true
-            betas = (2.0, 2.0)
+        if !(isnearcorners(el_x, el_y, grid))
+            # Avoid taking corner point stencils near corners of physical boundaries
+            multiply_add_to_node_vars!(unph, # unph += -0.5*dt*(gu-gd)/(yfu-yfd)
+                                       -0.5 * dt / (yfu - yfd),
+                                       gu,
+                                       0.5 * dt / (yfu - yfd),
+                                       gd,
+                                       eq,
+                                       i)
         end
+    end
+    # Put reflect bc here!
+    ul = get_node_vars(unph, eq, 1)
+    ur = get_node_vars(unph, eq, 2)
+    # if isnearcorners(el_x, el_y, grid)
+    #    ur = get_node_vars(u1, eq, 1,  jy, el_x,   el_y)
+    #    ul = get_node_vars(u1, eq, nd, jy, el_x-1, el_y)
+    #    if el_x == nx_tuple[1]+1 && el_y == ny_tuple[1]
+    #       ul = SVector{4}(ur[1],-ur[2],ur[3],ur[4])
+    #    end
+    # end
+    fl, fr = flux(xf, y, ul, eq, 1), flux(xf, y, ur, eq, 1)
+    X = SVector(xf, y)
 
-        for i in 1:2 # Loop over cells
-            ul, u_, ur = solns_x[i]
-            ud, uu = solns_y[i]
+    fn = num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
 
-            # TOTHINK - Add this feature
-            # u_, ul, ur = conservative2recon.((u_,ul,ur))
+    # Repetetition block
+    Fn = get_blended_flux_x(el_x, el_y, jy, eq, dt, grid,
+                            blend, scheme, xf, y, u1x, ua, fn, Fn, op)
 
-            xl, x, xr = sol_coords_x[i]
-            yd, yu = sol_coords_y[i]
-            xfl, xfr = face_coords_x[i]
-            yfd, yfu = face_coords_y[i]
+    # This subroutine allows user to specify boundary conditions
+    Fn = bc_x(u1, eq, op, xf, y, jy, el_x, el_y, Fn)
 
-            Δx1, Δx2 = x - xl, xr - x
-            Δy1, Δy2 = y - yd, yu - y
-            back_x, cent_x, fwd_x = finite_differences(Δx1, Δx2, ul, u_, ur)
-            back_y, cent_y, fwd_y = finite_differences(Δy1, Δy2, ud, u_, uu)
-            beta = betas[i]
-            Mdx2 = tvbM * Δx1
-            Mdy2 = tvbM * Δy1
-            slope_tuple_x = (minmod(cent_x[n], back_x[n], fwd_x[n], beta, Mdx2)
-                             for n in eachvariable(eq))
-            slope_tuple_y = (minmod(cent_y[n], back_y[n], fwd_y[n], beta, Mdy2)
-                             for n in eachvariable(eq))
-            slope_x = SVector{nvar}(slope_tuple_x)
-            slope_y = SVector{nvar}(slope_tuple_y)
+    r = @view res[:, :, jy, el_x - 1, el_y]
+    multiply_add_to_node_vars!(r, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
+                               alpha[el_x - 1, el_y] * dt / (dx[el_x - 1] * wg[nd]), Fn,
+                               eq, nd)
 
-            ufl = u_ + slope_x * (xfl - x)
-            ufr = u_ + slope_x * (xfr - x)
-            ufd = u_ + slope_y * (yfd - y)
-            ufu = u_ + slope_y * (yfu - y)
+    r = @view res[:, :, jy, el_x, el_y]
+    multiply_add_to_node_vars!(r, # r[1] -= alpha*dt/(dy*wg[1])*Fn
+                               -alpha[el_x, el_y] * dt / (dx[el_x] * wg[1]), Fn,
+                               eq, 1)
 
-            u_star_l = u_ + 2.0 * slope_x * (xfl - x)
-            u_star_r = u_ + 2.0 * slope_x * (xfr - x)
-            u_star_d = u_ + 2.0 * slope_y * (yfd - y)
-            u_star_u = u_ + 2.0 * slope_y * (yfu - y)
-
-            ufl, ufr = limit_slope(eq, slope_x, ufl, u_star_l, ufr, u_star_r, u_,
-                                   xfl - x, xfr - x)
-
-            ufd, ufu = limit_slope(eq, slope_y, ufd, u_star_d, ufu, u_star_u, u_,
-                                   yfd - y, yfu - y)
-            # TOTHINK - Add this feature
-            # Convert back to conservative variables for update
-            # ufl, ufr = recon2conservative.((ufl,ufr))
-
-            fl = flux(xfl, y, ufl, eq, 1)
-            fr = flux(xfr, y, ufr, eq, 1)
-            gd = flux(x, yfd, ufd, eq, 2)
-            gu = flux(x, yfu, ufu, eq, 2)
-
-            if i == 1
-                uf = ufr # The relevant face is on the right
-            elseif i == 2
-                uf = ufl # The relevant face is on the left
-            end
-
-            # Use finite difference method to evolve face values to time level n+1/2
-            multiply_add_set_node_vars!(unph, # unph = uf - 0.5*dt*(fr-fl)/(xfr-xfl)
-                                        uf,
-                                        -0.5 * dt / (xfr - xfl),
-                                        fr,
-                                        0.5 * dt / (xfr - xfl),
-                                        fl,
-                                        eq,
-                                        i)
-
-            if !(isnearcorners(el_x, el_y, grid))
-                # Avoid taking corner point stencils near corners of physical boundaries
-                multiply_add_to_node_vars!(unph, # unph += -0.5*dt*(gu-gd)/(yfu-yfd)
-                                           -0.5 * dt / (yfu - yfd),
-                                           gu,
-                                           0.5 * dt / (yfu - yfd),
-                                           gd,
-                                           eq,
-                                           i)
-            end
-        end
-        # Put reflect bc here!
-        ul = get_node_vars(unph, eq, 1)
-        ur = get_node_vars(unph, eq, 2)
-        # if isnearcorners(el_x, el_y, grid)
-        #    ur = get_node_vars(u1, eq, 1,  jy, el_x,   el_y)
-        #    ul = get_node_vars(u1, eq, nd, jy, el_x-1, el_y)
-        #    if el_x == nx_tuple[1]+1 && el_y == ny_tuple[1]
-        #       ul = SVector{4}(ur[1],-ur[2],ur[3],ur[4])
-        #    end
-        # end
-        fl, fr = flux(xf, y, ul, eq, 1), flux(xf, y, ur, eq, 1)
-        X = SVector(xf, y)
-
-        fn = num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
-
-        # Repetetition block
-        Fn = get_blended_flux_x(el_x, el_y, jy, eq, dt, grid,
-                                blend, scheme, xf, y, u1x, ua, fn, Fn, op)
-
-        # This subroutine allows user to specify boundary conditions
-        Fn = bc_x(u1, eq, op, xf, y, jy, el_x, el_y, Fn)
-
-        r = @view res[:, :, jy, el_x - 1, el_y]
-        multiply_add_to_node_vars!(r, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
-                                   alpha[el_x - 1, el_y] * dt / (dx[el_x - 1] * wg[nd]), Fn,
-                                   eq, nd)
-
-        r = @view res[:, :, jy, el_x, el_y]
-        multiply_add_to_node_vars!(r, # r[1] -= alpha*dt/(dy*wg[1])*Fn
-                                   -alpha[el_x, el_y] * dt / (dx[el_x] * wg[1]), Fn,
-                                   eq, 1)
-
-        return Fn, (1.0 - alpha[el_x - 1, el_y], 1.0 - alpha[el_x, el_y])
+    return Fn, (1.0 - alpha[el_x - 1, el_y], 1.0 - alpha[el_x, el_y])
     end # timer
 end
 
@@ -538,228 +541,229 @@ function blend_face_residual_muscl_y!(el_x, el_y, ix, x, yf, u1, ua,
                                       op,
                                       cache, scheme, param, Fn, aux, res)
     @timeit_debug aux.timer "Blending limiter" begin
-        @unpack blend = aux
-        @unpack alpha = blend.cache
-        @unpack tvbM = blend.parameters
-        @unpack dx, dy = grid
-        num_flux = scheme.numerical_flux
-        nvar = nvariables(eq)
-        nx_tuple, ny_tuple = grid.size
+    #! format: noindent
+    @unpack blend = aux
+    @unpack alpha = blend.cache
+    @unpack tvbM = blend.parameters
+    @unpack dx, dy = grid
+    num_flux = scheme.numerical_flux
+    nvar = nvariables(eq)
+    nx_tuple, ny_tuple = grid.size
 
-        id = Threads.threadid()
+    id = Threads.threadid()
 
-        dt = blend.cache.dt[1] # For support with DiffEq
+    dt = blend.cache.dt[1] # For support with DiffEq
 
-        unph_, = blend.cache.unph[id][1]
-        unph = @view unph_[:, 1:2, 1, 1] # Load nvar x 2 array
+    unph_, = blend.cache.unph[id][1]
+    unph = @view unph_[:, 1:2, 1, 1] # Load nvar x 2 array
 
-        @unpack xg, wg = op
-        @unpack u1x, u1y = cache
-        nd = length(xg)
+    @unpack xg, wg = op
+    @unpack u1x, u1y = cache
+    nd = length(xg)
 
-        # The two solution points neighbouring the super face have a numerical flux
-        # which is to be obtained after blending with the time averaged flux.
-        # Thus, the evolution for those points has two be done here.
+    # The two solution points neighbouring the super face have a numerical flux
+    # which is to be obtained after blending with the time averaged flux.
+    # Thus, the evolution for those points has two be done here.
 
-        # Since there are two points, we store relevant arrays in 2-tuples and loop
-        # Those solution values, locations and corresponding (subcell) faces
-        # are all stored. The first element corresponds to last point of left array
-        # and second element corresponds to first element of right array
+    # Since there are two points, we store relevant arrays in 2-tuples and loop
+    # Those solution values, locations and corresponding (subcell) faces
+    # are all stored. The first element corresponds to last point of left array
+    # and second element corresponds to first element of right array
 
-        # |-----||-----|
-        # |     ||     |
-        # |     ||     |
-        # |-----||-----|
+    # |-----||-----|
+    # |     ||     |
+    # |     ||     |
+    # |-----||-----|
 
-        # We first find u^{n+1/2}_{±} at the face. For that, there are two
-        # relevant cells. To do everything in one loop, we stack all
-        # quantities relevant to the computation at the very beginning
+    # We first find u^{n+1/2}_{±} at the face. For that, there are two
+    # relevant cells. To do everything in one loop, we stack all
+    # quantities relevant to the computation at the very beginning
 
-        # Stack all relevant arrays (ul, u, ur)
+    # Stack all relevant arrays (ul, u, ur)
 
-        arrays1_y = (get_node_vars(u1y, eq, ix, nd - 1, el_x, el_y - 1),
-                     get_node_vars(u1y, eq, ix, nd, el_x, el_y - 1),
-                     get_node_vars(u1y, eq, ix, 1, el_x, el_y))
-        arrays2_y = (get_node_vars(u1y, eq, ix, nd, el_x, el_y - 1),
-                     get_node_vars(u1y, eq, ix, 1, el_x, el_y),
-                     get_node_vars(u1y, eq, ix, 2, el_x, el_y))
+    arrays1_y = (get_node_vars(u1y, eq, ix, nd - 1, el_x, el_y - 1),
+                 get_node_vars(u1y, eq, ix, nd, el_x, el_y - 1),
+                 get_node_vars(u1y, eq, ix, 1, el_x, el_y))
+    arrays2_y = (get_node_vars(u1y, eq, ix, nd, el_x, el_y - 1),
+                 get_node_vars(u1y, eq, ix, 1, el_x, el_y),
+                 get_node_vars(u1y, eq, ix, 2, el_x, el_y))
 
-        solns_y = (arrays1_y, arrays2_y)
+    solns_y = (arrays1_y, arrays2_y)
 
-        sol_coords_y = ((yf - dy[el_y - 1] + xg[nd - 1] * dy[el_y - 1], # yd
-                         yf - dy[el_y - 1] + xg[nd] * dy[el_y - 1],   # y
-                         yf + xg[1] * dy[el_y]),                 # yu
-                        (yf - dy[el_y - 1] + xg[nd] * dy[el_y - 1],   # yd
-                         yf + xg[1] * dy[el_y],                   # y
-                         yf + xg[2] * dy[el_y]))
+    sol_coords_y = ((yf - dy[el_y - 1] + xg[nd - 1] * dy[el_y - 1], # yd
+                     yf - dy[el_y - 1] + xg[nd] * dy[el_y - 1],   # y
+                     yf + xg[1] * dy[el_y]),                 # yu
+                    (yf - dy[el_y - 1] + xg[nd] * dy[el_y - 1],   # yd
+                     yf + xg[1] * dy[el_y],                   # y
+                     yf + xg[2] * dy[el_y]))
 
-        if ix == 1
-            ul_1 = get_node_vars(u1x, eq, nd, nd, el_x - 1, el_y - 1)
-            ul_2 = get_node_vars(u1x, eq, nd, 1, el_x - 1, el_y)
+    if ix == 1
+        ul_1 = get_node_vars(u1x, eq, nd, nd, el_x - 1, el_y - 1)
+        ul_2 = get_node_vars(u1x, eq, nd, 1, el_x - 1, el_y)
 
-            if el_x - 1 == nx_tuple[1] && el_y - 1 == ny_tuple[1]
-                ul_2 = ul_1
-            end
-
-            # Solution points left of x
-            xl_1 = xl_2 = grid.xf[el_x] - dx[el_x - 1] + xg[nd] * dx[el_x - 1]
-
-            # Face between xfl and x
-            xfl_1 = xfl_2 = grid.xf[el_x]
-        else
-            ul_1 = get_node_vars(u1y, eq, ix - 1, nd, el_x, el_y - 1)
-            ul_2 = get_node_vars(u1y, eq, ix - 1, 1, el_x, el_y)
-
-            # Solution points left of x
-            xl_1 = xl_2 = grid.xf[el_x] + dx[el_x] * xg[ix - 1]
-
-            # Face between xl and x
-            xfl_1 = xfl_2 = grid.xf[el_x]
-            for iix in 1:(ix - 1)
-                xfl_2 += dx[el_x] * wg[iix]
-            end
-            xfl_1 = xfl_2
+        if el_x - 1 == nx_tuple[1] && el_y - 1 == ny_tuple[1]
+            ul_2 = ul_1
         end
 
-        if ix == nd
-            ur_1 = get_node_vars(u1x, eq, 1, nd, el_x + 1, el_y - 1)
-            ur_2 = get_node_vars(u1x, eq, 1, 1, el_x + 1, el_y)
+        # Solution points left of x
+        xl_1 = xl_2 = grid.xf[el_x] - dx[el_x - 1] + xg[nd] * dx[el_x - 1]
 
-            # Solution points right of x
-            xr_1 = xr_2 = grid.xf[el_x + 1] + xg[1] * grid.dx[el_x + 1]
+        # Face between xfl and x
+        xfl_1 = xfl_2 = grid.xf[el_x]
+    else
+        ul_1 = get_node_vars(u1y, eq, ix - 1, nd, el_x, el_y - 1)
+        ul_2 = get_node_vars(u1y, eq, ix - 1, 1, el_x, el_y)
 
-            # Face between x and xr
-            xfr_1 = xfr_2 = grid.xf[el_x + 1]
-        else
-            ur_1 = get_node_vars(u1y, eq, ix + 1, nd, el_x, el_y - 1)
-            ur_2 = get_node_vars(u1y, eq, ix + 1, nd, el_x, el_y)
+        # Solution points left of x
+        xl_1 = xl_2 = grid.xf[el_x] + dx[el_x] * xg[ix - 1]
 
-            # Solution points right of x
-            xr_1 = xr_2 = grid.xf[el_x] + xg[ix + 1] * grid.dx[el_x]
+        # Face between xl and x
+        xfl_1 = xfl_2 = grid.xf[el_x]
+        for iix in 1:(ix - 1)
+            xfl_2 += dx[el_x] * wg[iix]
+        end
+        xfl_1 = xfl_2
+    end
 
-            # Face between x and xr
-            xfr_1 = xfr_2 = grid.xf[el_x]
-            for iix in 1:ix
-                xfr_2 += wg[iix] * grid.dx[el_x]
-            end
-            xfr_1 = xfr_2
+    if ix == nd
+        ur_1 = get_node_vars(u1x, eq, 1, nd, el_x + 1, el_y - 1)
+        ur_2 = get_node_vars(u1x, eq, 1, 1, el_x + 1, el_y)
+
+        # Solution points right of x
+        xr_1 = xr_2 = grid.xf[el_x + 1] + xg[1] * grid.dx[el_x + 1]
+
+        # Face between x and xr
+        xfr_1 = xfr_2 = grid.xf[el_x + 1]
+    else
+        ur_1 = get_node_vars(u1y, eq, ix + 1, nd, el_x, el_y - 1)
+        ur_2 = get_node_vars(u1y, eq, ix + 1, nd, el_x, el_y)
+
+        # Solution points right of x
+        xr_1 = xr_2 = grid.xf[el_x] + xg[ix + 1] * grid.dx[el_x]
+
+        # Face between x and xr
+        xfr_1 = xfr_2 = grid.xf[el_x]
+        for iix in 1:ix
+            xfr_2 += wg[iix] * grid.dx[el_x]
+        end
+        xfr_1 = xfr_2
+    end
+
+    solns_x = ((ul_1, ur_1), (ul_2, ur_2))
+
+    # stack x coordinates of solution points (yd, y, yu)
+    sol_coords_x = ((xl_1, xr_1), (xl_2, xr_2))
+
+    face_coords_y = ((yf - wg[nd] * dy[el_y - 1], yf), # yfl, yf
+                     (yf, yf + wg[1] * dy[el_y]))
+    face_coords_x = ((xfl_1, xfr_1), (xfl_2, xfr_2))
+
+    betas = (2.0 - alpha[el_x, el_y - 1], 2.0 - alpha[el_x, el_y])
+    if blend.parameters.pure_fv == true
+        betas = (2.0, 2.0)
+    end
+
+    for i in 1:2 # Loop over the two relevant cells
+        ud, u_, uu = solns_y[i]
+        ul, ur = solns_x[i]
+
+        # TOTHINK - Add this feature
+        # ud, u_, uu = conservative2recon.((ud,u_,uu))
+
+        yd, y, yu = sol_coords_y[i]
+        xl, xr = sol_coords_x[i]
+        yfd, yfu = face_coords_y[i]
+        xfl, xfr = face_coords_x[i]
+        Δy1, Δy2 = y - yd, yu - y
+        Δx1, Δx2 = x - xl, xr - x
+        back_y, cent_y, fwd_y = finite_differences(Δy1, Δy2, ud, u_, uu)
+        back_x, cent_x, fwd_x = finite_differences(Δx1, Δx2, ul, u_, ur)
+        beta = betas[i]
+        Mdy2 = tvbM * Δy1
+        slope_tuple_y = (minmod(cent_y[n], back_y[n], fwd_y[n], beta, Mdy2)
+                         for n in eachvariable(eq))
+        Mdx2 = tvbM * Δx1
+        slope_tuple_x = (minmod(cent_x[n], back_x[n], fwd_x[n], beta, Mdx2)
+                         for n in eachvariable(eq))
+        slope_y = SVector{nvar}(slope_tuple_y)
+        slope_x = SVector{nvar}(slope_tuple_x)
+
+        ufd = u_ + slope_y * (yfd - y)
+        ufu = u_ + slope_y * (yfu - y)
+        ufl = u_ + slope_x * (xfl - x)
+        ufr = u_ + slope_x * (xfr - x)
+
+        u_star_d = u_ + 2.0 * slope_y * (yfd - y)
+        u_star_u = u_ + 2.0 * slope_y * (yfu - y)
+        u_star_l = u_ + 2.0 * slope_x * (xfl - x)
+        u_star_r = u_ + 2.0 * slope_x * (xfr - x)
+
+        ufd, ufu = limit_slope(eq, slope_y, ufd, u_star_d, ufu, u_star_u, u_,
+                               yfd - y, yfu - y)
+        ufl, ufr = limit_slope(eq, slope_x, ufl, u_star_l, ufr, u_star_r, u_,
+                               xfl - x, xfr - x)
+
+        # TOTHINK - add this feature
+        # Convert back to conservative variables for update
+        # ufl, ufr = recon2conservative.((ufl, ufr))
+
+        fl = flux(xfl, y, ufl, eq, 1)
+        fr = flux(xfr, y, ufr, eq, 1)
+        gd = flux(x, yfd, ufd, eq, 2)
+        gu = flux(x, yfu, ufu, eq, 2)
+
+        if i == 1
+            uf = ufu # relevant face is the one above
+        elseif i == 2
+            uf = ufd # relevant face is the one below
         end
 
-        solns_x = ((ul_1, ur_1), (ul_2, ur_2))
-
-        # stack x coordinates of solution points (yd, y, yu)
-        sol_coords_x = ((xl_1, xr_1), (xl_2, xr_2))
-
-        face_coords_y = ((yf - wg[nd] * dy[el_y - 1], yf), # yfl, yf
-                         (yf, yf + wg[1] * dy[el_y]))
-        face_coords_x = ((xfl_1, xfr_1), (xfl_2, xfr_2))
-
-        betas = (2.0 - alpha[el_x, el_y - 1], 2.0 - alpha[el_x, el_y])
-        if blend.parameters.pure_fv == true
-            betas = (2.0, 2.0)
+        # use finite difference method to evolve face values to time n+1/2
+        multiply_add_set_node_vars!(unph, # unph = uf - 0.5*dt*(gu-gd)/(yfu-yfd)
+                                    uf,
+                                    -0.5 * dt / (yfu - yfd),
+                                    gu,
+                                    -0.5 * dt / (yfu - yfd),
+                                    -gd,
+                                    eq,
+                                    i)
+        if !(isnearcorners(el_x, el_y, grid))
+            # Avoid corner stencil near physical corners of the domain
+            multiply_add_to_node_vars!(unph, # unph = uf - 0.5*dt*(gu-gd)/(yfu-yfd)
+                                       -0.5 * dt / (xfr - xfl),
+                                       fr,
+                                       0.5 * dt / (xfr - xfl),
+                                       fl,
+                                       eq,
+                                       i)
         end
+    end
 
-        for i in 1:2 # Loop over the two relevant cells
-            ud, u_, uu = solns_y[i]
-            ul, ur = solns_x[i]
+    # Put reflect bc here!
+    ud = get_node_vars(unph, eq, 1)
+    uu = get_node_vars(unph, eq, 2)
+    gd, gu = flux(x, yf, ud, eq, 2), flux(x, yf, uu, eq, 2)
+    X = SVector(x, yf)
+    fn = num_flux(X, ud, uu, gd, gu, ud, uu, eq, 2)
 
-            # TOTHINK - Add this feature
-            # ud, u_, uu = conservative2recon.((ud,u_,uu))
+    Fn = get_blended_flux_y(el_x, el_y, ix, eq, dt, grid, blend,
+                            scheme, x, yf, u1y, ua, fn, Fn, op)
 
-            yd, y, yu = sol_coords_y[i]
-            xl, xr = sol_coords_x[i]
-            yfd, yfu = face_coords_y[i]
-            xfl, xfr = face_coords_x[i]
-            Δy1, Δy2 = y - yd, yu - y
-            Δx1, Δx2 = x - xl, xr - x
-            back_y, cent_y, fwd_y = finite_differences(Δy1, Δy2, ud, u_, uu)
-            back_x, cent_x, fwd_x = finite_differences(Δx1, Δx2, ul, u_, ur)
-            beta = betas[i]
-            Mdy2 = tvbM * Δy1
-            slope_tuple_y = (minmod(cent_y[n], back_y[n], fwd_y[n], beta, Mdy2)
-                             for n in eachvariable(eq))
-            Mdx2 = tvbM * Δx1
-            slope_tuple_x = (minmod(cent_x[n], back_x[n], fwd_x[n], beta, Mdx2)
-                             for n in eachvariable(eq))
-            slope_y = SVector{nvar}(slope_tuple_y)
-            slope_x = SVector{nvar}(slope_tuple_x)
+    r = @view res[:, ix, :, el_x, el_y - 1]
 
-            ufd = u_ + slope_y * (yfd - y)
-            ufu = u_ + slope_y * (yfu - y)
-            ufl = u_ + slope_x * (xfl - x)
-            ufr = u_ + slope_x * (xfr - x)
+    multiply_add_to_node_vars!(r, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
+                               alpha[el_x, el_y - 1] * dt / (dy[el_y - 1] * wg[nd]),
+                               Fn,
+                               eq, nd)
 
-            u_star_d = u_ + 2.0 * slope_y * (yfd - y)
-            u_star_u = u_ + 2.0 * slope_y * (yfu - y)
-            u_star_l = u_ + 2.0 * slope_x * (xfl - x)
-            u_star_r = u_ + 2.0 * slope_x * (xfr - x)
+    r = @view res[:, ix, :, el_x, el_y]
 
-            ufd, ufu = limit_slope(eq, slope_y, ufd, u_star_d, ufu, u_star_u, u_,
-                                   yfd - y, yfu - y)
-            ufl, ufr = limit_slope(eq, slope_x, ufl, u_star_l, ufr, u_star_r, u_,
-                                   xfl - x, xfr - x)
+    multiply_add_to_node_vars!(r, # r[1] -= alpha*dt/(dy*wg[1])*Fn
+                               -alpha[el_x, el_y] * dt / (dy[el_y] * wg[1]),
+                               Fn,
+                               eq, 1)
 
-            # TOTHINK - add this feature
-            # Convert back to conservative variables for update
-            # ufl, ufr = recon2conservative.((ufl, ufr))
-
-            fl = flux(xfl, y, ufl, eq, 1)
-            fr = flux(xfr, y, ufr, eq, 1)
-            gd = flux(x, yfd, ufd, eq, 2)
-            gu = flux(x, yfu, ufu, eq, 2)
-
-            if i == 1
-                uf = ufu # relevant face is the one above
-            elseif i == 2
-                uf = ufd # relevant face is the one below
-            end
-
-            # use finite difference method to evolve face values to time n+1/2
-            multiply_add_set_node_vars!(unph, # unph = uf - 0.5*dt*(gu-gd)/(yfu-yfd)
-                                        uf,
-                                        -0.5 * dt / (yfu - yfd),
-                                        gu,
-                                        -0.5 * dt / (yfu - yfd),
-                                        -gd,
-                                        eq,
-                                        i)
-            if !(isnearcorners(el_x, el_y, grid))
-                # Avoid corner stencil near physical corners of the domain
-                multiply_add_to_node_vars!(unph, # unph = uf - 0.5*dt*(gu-gd)/(yfu-yfd)
-                                           -0.5 * dt / (xfr - xfl),
-                                           fr,
-                                           0.5 * dt / (xfr - xfl),
-                                           fl,
-                                           eq,
-                                           i)
-            end
-        end
-
-        # Put reflect bc here!
-        ud = get_node_vars(unph, eq, 1)
-        uu = get_node_vars(unph, eq, 2)
-        gd, gu = flux(x, yf, ud, eq, 2), flux(x, yf, uu, eq, 2)
-        X = SVector(x, yf)
-        fn = num_flux(X, ud, uu, gd, gu, ud, uu, eq, 2)
-
-        Fn = get_blended_flux_y(el_x, el_y, ix, eq, dt, grid, blend,
-                                scheme, x, yf, u1y, ua, fn, Fn, op)
-
-        r = @view res[:, ix, :, el_x, el_y - 1]
-
-        multiply_add_to_node_vars!(r, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
-                                   alpha[el_x, el_y - 1] * dt / (dy[el_y - 1] * wg[nd]),
-                                   Fn,
-                                   eq, nd)
-
-        r = @view res[:, ix, :, el_x, el_y]
-
-        multiply_add_to_node_vars!(r, # r[1] -= alpha*dt/(dy*wg[1])*Fn
-                                   -alpha[el_x, el_y] * dt / (dy[el_y] * wg[1]),
-                                   Fn,
-                                   eq, 1)
-
-        return Fn, (1.0 - alpha[el_x, el_y - 1], 1.0 - alpha[el_x, el_y])
+    return Fn, (1.0 - alpha[el_x, el_y - 1], 1.0 - alpha[el_x, el_y])
     end # timer
 end
 
@@ -831,136 +835,137 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
                                             scheme, problem, param, aux, op,
                                             u1, ua)
     @timeit aux.timer "Blending limiter" begin
-        @unpack dx, dy = grid
-        # nx, ny = grid.size
-        nx_tuple, ny_tuple = grid.size
-        @unpack nvar = eq
-        @unpack xg = op
-        nd = length(xg)
-        @unpack limiter = scheme
-        @unpack blend = aux
-        @unpack constant_node_factor = blend.parameters
-        @unpack amax = blend.parameters      # maximum factor of the lower order term
-        @unpack tolE = blend.parameters      # tolerance for denominator
-        @unpack E = blend.cache            # content in high frequency nodes
-        @unpack alpha, alpha_temp = blend.cache    # vector containing smoothness indicator values
-        @unpack (c, a, amin, a0, a1, smooth_alpha, smooth_factor) = blend.parameters # smoothing coefficients
-        @unpack get_indicating_variables! = blend.subroutines
-        @unpack cache = blend
-        @unpack Pn2m = cache
+    #! format: noindent
+    @unpack dx, dy = grid
+    # nx, ny = grid.size
+    nx_tuple, ny_tuple = grid.size
+    @unpack nvar = eq
+    @unpack xg = op
+    nd = length(xg)
+    @unpack limiter = scheme
+    @unpack blend = aux
+    @unpack constant_node_factor = blend.parameters
+    @unpack amax = blend.parameters      # maximum factor of the lower order term
+    @unpack tolE = blend.parameters      # tolerance for denominator
+    @unpack E = blend.cache            # content in high frequency nodes
+    @unpack alpha, alpha_temp = blend.cache    # vector containing smoothness indicator values
+    @unpack (c, a, amin, a0, a1, smooth_alpha, smooth_factor) = blend.parameters # smoothing coefficients
+    @unpack get_indicating_variables! = blend.subroutines
+    @unpack cache = blend
+    @unpack Pn2m = cache
 
-        @threaded for element_index in element_iterator(grid)
+    @threaded for element_index in element_iterator(grid)
+        element = element_indices(element_index, grid)
+        el_x, el_y = element[1], element[2]
+        un, um, tmp = cache.nodal_modal[Threads.threadid()]
+        # Continuous extension to faces
+        u = @view u1[:, :, :, el_x, el_y]
+        @turbo un .= u
+
+        # Copying is needed because we replace these with variables actually
+        # used for indicators like primitives or rho*p, etc.
+
+        # Convert un to ind var, get no. of variables used for indicator
+        n_ind_nvar = get_indicating_variables!(un, eq)
+
+        multiply_dimensionwise!(um, Pn2m, un, tmp)
+
+        # ind = zeros(n_ind_nvar)
+        ind = 0.0
+        # KLUDGE - You are assuming n_ind_var = 1
+
+        for n in 1:n_ind_nvar
+            # um[n,1,1] *= constant_node_factor
+            # TOTHINK - avoid redundant calculations in total_energy_clip1, 2, etc.?
+            total_energy = total_energy_clip1 = total_energy_clip2 = 0.0
+            for j in Base.OneTo(nd), i in Base.OneTo(nd) # TOTHINK - Why is @turbo bad here?
+                total_energy += um[n, i, j]^2
+            end
+
+            for j in Base.OneTo(nd - 1), i in Base.OneTo(nd - 1)
+                total_energy_clip1 += um[n, i, j]^2
+            end
+
+            for j in Base.OneTo(nd - 2), i in Base.OneTo(nd - 2)
+                total_energy_clip2 += um[n, i, j]^2
+            end
+
+            total_energy_den = total_energy - um[n, 1, 1]^2 +
+                               (constant_node_factor * um[n, 1, 1])^2
+
+            if total_energy > tolE
+                ind1 = (total_energy - total_energy_clip1) / total_energy_den
+            else
+                ind1 = 0.0
+            end
+
+            if total_energy_clip1 > tolE
+                ind2 = (total_energy_clip1 - total_energy_clip2) / total_energy_clip1
+            else
+                ind2 = 0.0
+            end
+
+            ind = max(ind1, ind2)
+        end
+        E[el_x, el_y] = maximum(ind) # maximum content among all indicating variables
+
+        T = a * 10^(-c * nd^(0.25))
+        # alpha(E=0) = 0.0001
+        s = log((1.0 - 0.0001) / 0.0001)  # chosen to that E = 0 => alpha = amin
+        alpha[el_x, el_y] = 1.0 / (1.0 + exp((-s / T) * (E[el_x, el_y] - T)))
+
+        if alpha[el_x, el_y] < amin # amin = 0.0001
+            alpha[el_x, el_y] = 0.0
+        elseif alpha[el_x, el_y] > 1.0 - amin
+            alpha[el_x, el_y] = 1.0
+        end
+
+        alpha[el_x, el_y] = min(alpha[el_x, el_y], amax)
+    end
+
+    top_cell = ny_tuple[2]
+    for el_y in 1:top_cell
+        el_x = leftmost_physical_element(el_y, grid)
+        alpha[el_x - 1, el_y] = alpha[el_x, el_y]
+        el_x = nx_tuple[2] # right most physical element
+        alpha[el_x + 1, el_y] = alpha[el_x, el_y]
+    end
+
+    rightmost_cell = nx_tuple[2]
+    for el_x in 1:rightmost_cell
+        alpha[el_x, ny_tuple[2] + 1] = alpha[el_x, ny_tuple[2]] # top
+        el_y = bottom_physical_element(el_x, grid)
+        alpha[el_x, el_y - 1] = alpha[el_x, el_y]
+    end
+
+    # Smoothening of alpha
+    if smooth_alpha == true
+        @turbo alpha_temp .= alpha
+        for element_index in element_iterator(grid)
             element = element_indices(element_index, grid)
             el_x, el_y = element[1], element[2]
-            un, um, tmp = cache.nodal_modal[Threads.threadid()]
-            # Continuous extension to faces
-            u = @view u1[:, :, :, el_x, el_y]
-            @turbo un .= u
-
-            # Copying is needed because we replace these with variables actually
-            # used for indicators like primitives or rho*p, etc.
-
-            # Convert un to ind var, get no. of variables used for indicator
-            n_ind_nvar = get_indicating_variables!(un, eq)
-
-            multiply_dimensionwise!(um, Pn2m, un, tmp)
-
-            # ind = zeros(n_ind_nvar)
-            ind = 0.0
-            # KLUDGE - You are assuming n_ind_var = 1
-
-            for n in 1:n_ind_nvar
-                # um[n,1,1] *= constant_node_factor
-                # TOTHINK - avoid redundant calculations in total_energy_clip1, 2, etc.?
-                total_energy = total_energy_clip1 = total_energy_clip2 = 0.0
-                for j in Base.OneTo(nd), i in Base.OneTo(nd) # TOTHINK - Why is @turbo bad here?
-                    total_energy += um[n, i, j]^2
-                end
-
-                for j in Base.OneTo(nd - 1), i in Base.OneTo(nd - 1)
-                    total_energy_clip1 += um[n, i, j]^2
-                end
-
-                for j in Base.OneTo(nd - 2), i in Base.OneTo(nd - 2)
-                    total_energy_clip2 += um[n, i, j]^2
-                end
-
-                total_energy_den = total_energy - um[n, 1, 1]^2 +
-                                   (constant_node_factor * um[n, 1, 1])^2
-
-                if total_energy > tolE
-                    ind1 = (total_energy - total_energy_clip1) / total_energy_den
-                else
-                    ind1 = 0.0
-                end
-
-                if total_energy_clip1 > tolE
-                    ind2 = (total_energy_clip1 - total_energy_clip2) / total_energy_clip1
-                else
-                    ind2 = 0.0
-                end
-
-                ind = max(ind1, ind2)
-            end
-            E[el_x, el_y] = maximum(ind) # maximum content among all indicating variables
-
-            T = a * 10^(-c * nd^(0.25))
-            # alpha(E=0) = 0.0001
-            s = log((1.0 - 0.0001) / 0.0001)  # chosen to that E = 0 => alpha = amin
-            alpha[el_x, el_y] = 1.0 / (1.0 + exp((-s / T) * (E[el_x, el_y] - T)))
-
-            if alpha[el_x, el_y] < amin # amin = 0.0001
-                alpha[el_x, el_y] = 0.0
-            elseif alpha[el_x, el_y] > 1.0 - amin
-                alpha[el_x, el_y] = 1.0
-            end
-
-            alpha[el_x, el_y] = min(alpha[el_x, el_y], amax)
+            alpha[el_x, el_y] = max(smooth_factor * alpha_temp[el_x - 1, el_y],
+                                    smooth_factor * alpha_temp[el_x, el_y - 1],
+                                    alpha[el_x, el_y],
+                                    smooth_factor * alpha_temp[el_x + 1, el_y],
+                                    smooth_factor * alpha_temp[el_x, el_y + 1])
         end
+    end
 
-        top_cell = ny_tuple[2]
-        for el_y in 1:top_cell
-            el_x = leftmost_physical_element(el_y, grid)
-            alpha[el_x - 1, el_y] = alpha[el_x, el_y]
-            el_x = nx_tuple[2] # right most physical element
-            alpha[el_x + 1, el_y] = alpha[el_x, el_y]
-        end
+    if dt > 0.0
+        blend.cache.dt[1] = dt # hacky fix for compatibility with OrdinaryDiffEq
+    end
 
-        rightmost_cell = nx_tuple[2]
-        for el_x in 1:rightmost_cell
-            alpha[el_x, ny_tuple[2] + 1] = alpha[el_x, ny_tuple[2]] # top
-            el_y = bottom_physical_element(el_x, grid)
-            alpha[el_x, el_y - 1] = alpha[el_x, el_y]
-        end
+    if t < 1e-6
+        alpha .= 1.0
+    end
 
-        # Smoothening of alpha
-        if smooth_alpha == true
-            @turbo alpha_temp .= alpha
-            for element_index in element_iterator(grid)
-                element = element_indices(element_index, grid)
-                el_x, el_y = element[1], element[2]
-                alpha[el_x, el_y] = max(smooth_factor * alpha_temp[el_x - 1, el_y],
-                                        smooth_factor * alpha_temp[el_x, el_y - 1],
-                                        alpha[el_x, el_y],
-                                        smooth_factor * alpha_temp[el_x + 1, el_y],
-                                        smooth_factor * alpha_temp[el_x, el_y + 1])
-            end
-        end
+    if limiter.pure_fv == true
+        @assert scheme.limiter.name == "blend"
+        @turbo alpha .= one(eltype(alpha))
+    end
 
-        if dt > 0.0
-            blend.cache.dt[1] = dt # hacky fix for compatibility with OrdinaryDiffEq
-        end
-
-        if t < 1e-6
-            alpha .= 1.0
-        end
-
-        if limiter.pure_fv == true
-            @assert scheme.limiter.name == "blend"
-            @turbo alpha .= one(eltype(alpha))
-        end
-
-        return nothing
+    return nothing
     end # timer
 end
 
@@ -986,143 +991,145 @@ end
 function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid::StepGrid, op,
                                  u1, aux, t)
     @timeit aux.timer "Update ghost values" begin
-        nx_tuple, ny_tuple = grid.size
-        nd = op.degree + 1
-        @unpack xg = op
-        nvar = size(u1, 1)
+    #! format: noindent
+    nx_tuple, ny_tuple = grid.size
+    nd = op.degree + 1
+    @unpack xg = op
+    nvar = size(u1, 1)
 
-        @unpack cache = aux
+    @unpack cache = aux
 
-        @unpack u1x, u1y = cache
+    @unpack u1x, u1y = cache
 
-        @turbo u1x .= u1
-        @turbo u1y .= u1
+    @turbo u1x .= u1
+    @turbo u1y .= u1
 
-        left, right, bottom, top = problem.boundary_condition
-        boundary_value = problem.boundary_value
-        @unpack dx, dy, xf, yf = grid
+    left, right, bottom, top = problem.boundary_condition
+    boundary_value = problem.boundary_value
+    @unpack dx, dy, xf, yf = grid
 
-        # Left bc is Dirichlet
-        x = xf[1]
-        for j in (ny_tuple[1] + 1):ny_tuple[2]
-            for k in 1:nd
-                y = yf[j] + xg[k] * dy[j]
-                ub = boundary_value(x, y, t)
-                for ix in 1:nd, n in 1:nvar
-                    u1x[n, ix, k, 0, j] = ub[n]
-                end
+    # Left bc is Dirichlet
+    x = xf[1]
+    for j in (ny_tuple[1] + 1):ny_tuple[2]
+        for k in 1:nd
+            y = yf[j] + xg[k] * dy[j]
+            ub = boundary_value(x, y, t)
+            for ix in 1:nd, n in 1:nvar
+                u1x[n, ix, k, 0, j] = ub[n]
             end
         end
+    end
 
-        # Right bc is outflow
-        for el_y in 1:ny_tuple[2], j in 1:nd, i in 1:nd
+    # Right bc is outflow
+    for el_y in 1:ny_tuple[2], j in 1:nd, i in 1:nd
+        for n in eachvariable(eq)
+            u1x[n, i, j, nx_tuple[2] + 1, el_y] = u1[n, nd, j, nx_tuple[2], el_y]
+        end
+    end
+
+    # Horizontal bottom walls are reflective
+    for el_x in bottom_horizontal_iterator(grid)
+        el_y = bottom_physical_element(el_x, grid)
+        for j in 1:nd, i in 1:nd
+            for n in 1:nvar
+                u1y[n, i, j, el_x, el_y - 1] = u1[n, i, 1, el_x, el_y]
+            end
+            u1y[3, i, j, el_x, el_y - 1] *= -1.0 # rho * v2
+        end
+    end
+
+    # Vertical bottom walls are reflective
+    for el_y in bottom_vertical_iterator(grid)
+        el_x = leftmost_physical_element(el_y, grid)
+        for j in 1:nd, i in 1:nd
+            for n in 1:nvar
+                u1x[n, i, j, el_x - 1, el_y] = u1[n, nd, j, el_x, el_y]
+            end
+            u1x[2, i, j, el_x - 1, el_y] *= -1.0 # ρ * v1
+        end
+    end
+
+    # Horizontal walls at top are reflective
+    for el_x in 1:nx_tuple[2]
+        el_y = ny_tuple[2] # top most physical element
+        for j in 1:nd, i in 1:nd
             for n in eachvariable(eq)
-                u1x[n, i, j, nx_tuple[2] + 1, el_y] = u1[n, nd, j, nx_tuple[2], el_y]
+                u1y[n, i, j, el_x, el_y + 1] = u1[n, i, nd, el_x, el_y]
             end
+            u1y[3, i, j, el_x, el_y + 1] *= -1.0 # ρ * v2
         end
-
-        # Horizontal bottom walls are reflective
-        for el_x in bottom_horizontal_iterator(grid)
-            el_y = bottom_physical_element(el_x, grid)
-            for j in 1:nd, i in 1:nd
-                for n in 1:nvar
-                    u1y[n, i, j, el_x, el_y - 1] = u1[n, i, 1, el_x, el_y]
-                end
-                u1y[3, i, j, el_x, el_y - 1] *= -1.0 # rho * v2
-            end
-        end
-
-        # Vertical bottom walls are reflective
-        for el_y in bottom_vertical_iterator(grid)
-            el_x = leftmost_physical_element(el_y, grid)
-            for j in 1:nd, i in 1:nd
-                for n in 1:nvar
-                    u1x[n, i, j, el_x - 1, el_y] = u1[n, nd, j, el_x, el_y]
-                end
-                u1x[2, i, j, el_x - 1, el_y] *= -1.0 # ρ * v1
-            end
-        end
-
-        # Horizontal walls at top are reflective
-        for el_x in 1:nx_tuple[2]
-            el_y = ny_tuple[2] # top most physical element
-            for j in 1:nd, i in 1:nd
-                for n in eachvariable(eq)
-                    u1y[n, i, j, el_x, el_y + 1] = u1[n, i, nd, el_x, el_y]
-                end
-                u1y[3, i, j, el_x, el_y + 1] *= -1.0 # ρ * v2
-            end
-        end
-        return nothing
+    end
+    return nothing
     end # timer
 end
 
 function compute_error(problem, grid::StepGrid, eq::AbstractEquations{2}, aux, op, u1, t)
     @timeit aux.timer "Compute error" begin
-        @unpack error_file, aux_cache = aux
-        @unpack error_cache = aux_cache
-        xmin, xmax, ymin, ymax = grid.domain
-        @unpack xg = op
-        nd = length(xg)
+    #! format: noindent
+    @unpack error_file, aux_cache = aux
+    @unpack error_cache = aux_cache
+    xmin, xmax, ymin, ymax = grid.domain
+    @unpack xg = op
+    nd = length(xg)
 
-        refresh!(u) = fill!(u, zero(eltype(u)))
+    refresh!(u) = fill!(u, zero(eltype(u)))
 
-        @unpack exact_solution = problem
+    @unpack exact_solution = problem
 
-        @unpack xq, w2d, V, arr_cache = error_cache
+    @unpack xq, w2d, V, arr_cache = error_cache
 
-        nq = length(xq)
+    nq = length(xq)
 
-        nx_tuple, ny_tuple = grid.size
-        @unpack xc, yc, dx, dy = grid
+    nx_tuple, ny_tuple = grid.size
+    @unpack xc, yc, dx, dy = grid
 
-        l1_error, l2_error, energy = 0.0, 0.0, 0.0
-        @inbounds @floop for element in CartesianIndices((1:nx_tuple[2], 1:ny_tuple[2]))
-            # for element in CartesianIndices((1:nx, 1:ny))
-            el_x, el_y = element[1], element[2]
-            ue, un = arr_cache[Threads.threadid()]
-            for j in 1:nq, i in 1:nq
-                x = xc[el_x] - 0.5 * dx[el_x] + dx[el_x] * xq[i]
-                y = yc[el_y] - 0.5 * dy[el_y] + dy[el_y] * xq[j]
-                ue_node = exact_solution(x, y, t)
-                set_node_vars!(ue, ue_node, eq, i, j)
-            end
-            u1_ = @view u1[:, :, :, el_x, el_y]
-            refresh!(un)
-            for j in 1:nd, i in 1:nd
-                u_node = get_node_vars(u1_, eq, i, j)
-                for jj in 1:nq, ii in 1:nq
-                    # un = V*u*V', so that
-                    # un[ii,jj] = ∑_ij V[ii,i]*u[i,j]*V[jj,j]
-                    multiply_add_to_node_vars!(un, V[ii, i] * V[jj, j], u_node, eq, ii, jj)
-                end
-            end
-            l1 = l2 = e = 0.0
-            for j in 1:nq, i in 1:nq
-                un_node = get_node_vars(un, eq, i, j)
-                ue_node = get_node_vars(ue, eq, i, j) # KLUDGE - allocated ue is not needed
-                for n in 1:1 # Only computing error in first conservative variable
-                    du = abs(un_node[n] - ue_node[n])
-                    l1 += du * w2d[i, j]
-                    l2 += du * du * w2d[i, j]
-                    e += un_node[n]^2 * w2d[i, j]
-                end
-            end
-            l1 *= dx[el_x] * dy[el_y]
-            l2 *= dx[el_x] * dy[el_y]
-            e *= dx[el_x] * dy[el_y]
-            @reduce(l1_error+=l1, l2_error+=l2, energy+=e)
-            # l1_error += l1; l2_error += l2; energy += e
+    l1_error, l2_error, energy = 0.0, 0.0, 0.0
+    @inbounds @floop for element in CartesianIndices((1:nx_tuple[2], 1:ny_tuple[2]))
+        # for element in CartesianIndices((1:nx, 1:ny))
+        el_x, el_y = element[1], element[2]
+        ue, un = arr_cache[Threads.threadid()]
+        for j in 1:nq, i in 1:nq
+            x = xc[el_x] - 0.5 * dx[el_x] + dx[el_x] * xq[i]
+            y = yc[el_y] - 0.5 * dy[el_y] + dy[el_y] * xq[j]
+            ue_node = exact_solution(x, y, t)
+            set_node_vars!(ue, ue_node, eq, i, j)
         end
-        domain_size = (xmax - xmin) * (ymax - ymin)
-        l1_error = l1_error / domain_size
-        l2_error = sqrt(l2_error / domain_size)
-        energy = energy / domain_size
-        @printf(error_file, "%.16e %.16e %.16e %.16e\n", t, l1_error[1], l2_error[1],
-                energy[1])
+        u1_ = @view u1[:, :, :, el_x, el_y]
+        refresh!(un)
+        for j in 1:nd, i in 1:nd
+            u_node = get_node_vars(u1_, eq, i, j)
+            for jj in 1:nq, ii in 1:nq
+                # un = V*u*V', so that
+                # un[ii,jj] = ∑_ij V[ii,i]*u[i,j]*V[jj,j]
+                multiply_add_to_node_vars!(un, V[ii, i] * V[jj, j], u_node, eq, ii, jj)
+            end
+        end
+        l1 = l2 = e = 0.0
+        for j in 1:nq, i in 1:nq
+            un_node = get_node_vars(un, eq, i, j)
+            ue_node = get_node_vars(ue, eq, i, j) # KLUDGE - allocated ue is not needed
+            for n in 1:1 # Only computing error in first conservative variable
+                du = abs(un_node[n] - ue_node[n])
+                l1 += du * w2d[i, j]
+                l2 += du * du * w2d[i, j]
+                e += un_node[n]^2 * w2d[i, j]
+            end
+        end
+        l1 *= dx[el_x] * dy[el_y]
+        l2 *= dx[el_x] * dy[el_y]
+        e *= dx[el_x] * dy[el_y]
+        @reduce(l1_error+=l1, l2_error+=l2, energy+=e)
+        # l1_error += l1; l2_error += l2; energy += e
+    end
+    domain_size = (xmax - xmin) * (ymax - ymin)
+    l1_error = l1_error / domain_size
+    l2_error = sqrt(l2_error / domain_size)
+    energy = energy / domain_size
+    @printf(error_file, "%.16e %.16e %.16e %.16e\n", t, l1_error[1], l2_error[1],
+            energy[1])
 
-        return Dict("l1_error" => l1_error, "l2_error" => l2_error,
-                    "energy" => energy)
+    return Dict("l1_error" => l1_error, "l2_error" => l2_error,
+                "energy" => energy)
     end # timer
 end
 
@@ -1141,8 +1148,10 @@ function Blend(eq::AbstractEquations{2}, op, grid::StepGrid,
         cache = (;
                  dt = MVector(1.0e20), # filler
                  alpha = zeros(nx_tuple[2], ny_tuple[2]))
+        positivity_blending = NoPositivityBlending()
+        parameters = (; positivity_blending)
         # If limiter is not blend, replace blending with 'do nothing functions'
-        return (; subroutines, cache)
+        return (; parameters, subroutines, cache)
     end
 
     println("Setting up blending limiter...")
@@ -1151,7 +1160,7 @@ function Blend(eq::AbstractEquations{2}, op, grid::StepGrid,
     indicator_model, amax, constant_node_factor,
     smooth_alpha, smooth_factor,
     c, a, amin, tvbM,
-    debug_blend, pure_fv, bc_x) = limiter
+    debug_blend, pure_fv, bc_x, positivity_blending) = limiter
 
     @unpack xc, yc, xf, yf, dx, dy = grid
     nx_tuple, ny_tuple = grid.size
@@ -1170,7 +1179,7 @@ function Blend(eq::AbstractEquations{2}, op, grid::StepGrid,
     parameters = (; E1, E0, tolE, amax, a0, a1, constant_node_factor,
                   smooth_alpha, smooth_factor,
                   c, a, amin, tvbM,
-                  pure_fv, debug = debug_blend)
+                  pure_fv, positivity_blending, debug = debug_blend)
 
     # Big arrays
     E = zeros(nx_tuple[2], ny_tuple[2])
@@ -1238,271 +1247,272 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
                                     scheme, aux, dt, grid::StepGrid, dx, dy, xf, yf, op,
                                     cache, u1, ::Any, f, res)
     @timeit_debug aux.timer "Blending limiter" begin
-        @unpack blend = aux
-        @unpack tvbM = blend.parameters
-        @unpack xg, wg = op
-        num_flux = scheme.numerical_flux
-        nd = length(xg)
-        nvar = nvariables(eq)
+    #! format: noindent
+    @unpack blend = aux
+    @unpack tvbM = blend.parameters
+    @unpack xg, wg = op
+    num_flux = scheme.numerical_flux
+    nd = length(xg)
+    nvar = nvariables(eq)
 
-        @unpack u1x, u1y = cache
-        nx_tuple, ny_tuple = grid.size
+    @unpack u1x, u1y = cache
+    nx_tuple, ny_tuple = grid.size
 
-        id = Threads.threadid()
-        xxf, yyf = blend.cache.subcell_faces[id]
-        xe, ye = blend.cache.solution_points[id] # cell points & 2 from neighbours
-        ue, = blend.cache.ue[id][1] # solution values in cell + 2 from neighbours
-        unph, = blend.cache.unph[id][1] # face values evolved to to time level n+1/2
-        dt = blend.cache.dt[1] # For support with DiffEq
-        @unpack fn_low = blend.cache
-        alpha = blend.cache.alpha[el_x, el_y]
+    id = Threads.threadid()
+    xxf, yyf = blend.cache.subcell_faces[id]
+    xe, ye = blend.cache.solution_points[id] # cell points & 2 from neighbours
+    ue, = blend.cache.ue[id][1] # solution values in cell + 2 from neighbours
+    unph, = blend.cache.unph[id][1] # face values evolved to to time level n+1/2
+    dt = blend.cache.dt[1] # For support with DiffEq
+    @unpack fn_low = blend.cache
+    alpha = blend.cache.alpha[el_x, el_y]
 
-        @unpack conservative2recon!, recon2conservative! = blend.subroutines
+    @unpack conservative2recon!, recon2conservative! = blend.subroutines
 
-        u = @view u1[:, :, :, el_x, el_y]
-        ux = @view u1x[:, :, :, el_x, el_y]
-        uy = @view u1y[:, :, :, el_y, el_y]
-        r = @view res[:, :, :, el_x, el_y]
+    u = @view u1[:, :, :, el_x, el_y]
+    ux = @view u1x[:, :, :, el_x, el_y]
+    uy = @view u1y[:, :, :, el_y, el_y]
+    r = @view res[:, :, :, el_x, el_y]
 
-        # limit the higher order part
-        lmul!(1.0 - alpha, r)
+    # limit the higher order part
+    lmul!(1.0 - alpha, r)
 
-        # compute subcell faces
-        xxf[0], yyf[0] = xf, yf
+    # compute subcell faces
+    xxf[0], yyf[0] = xf, yf
+    for ii in Base.OneTo(nd)
+        xxf[ii] = xxf[ii - 1] + dx * wg[ii]
+        yyf[ii] = yyf[ii - 1] + dy * wg[ii]
+    end
+
+    # Get solution points
+    # xe[0] = xf - dx[el_x-1]*(1.0-xg[nd])
+    xe[0] = xf - grid.dx[el_x - 1] * (1.0 - xg[nd])   # Last solution point of left cell
+    xe[1:nd] .= xf .+ dx * xg          # Solution points inside the cell
+    xe[nd + 1] = xf + grid.dx[el_x] + grid.dx[el_x + 1] * (xg[1]) # First point of right cell
+
+    ye[0] = yf - grid.dy[el_y - 1] * (1.0 - xg[nd]) # Last solution point of lower cell
+    ye[1:nd] .= yf .+ dy * xg                         # solution points inside the cell
+    ye[nd + 1] = yf + grid.dy[el_y] + grid.dy[el_y + 1] * xg[1]  # First point of upper cell
+
+    # EFFICIENCY - Add @turbo here
+    for j in Base.OneTo(nd), i in Base.OneTo(nd), n in eachvariable(eq)
+        ue[n, i, j] = u[n, i, j] # values from current cell
+    end
+
+    # EFFICIENCY - Add @turbo here
+    for k in Base.OneTo(nd), n in eachvariable(eq)
+        ue[n, 0, k] = u1x[n, nd, k, el_x - 1, el_y] # values from left neighbour
+        ue[n, nd + 1, k] = u1x[n, 1, k, el_x + 1, el_y] # values from right neighbour
+
+        ue[n, k, 0] = u1y[n, k, nd, el_x, el_y - 1] # values from lower neighbour
+        ue[n, k, nd + 1] = u1y[n, k, 1, el_x, el_y + 1] # values from upper neighbour
+    end
+
+    # Loop over subcells
+    for jj in Base.OneTo(nd), ii in Base.OneTo(nd)
+        u_ = get_node_vars(ue, eq, ii, jj)
+        ul = get_node_vars(ue, eq, ii - 1, jj)
+        ur = get_node_vars(ue, eq, ii + 1, jj)
+        ud = get_node_vars(ue, eq, ii, jj - 1)
+        uu = get_node_vars(ue, eq, ii, jj + 1)
+
+        # TOTHINK - Add this feature
+        # u_, ul, ur, ud, uu = conservative2recon.((u_,ul,ur,ud,uu))
+
+        # Compute finite differences
+        Δx1, Δx2 = xe[ii] - xe[ii - 1], xe[ii + 1] - xe[ii]
+        back_x, cent_x, fwd_x = finite_differences(Δx1, Δx2, ul, u_, ur)
+        Δy1, Δy2 = ye[jj] - ye[jj - 1], ye[jj + 1] - ye[jj]
+        back_y, cent_y, fwd_y = finite_differences(Δy1, Δy2, ud, u_, uu)
+
+        Mdx2 = tvbM * Δx1
+        Mdy2 = tvbM * Δy1
+
+        # Slopes of linear approximation in cell
+        # Ideally, I'd name both the tuples as slope_tuple, but that
+        # was giving a type instability
+        # beta1 = 2.0
+        # if blend.parameters.pure_fv == true # KLUDGE - Do this in blend.paramaeters
+        beta1, beta2 = 2.0 - alpha, 2.0 - alpha # Unfortunate way to fix type instability
+        # else
+        #    beta1, beta2 = 2.0 - alpha, 2.0 - alpha
+        # end
+
+        slope_tuple_x = (minmod(cent_x[n], back_x[n], fwd_x[n], beta1, Mdx2)
+                         for n in eachvariable(eq))
+
+        slope_x = SVector{nvar}(slope_tuple_x)
+        # beta2 = 2.00.0
+        slope_tuple_y = (minmod(cent_y[n], back_y[n], fwd_y[n], beta2, Mdy2)
+                         for n in eachvariable(eq))
+        slope_y = SVector{nvar}(slope_tuple_y)
+        ufl = u_ + slope_x * (xxf[ii - 1] - xe[ii]) # left  face value u_{i-1/2,j}
+        ufr = u_ + slope_x * (xxf[ii] - xe[ii]) # right face value u_{i+1/2,j}
+
+        ufd = u_ + slope_y * (yyf[jj - 1] - ye[jj]) # lower face value u_{i,j-1/2}
+        ufu = u_ + slope_y * (yyf[jj] - ye[jj]) # upper face value u_{i,j+1/2}
+
+        # KLUDGE - u_star's are not needed in this function, just create and use them
+        # in limit_slope
+
+        u_star_l = u_ + 2.0 * slope_x * (xxf[ii - 1] - xe[ii])
+        u_star_r = u_ + 2.0 * slope_x * (xxf[ii] - xe[ii])
+
+        u_star_d = u_ + 2.0 * slope_y * (yyf[jj - 1] - ye[jj])
+        u_star_u = u_ + 2.0 * slope_y * (yyf[jj] - ye[jj])
+
+        ufl, ufr = limit_slope(eq, slope_x, ufl, u_star_l, ufr, u_star_r, u_,
+                               xxf[ii - 1] - xe[ii], xxf[ii] - xe[ii])
+        ufd, ufu = limit_slope(eq, slope_y, ufd, u_star_d, ufu, u_star_u, u_,
+                               yyf[jj - 1] - ye[jj], yyf[jj] - ye[jj])
+
+        # TOTHINK - Add this feature
+        # Convert back to conservative variables for update
+        # ufl, ufr, ufd, ufu = recon2conservative.((ufl,ufr,ufd,ufu))
+
+        fl = flux(xxf[ii - 1], ye[jj], ufl, eq, 1)
+        fr = flux(xxf[ii], ye[jj], ufr, eq, 1)
+
+        gd = flux(xe[ii], yyf[jj - 1], ufd, eq, 2)
+        gu = flux(xe[ii], yyf[jj], ufu, eq, 2)
+
+        # Use finite difference method to evolve face values to time level n+1/2
+
+        multiply_add_set_node_vars!(unph, # u_{i-1/2+,j}=u_{i-1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
+                                    ufl,  # u_{i-1/2,j}
+                                    -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                    fr,
+                                    -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                    -fl,
+                                    eq,
+                                    1, # Left face
+                                    ii, jj)
+        multiply_add_set_node_vars!(unph, # u_{i+1/2-,j}=u_{i+1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
+                                    ufr,  # u_{i+1/2,j}
+                                    -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                    fr,
+                                    -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                    -fl,
+                                    eq,
+                                    2, # Right face
+                                    ii, jj)
+        multiply_add_set_node_vars!(unph, # u_{i,j-1/2+}=u_{i,j-1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
+                                    ufd,  # u_{i,j-1/2}
+                                    -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                    gu,
+                                    -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                    -gd,
+                                    eq,
+                                    3, # Bottom face
+                                    ii, jj)
+        multiply_add_set_node_vars!(unph, # u_{i,j+1/2-}=u_{i,j+1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
+                                    ufu,  # u_{i,j+1/2}
+                                    -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                    gu,
+                                    -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                    -gd,
+                                    eq,
+                                    4, # Top face
+                                    ii, jj)
+
+        multiply_add_to_node_vars!(unph, # u_{i-1/2+,j}=u_{i,j-1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
+                                   -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                   gu,
+                                   -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                   -gd,
+                                   eq,
+                                   1, # Left face
+                                   ii, jj)
+        multiply_add_to_node_vars!(unph, # u_{i+1/2+,j}=u_{i+1/2,j}-0.5*dt*(gu-gd)/(yfu-yfd)
+                                   -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                   gu,
+                                   -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
+                                   -gd,
+                                   eq,
+                                   2, # Right face
+                                   ii, jj)
+        multiply_add_to_node_vars!(unph, # u_{i-1/2+,j}=u_{i-1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
+                                   -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                   fr,
+                                   -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                   -fl,
+                                   eq,
+                                   3, # Bottom face
+                                   ii, jj)
+        multiply_add_to_node_vars!(unph, # u_{i-1/2+,j}=u_{i-1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
+                                   -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                   fr,
+                                   -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
+                                   -fl,
+                                   eq,
+                                   4, # Top face
+                                   ii, jj)
+    end
+
+    # Now we loop over faces and perform the update
+
+    # loop over vertical inner faces between (ii-1,jj) and (ii,jj)
+    for ii in 2:nd # Supercell faces will be done in blend_face_residual
+        xx = xxf[ii - 1] # face x coordinate, offset because index starts from 0
+        for jj in Base.OneTo(nd)
+            yy = yf + dy * xg[jj] # y coordinate same as solution point
+            X = SVector(xx, yy)
+            ul = get_node_vars(unph, eq, 2, ii - 1, jj)
+            ur = get_node_vars(unph, eq, 1, ii, jj)
+            fl, fr = flux(xx, yy, ul, eq, 1), flux(xx, yy, ur, eq, 1)
+            local fn
+            try
+                fn = num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
+            catch e
+                isa(e, DomainError)
+                @show el_x, el_y
+                @show ii, jj
+                @show ul, ur
+                rethrow(e)
+            end
+            multiply_add_to_node_vars!(r, # r[ii-1,jj] += dt/(dx*wg[ii-1])*fn
+                                       alpha * dt / (dx * wg[ii - 1]),
+                                       fn,
+                                       eq, ii - 1, jj)
+            multiply_add_to_node_vars!(r, # r[ii,jj] += dt/(dx*wg[ii])*fn
+                                       -alpha * dt / (dx * wg[ii]),
+                                       fn,
+                                       eq, ii, jj)
+            # TOTHINK - Can checking this at every iteration be avoided?
+            if ii == 2
+                set_node_vars!(fn_low, fn, eq, jj, 1, el_x, el_y)
+            elseif ii == nd
+                set_node_vars!(fn_low, fn, eq, jj, 2, el_x, el_y)
+            end
+        end
+    end
+
+    # loop over horizontal inner faces between (ii,jj-1) and (ii,jj)
+    for jj in 2:nd
+        yy = yyf[jj - 1] # face y coordinate, offset because index starts from 0
         for ii in Base.OneTo(nd)
-            xxf[ii] = xxf[ii - 1] + dx * wg[ii]
-            yyf[ii] = yyf[ii - 1] + dy * wg[ii]
-        end
-
-        # Get solution points
-        # xe[0] = xf - dx[el_x-1]*(1.0-xg[nd])
-        xe[0] = xf - grid.dx[el_x - 1] * (1.0 - xg[nd])   # Last solution point of left cell
-        xe[1:nd] .= xf .+ dx * xg          # Solution points inside the cell
-        xe[nd + 1] = xf + grid.dx[el_x] + grid.dx[el_x + 1] * (xg[1]) # First point of right cell
-
-        ye[0] = yf - grid.dy[el_y - 1] * (1.0 - xg[nd]) # Last solution point of lower cell
-        ye[1:nd] .= yf .+ dy * xg                         # solution points inside the cell
-        ye[nd + 1] = yf + grid.dy[el_y] + grid.dy[el_y + 1] * xg[1]  # First point of upper cell
-
-        # EFFICIENCY - Add @turbo here
-        for j in Base.OneTo(nd), i in Base.OneTo(nd), n in eachvariable(eq)
-            ue[n, i, j] = u[n, i, j] # values from current cell
-        end
-
-        # EFFICIENCY - Add @turbo here
-        for k in Base.OneTo(nd), n in eachvariable(eq)
-            ue[n, 0, k] = u1x[n, nd, k, el_x - 1, el_y] # values from left neighbour
-            ue[n, nd + 1, k] = u1x[n, 1, k, el_x + 1, el_y] # values from right neighbour
-
-            ue[n, k, 0] = u1y[n, k, nd, el_x, el_y - 1] # values from lower neighbour
-            ue[n, k, nd + 1] = u1y[n, k, 1, el_x, el_y + 1] # values from upper neighbour
-        end
-
-        # Loop over subcells
-        for jj in Base.OneTo(nd), ii in Base.OneTo(nd)
-            u_ = get_node_vars(ue, eq, ii, jj)
-            ul = get_node_vars(ue, eq, ii - 1, jj)
-            ur = get_node_vars(ue, eq, ii + 1, jj)
-            ud = get_node_vars(ue, eq, ii, jj - 1)
-            uu = get_node_vars(ue, eq, ii, jj + 1)
-
-            # TOTHINK - Add this feature
-            # u_, ul, ur, ud, uu = conservative2recon.((u_,ul,ur,ud,uu))
-
-            # Compute finite differences
-            Δx1, Δx2 = xe[ii] - xe[ii - 1], xe[ii + 1] - xe[ii]
-            back_x, cent_x, fwd_x = finite_differences(Δx1, Δx2, ul, u_, ur)
-            Δy1, Δy2 = ye[jj] - ye[jj - 1], ye[jj + 1] - ye[jj]
-            back_y, cent_y, fwd_y = finite_differences(Δy1, Δy2, ud, u_, uu)
-
-            Mdx2 = tvbM * Δx1
-            Mdy2 = tvbM * Δy1
-
-            # Slopes of linear approximation in cell
-            # Ideally, I'd name both the tuples as slope_tuple, but that
-            # was giving a type instability
-            # beta1 = 2.0
-            # if blend.parameters.pure_fv == true # KLUDGE - Do this in blend.paramaeters
-            beta1, beta2 = 2.0 - alpha, 2.0 - alpha # Unfortunate way to fix type instability
-            # else
-            #    beta1, beta2 = 2.0 - alpha, 2.0 - alpha
-            # end
-
-            slope_tuple_x = (minmod(cent_x[n], back_x[n], fwd_x[n], beta1, Mdx2)
-                             for n in eachvariable(eq))
-
-            slope_x = SVector{nvar}(slope_tuple_x)
-            # beta2 = 2.00.0
-            slope_tuple_y = (minmod(cent_y[n], back_y[n], fwd_y[n], beta2, Mdy2)
-                             for n in eachvariable(eq))
-            slope_y = SVector{nvar}(slope_tuple_y)
-            ufl = u_ + slope_x * (xxf[ii - 1] - xe[ii]) # left  face value u_{i-1/2,j}
-            ufr = u_ + slope_x * (xxf[ii] - xe[ii]) # right face value u_{i+1/2,j}
-
-            ufd = u_ + slope_y * (yyf[jj - 1] - ye[jj]) # lower face value u_{i,j-1/2}
-            ufu = u_ + slope_y * (yyf[jj] - ye[jj]) # upper face value u_{i,j+1/2}
-
-            # KLUDGE - u_star's are not needed in this function, just create and use them
-            # in limit_slope
-
-            u_star_l = u_ + 2.0 * slope_x * (xxf[ii - 1] - xe[ii])
-            u_star_r = u_ + 2.0 * slope_x * (xxf[ii] - xe[ii])
-
-            u_star_d = u_ + 2.0 * slope_y * (yyf[jj - 1] - ye[jj])
-            u_star_u = u_ + 2.0 * slope_y * (yyf[jj] - ye[jj])
-
-            ufl, ufr = limit_slope(eq, slope_x, ufl, u_star_l, ufr, u_star_r, u_,
-                                   xxf[ii - 1] - xe[ii], xxf[ii] - xe[ii])
-            ufd, ufu = limit_slope(eq, slope_y, ufd, u_star_d, ufu, u_star_u, u_,
-                                   yyf[jj - 1] - ye[jj], yyf[jj] - ye[jj])
-
-            # TOTHINK - Add this feature
-            # Convert back to conservative variables for update
-            # ufl, ufr, ufd, ufu = recon2conservative.((ufl,ufr,ufd,ufu))
-
-            fl = flux(xxf[ii - 1], ye[jj], ufl, eq, 1)
-            fr = flux(xxf[ii], ye[jj], ufr, eq, 1)
-
-            gd = flux(xe[ii], yyf[jj - 1], ufd, eq, 2)
-            gu = flux(xe[ii], yyf[jj], ufu, eq, 2)
-
-            # Use finite difference method to evolve face values to time level n+1/2
-
-            multiply_add_set_node_vars!(unph, # u_{i-1/2+,j}=u_{i-1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
-                                        ufl,  # u_{i-1/2,j}
-                                        -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
-                                        fr,
-                                        -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
-                                        -fl,
-                                        eq,
-                                        1, # Left face
-                                        ii, jj)
-            multiply_add_set_node_vars!(unph, # u_{i+1/2-,j}=u_{i+1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
-                                        ufr,  # u_{i+1/2,j}
-                                        -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
-                                        fr,
-                                        -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
-                                        -fl,
-                                        eq,
-                                        2, # Right face
-                                        ii, jj)
-            multiply_add_set_node_vars!(unph, # u_{i,j-1/2+}=u_{i,j-1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
-                                        ufd,  # u_{i,j-1/2}
-                                        -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
-                                        gu,
-                                        -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
-                                        -gd,
-                                        eq,
-                                        3, # Bottom face
-                                        ii, jj)
-            multiply_add_set_node_vars!(unph, # u_{i,j+1/2-}=u_{i,j+1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
-                                        ufu,  # u_{i,j+1/2}
-                                        -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
-                                        gu,
-                                        -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
-                                        -gd,
-                                        eq,
-                                        4, # Top face
-                                        ii, jj)
-
-            multiply_add_to_node_vars!(unph, # u_{i-1/2+,j}=u_{i,j-1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
-                                       -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
-                                       gu,
-                                       -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
-                                       -gd,
-                                       eq,
-                                       1, # Left face
-                                       ii, jj)
-            multiply_add_to_node_vars!(unph, # u_{i+1/2+,j}=u_{i+1/2,j}-0.5*dt*(gu-gd)/(yfu-yfd)
-                                       -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
-                                       gu,
-                                       -0.5 * dt / (yyf[jj] - yyf[jj - 1]),
-                                       -gd,
-                                       eq,
-                                       2, # Right face
-                                       ii, jj)
-            multiply_add_to_node_vars!(unph, # u_{i-1/2+,j}=u_{i-1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
-                                       -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
-                                       fr,
-                                       -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
-                                       -fl,
-                                       eq,
-                                       3, # Bottom face
-                                       ii, jj)
-            multiply_add_to_node_vars!(unph, # u_{i-1/2+,j}=u_{i-1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
-                                       -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
-                                       fr,
-                                       -0.5 * dt / (xxf[ii] - xxf[ii - 1]),
-                                       -fl,
-                                       eq,
-                                       4, # Top face
-                                       ii, jj)
-        end
-
-        # Now we loop over faces and perform the update
-
-        # loop over vertical inner faces between (ii-1,jj) and (ii,jj)
-        for ii in 2:nd # Supercell faces will be done in blend_face_residual
-            xx = xxf[ii - 1] # face x coordinate, offset because index starts from 0
-            for jj in Base.OneTo(nd)
-                yy = yf + dy * xg[jj] # y coordinate same as solution point
-                X = SVector(xx, yy)
-                ul = get_node_vars(unph, eq, 2, ii - 1, jj)
-                ur = get_node_vars(unph, eq, 1, ii, jj)
-                fl, fr = flux(xx, yy, ul, eq, 1), flux(xx, yy, ur, eq, 1)
-                local fn
-                try
-                    fn = num_flux(X, ul, ur, fl, fr, ul, ur, eq, 1)
-                catch e
-                    isa(e, DomainError)
-                    @show el_x, el_y
-                    @show ii, jj
-                    @show ul, ur
-                    rethrow(e)
-                end
-                multiply_add_to_node_vars!(r, # r[ii-1,jj] += dt/(dx*wg[ii-1])*fn
-                                           alpha * dt / (dx * wg[ii - 1]),
-                                           fn,
-                                           eq, ii - 1, jj)
-                multiply_add_to_node_vars!(r, # r[ii,jj] += dt/(dx*wg[ii])*fn
-                                           -alpha * dt / (dx * wg[ii]),
-                                           fn,
-                                           eq, ii, jj)
-                # TOTHINK - Can checking this at every iteration be avoided?
-                if ii == 2
-                    set_node_vars!(fn_low, fn, eq, jj, 1, el_x, el_y)
-                elseif ii == nd
-                    set_node_vars!(fn_low, fn, eq, jj, 2, el_x, el_y)
-                end
+            xx = xf + dx * xg[ii] # face x coordinate picked same as the soln point
+            X = SVector(xx, yy)
+            ud = get_node_vars(unph, eq, 4, ii, jj - 1)
+            uu = get_node_vars(unph, eq, 3, ii, jj)
+            gd, gu = flux(xx, yy, ud, eq, 2), flux(xx, yy, uu, eq, 2)
+            gn = num_flux(X, ud, uu, gd, gu, ud, uu, eq, 2)
+            multiply_add_to_node_vars!(r, # r[ii,jj-1]+=alpha*dt/(dy*wg[jj-1])*gn
+                                       alpha * dt / (dy * wg[jj - 1]),
+                                       gn,
+                                       eq, ii, jj - 1)
+            multiply_add_to_node_vars!(r, # r[ii,jj]-=alpha*dt/(dy*wg[jj])*gn
+                                       -alpha * dt / (dy * wg[jj]),
+                                       gn,
+                                       eq, ii, jj)
+            # TOTHINK - Can checking this at every iteration be avoided
+            if jj == 2
+                set_node_vars!(fn_low, gn, eq, ii, 3, el_x, el_y)
+            elseif jj == nd
+                set_node_vars!(fn_low, gn, eq, ii, 4, el_x, el_y)
             end
         end
-
-        # loop over horizontal inner faces between (ii,jj-1) and (ii,jj)
-        for jj in 2:nd
-            yy = yyf[jj - 1] # face y coordinate, offset because index starts from 0
-            for ii in Base.OneTo(nd)
-                xx = xf + dx * xg[ii] # face x coordinate picked same as the soln point
-                X = SVector(xx, yy)
-                ud = get_node_vars(unph, eq, 4, ii, jj - 1)
-                uu = get_node_vars(unph, eq, 3, ii, jj)
-                gd, gu = flux(xx, yy, ud, eq, 2), flux(xx, yy, uu, eq, 2)
-                gn = num_flux(X, ud, uu, gd, gu, ud, uu, eq, 2)
-                multiply_add_to_node_vars!(r, # r[ii,jj-1]+=alpha*dt/(dy*wg[jj-1])*gn
-                                           alpha * dt / (dy * wg[jj - 1]),
-                                           gn,
-                                           eq, ii, jj - 1)
-                multiply_add_to_node_vars!(r, # r[ii,jj]-=alpha*dt/(dy*wg[jj])*gn
-                                           -alpha * dt / (dy * wg[jj]),
-                                           gn,
-                                           eq, ii, jj)
-                # TOTHINK - Can checking this at every iteration be avoided
-                if jj == 2
-                    set_node_vars!(fn_low, gn, eq, ii, 3, el_x, el_y)
-                elseif jj == nd
-                    set_node_vars!(fn_low, gn, eq, ii, 4, el_x, el_y)
-                end
-            end
-        end
+    end
     end # timer
 end
 
@@ -1613,109 +1623,110 @@ end
 function update_ghost_values_cRK!(problem, scheme, eq::AbstractEquations{2},
                                   grid::StepGrid, aux, op, cache, t, dt, scaling_factor = 1)
     @timeit aux.timer "Update ghost values" begin
-        @unpack Fb, Ub = cache
-        update_ghost_values_periodic!(eq, problem, Fb, Ub)
+    #! format: noindent
+    @unpack Fb, Ub = cache
+    update_ghost_values_periodic!(eq, problem, Fb, Ub)
 
-        @unpack periodic_x, periodic_y = problem
-        if periodic_x && periodic_y
-            return nothing
-        end
-
-        nx_tuple, ny_tuple = grid.size
-        nvar = nvariables(eq)
-        @unpack degree, xg, wg = op
-        nd = degree + 1
-        @unpack dx, dy, xf, yf = grid
-        @unpack boundary_condition, boundary_value = problem
-        left, right, bottom, top = boundary_condition
-
-        refresh!(u) = fill!(u, 0.0)
-
-        # For Dirichlet bc, use upwind flux at faces by assigning both physical
-        # and ghost cells through the bc.
-        # Dirichlet bc at left
-        pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
-        for j in 1:ny_tuple[2]
-            x = xf[1]
-            for k in 1:nd
-                y = yf[j] + xg[k] * dy[j]
-                # KLUDGE - Don't allocate so much!
-                ub, fb = pre_allocated[Threads.threadid()]
-                for l in 1:nd
-                    tq = t + xg[l] * dt
-                    ubvalue = boundary_value(x, y, tq)
-                    fbvalue = flux(x, y, ubvalue, eq, 1)
-                    for n in 1:nvar
-                        ub[n] += ubvalue[n] * wg[l]
-                        fb[n] += fbvalue[n] * wg[l]
-                    end
-                end
-                for n in 1:nvar
-                    Ub[n, k, 1, 1, j] = Ub[n, k, 2, 0, j] = ub[n] # upwind
-                    Fb[n, k, 1, 1, j] = Fb[n, k, 2, 0, j] = fb[n] # upwind
-                end
-            end
-        end
-
-        # Right bc are neumann
-        for j in 1:ny_tuple[2]
-            el_x = nx_tuple[2] # right most element
-            for k in 1:nd, n in eachvariable(eq)
-                Ub[n, k, 1, el_x + 1, j] = Ub[n, k, 2, el_x, j]
-                Fb[n, k, 1, el_x + 1, j] = Fb[n, k, 2, el_x, j]
-            end
-        end
-
-        # Horizontal bottom walls are reflective
-        for el_x in bottom_horizontal_iterator(grid)
-            el_y = bottom_physical_element(el_x, grid)
-            for k in 1:nd
-                for n in 1:nvar
-                    Ub[n, k, 4, el_x, el_y - 1] = Ub[n, k, 3, el_x, el_y]
-                    Fb[n, k, 4, el_x, el_y - 1] = Fb[n, k, 3, el_x, el_y]
-                end
-                Ub[3, k, 4, el_x, el_y - 1] *= -1.0 # rho * v2
-                Fb[1, k, 4, el_x, el_y - 1] *= -1.0 # rho * v2
-                Fb[2, k, 4, el_x, el_y - 1] *= -1.0 # rho * v1 * v2
-                Fb[4, k, 4, el_x, el_y - 1] *= -1.0 # (rho*e + p) * v1
-            end
-        end
-
-        # Vertical walls at bottom are reflective
-        for el_y in bottom_vertical_iterator(grid)
-            el_x = leftmost_physical_element(el_y, grid)
-            for k in 1:nd
-                for n in 1:nvar
-                    Ub[n, k, 1, el_x - 1, el_y] = Ub[n, k, 2, el_x, el_y]
-                    Fb[n, k, 1, el_x - 1, el_y] = Fb[n, k, 2, el_x, el_y]
-                end
-                Ub[2, k, 1, el_x - 1, el_y] *= -1.0 # ρ*u1
-                Fb[1, k, 1, el_x - 1, el_y] *= -1.0 # ρ*u1
-                Fb[3, k, 1, el_x - 1, el_y] *= -1.0 # ρ*u1*u2
-                Fb[4, k, 1, el_x - 1, el_y] *= -1.0 # (ρ_e + p) * u1
-            end
-        end
-
-        # Horizontal walls at top are reflective
-        for el_x in 1:nx_tuple[2]
-            el_y = ny_tuple[2] # top most physical element
-            for k in 1:nd
-                for n in eachvariable(eq)
-                    Ub[n, k, 3, el_x, el_y + 1] = Ub[n, k, 4, el_x, el_y]
-                    Fb[n, k, 3, el_x, el_y + 1] = Fb[n, k, 4, el_x, el_y]
-                end
-                Ub[3, k, 3, el_x, el_y + 1] *= -1.0 # ρ*v2
-                Fb[1, k, 3, el_x, el_y + 1] *= -1.0 # ρ*v1*v2
-                Fb[2, k, 3, el_x, el_y + 1] *= -1.0 # ρ*v1*v2
-                Fb[4, k, 3, el_x, el_y + 1] *= -1.0 # (E+p)*v2
-            end
-        end
-
-        if scheme.limiter.name == "blend"
-            update_ghost_values_fn_blend!(eq, problem, grid, aux)
-        end
-
+    @unpack periodic_x, periodic_y = problem
+    if periodic_x && periodic_y
         return nothing
+    end
+
+    nx_tuple, ny_tuple = grid.size
+    nvar = nvariables(eq)
+    @unpack degree, xg, wg = op
+    nd = degree + 1
+    @unpack dx, dy, xf, yf = grid
+    @unpack boundary_condition, boundary_value = problem
+    left, right, bottom, top = boundary_condition
+
+    refresh!(u) = fill!(u, 0.0)
+
+    # For Dirichlet bc, use upwind flux at faces by assigning both physical
+    # and ghost cells through the bc.
+    # Dirichlet bc at left
+    pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
+    for j in 1:ny_tuple[2]
+        x = xf[1]
+        for k in 1:nd
+            y = yf[j] + xg[k] * dy[j]
+            # KLUDGE - Don't allocate so much!
+            ub, fb = pre_allocated[Threads.threadid()]
+            for l in 1:nd
+                tq = t + xg[l] * dt
+                ubvalue = boundary_value(x, y, tq)
+                fbvalue = flux(x, y, ubvalue, eq, 1)
+                for n in 1:nvar
+                    ub[n] += ubvalue[n] * wg[l]
+                    fb[n] += fbvalue[n] * wg[l]
+                end
+            end
+            for n in 1:nvar
+                Ub[n, k, 1, 1, j] = Ub[n, k, 2, 0, j] = ub[n] # upwind
+                Fb[n, k, 1, 1, j] = Fb[n, k, 2, 0, j] = fb[n] # upwind
+            end
+        end
+    end
+
+    # Right bc are neumann
+    for j in 1:ny_tuple[2]
+        el_x = nx_tuple[2] # right most element
+        for k in 1:nd, n in eachvariable(eq)
+            Ub[n, k, 1, el_x + 1, j] = Ub[n, k, 2, el_x, j]
+            Fb[n, k, 1, el_x + 1, j] = Fb[n, k, 2, el_x, j]
+        end
+    end
+
+    # Horizontal bottom walls are reflective
+    for el_x in bottom_horizontal_iterator(grid)
+        el_y = bottom_physical_element(el_x, grid)
+        for k in 1:nd
+            for n in 1:nvar
+                Ub[n, k, 4, el_x, el_y - 1] = Ub[n, k, 3, el_x, el_y]
+                Fb[n, k, 4, el_x, el_y - 1] = Fb[n, k, 3, el_x, el_y]
+            end
+            Ub[3, k, 4, el_x, el_y - 1] *= -1.0 # rho * v2
+            Fb[1, k, 4, el_x, el_y - 1] *= -1.0 # rho * v2
+            Fb[2, k, 4, el_x, el_y - 1] *= -1.0 # rho * v1 * v2
+            Fb[4, k, 4, el_x, el_y - 1] *= -1.0 # (rho*e + p) * v1
+        end
+    end
+
+    # Vertical walls at bottom are reflective
+    for el_y in bottom_vertical_iterator(grid)
+        el_x = leftmost_physical_element(el_y, grid)
+        for k in 1:nd
+            for n in 1:nvar
+                Ub[n, k, 1, el_x - 1, el_y] = Ub[n, k, 2, el_x, el_y]
+                Fb[n, k, 1, el_x - 1, el_y] = Fb[n, k, 2, el_x, el_y]
+            end
+            Ub[2, k, 1, el_x - 1, el_y] *= -1.0 # ρ*u1
+            Fb[1, k, 1, el_x - 1, el_y] *= -1.0 # ρ*u1
+            Fb[3, k, 1, el_x - 1, el_y] *= -1.0 # ρ*u1*u2
+            Fb[4, k, 1, el_x - 1, el_y] *= -1.0 # (ρ_e + p) * u1
+        end
+    end
+
+    # Horizontal walls at top are reflective
+    for el_x in 1:nx_tuple[2]
+        el_y = ny_tuple[2] # top most physical element
+        for k in 1:nd
+            for n in eachvariable(eq)
+                Ub[n, k, 3, el_x, el_y + 1] = Ub[n, k, 4, el_x, el_y]
+                Fb[n, k, 3, el_x, el_y + 1] = Fb[n, k, 4, el_x, el_y]
+            end
+            Ub[3, k, 3, el_x, el_y + 1] *= -1.0 # ρ*v2
+            Fb[1, k, 3, el_x, el_y + 1] *= -1.0 # ρ*v1*v2
+            Fb[2, k, 3, el_x, el_y + 1] *= -1.0 # ρ*v1*v2
+            Fb[4, k, 3, el_x, el_y + 1] *= -1.0 # (E+p)*v2
+        end
+    end
+
+    if scheme.limiter.name == "blend"
+        update_ghost_values_fn_blend!(eq, problem, grid, aux)
+    end
+
+    return nothing
     end # timer
 end
 
@@ -1724,162 +1735,163 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid::StepGrid, op
                                     problem, scheme::Scheme{<:cRK44}, aux, t,
                                     dt, cache)
     @timeit aux.timer "Cell Residual" begin
-        @unpack source_terms = problem
-        @unpack xg, wg, Dm, D1, Vl, Vr = op
-        nd = length(xg)
-        nx, ny = grid.size
-        refresh!(u) = fill!(u, zero(eltype(u)))
-        @unpack bflux_ind = scheme.bflux
-        @unpack blend = aux
+    #! format: noindent
+    @unpack source_terms = problem
+    @unpack xg, wg, Dm, D1, Vl, Vr = op
+    nd = length(xg)
+    nx, ny = grid.size
+    refresh!(u) = fill!(u, zero(eltype(u)))
+    @unpack bflux_ind = scheme.bflux
+    @unpack blend = aux
 
-        @unpack blend_cell_residual! = aux.blend.subroutines
-        @unpack compute_bflux! = scheme.bflux
-        get_dissipation_node_vars = scheme.dissipation
-        @unpack eval_data, cell_arrays, ua, u1, res, Fb, Ub = cache
+    @unpack blend_cell_residual! = aux.blend.subroutines
+    @unpack compute_bflux! = scheme.bflux
+    get_dissipation_node_vars = scheme.dissipation
+    @unpack eval_data, cell_arrays, ua, u1, res, Fb, Ub = cache
 
-        refresh!.((res, Ub, Fb)) # Reset previously used variables to zero
+    refresh!.((res, Ub, Fb)) # Reset previously used variables to zero
 
-        @threaded for element_index in element_iterator(grid) # Loop over cells
-            element = element_indices(element_index, grid)
-            el_x, el_y = element[1], element[2]
-            dx, dy = grid.dx[el_x], grid.dy[el_y]
-            xc, yc = grid.xc[el_x], grid.yc[el_y]
-            lamx, lamy = dt / dx, dt / dy
+    @threaded for element_index in element_iterator(grid) # Loop over cells
+        element = element_indices(element_index, grid)
+        el_x, el_y = element[1], element[2]
+        dx, dy = grid.dx[el_x], grid.dy[el_y]
+        xc, yc = grid.xc[el_x], grid.yc[el_y]
+        lamx, lamy = dt / dx, dt / dy
 
-            u1_ = @view u1[:, :, :, el_x, el_y]
-            r1 = @view res[:, :, :, el_x, el_y]
-            Ub_ = @view Ub[:, :, :, el_x, el_y]
+        u1_ = @view u1[:, :, :, el_x, el_y]
+        r1 = @view res[:, :, :, el_x, el_y]
+        Ub_ = @view Ub[:, :, :, el_x, el_y]
 
-            id = Threads.threadid()
-            u2, u3, u4, F, G, U, S = cell_arrays[id]
+        id = Threads.threadid()
+        u2, u3, u4, F, G, U, S = cell_arrays[id]
 
-            u2 .= u1_
-            u3 .= u1_
-            u4 .= u1_
+        u2 .= u1_
+        u3 .= u1_
+        u4 .= u1_
 
-            # Solution points
-            for j in 1:nd, i in 1:nd
-                x = xc - 0.5 * dx + xg[i] * dx
-                y = yc - 0.5 * dy + xg[j] * dy
-                u_node = get_node_vars(u1_, eq, i, j)
-                flux1, flux2 = flux(x, y, u_node, eq)
-                set_node_vars!(F, flux1 / 6.0, eq, i, j)
-                set_node_vars!(G, flux2 / 6.0, eq, i, j)
-                set_node_vars!(U, u_node / 6.0, eq, i, j)
-                for ii in Base.OneTo(nd)
-                    # ut              += -lam * D * f for each variable
-                    # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-                    multiply_add_to_node_vars!(u2, -0.5 * lamx * Dm[ii, i], flux1, eq,
-                                               ii, j)
-                end
-                for jj in Base.OneTo(nd)
-                    # C += -lam*g*Dm' for each variable
-                    # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-                    multiply_add_to_node_vars!(u2, -0.5 * lamy * Dm[jj, j], flux2, eq,
-                                               i, jj)
-                end
+        # Solution points
+        for j in 1:nd, i in 1:nd
+            x = xc - 0.5 * dx + xg[i] * dx
+            y = yc - 0.5 * dy + xg[j] * dy
+            u_node = get_node_vars(u1_, eq, i, j)
+            flux1, flux2 = flux(x, y, u_node, eq)
+            set_node_vars!(F, flux1 / 6.0, eq, i, j)
+            set_node_vars!(G, flux2 / 6.0, eq, i, j)
+            set_node_vars!(U, u_node / 6.0, eq, i, j)
+            for ii in Base.OneTo(nd)
+                # ut              += -lam * D * f for each variable
+                # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
+                multiply_add_to_node_vars!(u2, -0.5 * lamx * Dm[ii, i], flux1, eq,
+                                           ii, j)
             end
-
-            for j in Base.OneTo(nd), i in Base.OneTo(nd)
-                x = xc - 0.5 * dx + xg[i] * dx
-                y = yc - 0.5 * dy + xg[j] * dy
-
-                u2_node = get_node_vars(u2, eq, i, j)
-
-                flux1, flux2 = flux(x, y, u2_node, eq)
-
-                multiply_add_to_node_vars!(F, 1.0 / 3.0, flux1, eq, i, j)
-                multiply_add_to_node_vars!(G, 1.0 / 3.0, flux2, eq, i, j)
-                multiply_add_to_node_vars!(U, 1.0 / 3.0, u2_node, eq, i, j)
-
-                for ii in Base.OneTo(nd)
-                    # ut              += -lam * D * f for each variable
-                    # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-                    multiply_add_to_node_vars!(u3, -0.5 * lamx * Dm[ii, i], flux1, eq,
-                                               ii, j)
-                end
-                for jj in Base.OneTo(nd)
-                    # C += -lam*g*Dm' for each variable
-                    # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-                    multiply_add_to_node_vars!(u3, -0.5 * lamy * Dm[jj, j], flux2, eq,
-                                               i, jj)
-                end
+            for jj in Base.OneTo(nd)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                multiply_add_to_node_vars!(u2, -0.5 * lamy * Dm[jj, j], flux2, eq,
+                                           i, jj)
             end
-
-            for j in Base.OneTo(nd), i in Base.OneTo(nd)
-                x = xc - 0.5 * dx + xg[i] * dx
-                y = yc - 0.5 * dy + xg[j] * dy
-
-                u3_node = get_node_vars(u3, eq, i, j)
-
-                flux1, flux2 = flux(x, y, u3_node, eq)
-
-                multiply_add_to_node_vars!(F, 1.0 / 3.0, flux1, eq, i, j)
-                multiply_add_to_node_vars!(G, 1.0 / 3.0, flux2, eq, i, j)
-                multiply_add_to_node_vars!(U, 1.0 / 3.0, u3_node, eq, i, j)
-
-                for ii in Base.OneTo(nd)
-                    # ut              += -lam * D * f for each variable
-                    # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-                    multiply_add_to_node_vars!(u4, -lamx * Dm[ii, i], flux1, eq, ii, j)
-                end
-                for jj in Base.OneTo(nd)
-                    # C += -lam*g*Dm' for each variable
-                    # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-                    multiply_add_to_node_vars!(u4, -lamy * Dm[jj, j], flux2, eq, i, jj)
-                end
-            end
-
-            for j in Base.OneTo(nd), i in Base.OneTo(nd)
-                x = xc - 0.5 * dx + xg[i] * dx
-                y = yc - 0.5 * dy + xg[j] * dy
-
-                u4_node = get_node_vars(u4, eq, i, j)
-
-                flux1, flux2 = flux(x, y, u4_node, eq)
-
-                multiply_add_to_node_vars!(F, 1.0 / 6.0, flux1, eq, i, j)
-                multiply_add_to_node_vars!(G, 1.0 / 6.0, flux2, eq, i, j)
-                multiply_add_to_node_vars!(U, 1.0 / 6.0, u4_node, eq, i, j)
-
-                F_node = get_node_vars(F, eq, i, j)
-                G_node = get_node_vars(G, eq, i, j)
-                for ii in Base.OneTo(nd)
-                    # res              += -lam * D * F for each variable
-                    # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)
-                    multiply_add_to_node_vars!(r1, lamx * D1[ii, i], F_node, eq, ii, j)
-                end
-                for jj in Base.OneTo(nd)
-                    # C += -lam*g*Dm' for each variable
-                    # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-                    multiply_add_to_node_vars!(r1, lamy * D1[jj, j], G_node, eq, i, jj)
-                end
-
-                # KLUDGE - update to v1.8 and call with @inline
-                # Give u1_ or U depending on dissipation model
-                U_node = get_dissipation_node_vars(u1_, U, eq, i, j)
-
-                # Ub = UT * V
-                # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
-                multiply_add_to_node_vars!(Ub_, Vl[i], U_node, eq, j, 1)
-                multiply_add_to_node_vars!(Ub_, Vr[i], U_node, eq, j, 2)
-
-                # Ub = U * V
-                # Ub[i] += ∑_j U[i,j]*V[j]
-                multiply_add_to_node_vars!(Ub_, Vl[j], U_node, eq, i, 3)
-                multiply_add_to_node_vars!(Ub_, Vr[j], U_node, eq, i, 4)
-            end
-
-            u = @view u1[:, :, :, el_x, el_y]
-            blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, grid, dx,
-                                 dy,
-                                 grid.xf[el_x], grid.yf[el_y], op, cache, u1, u, nothing,
-                                 res)
-            # Interpolate to faces
-            @views cell_data = (u1_, u2, u3, u4, el_x, el_y)
-            @views compute_bflux!(eq, scheme, grid, cell_data, eval_data, xg, Vl, Vr,
-                                  F, G, Fb[:, :, :, el_x, el_y], aux)
         end
+
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            x = xc - 0.5 * dx + xg[i] * dx
+            y = yc - 0.5 * dy + xg[j] * dy
+
+            u2_node = get_node_vars(u2, eq, i, j)
+
+            flux1, flux2 = flux(x, y, u2_node, eq)
+
+            multiply_add_to_node_vars!(F, 1.0 / 3.0, flux1, eq, i, j)
+            multiply_add_to_node_vars!(G, 1.0 / 3.0, flux2, eq, i, j)
+            multiply_add_to_node_vars!(U, 1.0 / 3.0, u2_node, eq, i, j)
+
+            for ii in Base.OneTo(nd)
+                # ut              += -lam * D * f for each variable
+                # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
+                multiply_add_to_node_vars!(u3, -0.5 * lamx * Dm[ii, i], flux1, eq,
+                                           ii, j)
+            end
+            for jj in Base.OneTo(nd)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                multiply_add_to_node_vars!(u3, -0.5 * lamy * Dm[jj, j], flux2, eq,
+                                           i, jj)
+            end
+        end
+
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            x = xc - 0.5 * dx + xg[i] * dx
+            y = yc - 0.5 * dy + xg[j] * dy
+
+            u3_node = get_node_vars(u3, eq, i, j)
+
+            flux1, flux2 = flux(x, y, u3_node, eq)
+
+            multiply_add_to_node_vars!(F, 1.0 / 3.0, flux1, eq, i, j)
+            multiply_add_to_node_vars!(G, 1.0 / 3.0, flux2, eq, i, j)
+            multiply_add_to_node_vars!(U, 1.0 / 3.0, u3_node, eq, i, j)
+
+            for ii in Base.OneTo(nd)
+                # ut              += -lam * D * f for each variable
+                # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
+                multiply_add_to_node_vars!(u4, -lamx * Dm[ii, i], flux1, eq, ii, j)
+            end
+            for jj in Base.OneTo(nd)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                multiply_add_to_node_vars!(u4, -lamy * Dm[jj, j], flux2, eq, i, jj)
+            end
+        end
+
+        for j in Base.OneTo(nd), i in Base.OneTo(nd)
+            x = xc - 0.5 * dx + xg[i] * dx
+            y = yc - 0.5 * dy + xg[j] * dy
+
+            u4_node = get_node_vars(u4, eq, i, j)
+
+            flux1, flux2 = flux(x, y, u4_node, eq)
+
+            multiply_add_to_node_vars!(F, 1.0 / 6.0, flux1, eq, i, j)
+            multiply_add_to_node_vars!(G, 1.0 / 6.0, flux2, eq, i, j)
+            multiply_add_to_node_vars!(U, 1.0 / 6.0, u4_node, eq, i, j)
+
+            F_node = get_node_vars(F, eq, i, j)
+            G_node = get_node_vars(G, eq, i, j)
+            for ii in Base.OneTo(nd)
+                # res              += -lam * D * F for each variable
+                # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)
+                multiply_add_to_node_vars!(r1, lamx * D1[ii, i], F_node, eq, ii, j)
+            end
+            for jj in Base.OneTo(nd)
+                # C += -lam*g*Dm' for each variable
+                # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
+                multiply_add_to_node_vars!(r1, lamy * D1[jj, j], G_node, eq, i, jj)
+            end
+
+            # KLUDGE - update to v1.8 and call with @inline
+            # Give u1_ or U depending on dissipation model
+            U_node = get_dissipation_node_vars(u1_, U, eq, i, j)
+
+            # Ub = UT * V
+            # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
+            multiply_add_to_node_vars!(Ub_, Vl[i], U_node, eq, j, 1)
+            multiply_add_to_node_vars!(Ub_, Vr[i], U_node, eq, j, 2)
+
+            # Ub = U * V
+            # Ub[i] += ∑_j U[i,j]*V[j]
+            multiply_add_to_node_vars!(Ub_, Vl[j], U_node, eq, i, 3)
+            multiply_add_to_node_vars!(Ub_, Vr[j], U_node, eq, i, 4)
+        end
+
+        u = @view u1[:, :, :, el_x, el_y]
+        blend_cell_residual!(el_x, el_y, eq, scheme, aux, dt, grid, dx,
+                             dy,
+                             grid.xf[el_x], grid.yf[el_y], op, cache, u1, u, nothing,
+                             res)
+        # Interpolate to faces
+        @views cell_data = (u1_, u2, u3, u4, el_x, el_y)
+        @views compute_bflux!(eq, scheme, grid, cell_data, eval_data, xg, Vl, Vr,
+                              F, G, Fb[:, :, :, el_x, el_y], aux)
+    end
     end # timer
 end
 

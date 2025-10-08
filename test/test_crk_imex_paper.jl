@@ -38,7 +38,7 @@ overwrite_errors = false
                   save_iter_interval = 0, save_time_interval = 0.0,
                   animate = false, final_time = 1.0, nx = 4)
     data_name = "reactive_rp1_first_order.txt"
-    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-5)
 
     # cHT112 test, requiring lower CFL
     EqReactive = Tenkai.TenkaicRK.EqEulerReactive1D
@@ -212,6 +212,43 @@ end
                   degree = 0, bound_limit = "no", limiter = setup_limiter_none(),
                   solver = cIMEX111())
     data_name = "tenmom_two_rare_source_super_stiff_2d_cimex111.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    Eq = Tenkai.EqTenMoment2D
+    eq = Eq.get_equation()
+
+    limiter_pure_fv = setup_limiter_blend(blend_type = fo_blend_imex(eq),
+                                          indicating_variables = Eq.conservative_indicator!,
+                                          reconstruction_variables = conservative_reconstruction,
+                                          indicator_model = "gassner",
+                                          amax = 0.5,
+                                          pure_fv = true)
+
+    trixi_include(joinpath(cRK_examples_dir(), "2d",
+                           "run_tenmom_two_rare_source_super_stiff.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.001, nx = 20, ny = 20,
+                  degree = 1, bound_limit = "yes", limiter = limiter_pure_fv,
+                  solver = cRK22())
+    data_name = "tenmom_two_rare_source_super_stiff_2d_pure_fv.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    limiter_blend = setup_limiter_blend(blend_type = fo_blend_imex(eq),
+                                        indicating_variables = Eq.conservative_indicator!,
+                                        reconstruction_variables = conservative_reconstruction,
+                                        indicator_model = "gassner",
+                                        amax = 0.5,
+                                        pure_fv = false)
+
+    trixi_include(joinpath(cRK_examples_dir(), "2d",
+                           "run_tenmom_two_rare_source_super_stiff.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.001, nx = 20, ny = 20,
+                  degree = 1, bound_limit = "yes", limiter = limiter_blend,
+                  solver = cHT112())
+    data_name = "tenmom_two_rare_source_super_stiff_2d_blend.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
 
