@@ -416,6 +416,15 @@ end
 #-------------------------------------------------------------------------------
 # Add numerical flux to residual
 #-------------------------------------------------------------------------------
+
+function get_element_alpha_blending_limiter(blend, el_x, el_y)
+    return blend.cache.alpha[el_x, el_y]
+end
+
+function get_element_alpha_other_limiter(blend, el_x, el_y)
+    return zero(Float64)
+end
+
 # res = ∂_x F_h + ∂_y G_h where F_h, G_h are continuous fluxes. We write it as
 # res = D1*F_δ + gL'*Fn_L + gR'*Fn_R + G_δ*D1T + gL'*Fn_D + gR'*Fn_U.
 # The gL,gR part is what we include in the face residual.
@@ -1247,14 +1256,6 @@ end
 
 @inbounds @inline function no_upwinding_x(u1, eq, op, xf, y, jy, el_x, el_y, Fn)
     return Fn
-end
-
-function get_element_alpha_blending_limiter(blend, el_x, el_y)
-    return blend.cache.alpha[el_x, el_y]
-end
-
-function get_element_alpha_other_limiter(blend, el_x, el_y)
-    return zero(Float64)
 end
 
 # Create Blend2D struct
