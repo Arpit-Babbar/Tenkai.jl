@@ -492,7 +492,7 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
     # This loop is slow with Threads.@threads so we use Polyster.jl threads
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
-        alpha = get_element_alpha(blend, el_x, el_y) # TODO - Use a function to get this
+        alpha = get_element_alpha(blend, el_x, el_y)
         one_m_alp = 1.0 - alpha
         for ix in Base.OneTo(nd)
             for jy in Base.OneTo(nd)
@@ -514,16 +514,26 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
         end
     end
 
-    # This loop is slow with Threads.@threads so we use Polyster.jl threads
+    add_low_order_face_residual!(get_element_alpha, eq, grid, op, aux, dt, Fb, res)
+    return nothing
+    end # timer
+end
+
+function add_low_order_face_residual!(get_element_alpha::typeof(get_element_alpha_blending_limiter),
+                                      eq::AbstractEquations{2}, grid, op, aux, dt, Fb,
+                                      res)
+    @unpack bl, br, wg, degree = op
+    nd = degree + 1
+    nx, ny = grid.size
+    @unpack dx, dy = grid
+    @unpack blend = aux
+    blend_resl = blend.cache.resl
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
         alpha = get_element_alpha(blend, el_x, el_y) # TODO - Use a function to get this
-        one_m_alp = 1.0 - alpha
         for ix in Base.OneTo(nd)
             Fd = get_node_vars(Fb, eq, ix, 3, el_x, el_y)
             Fu = get_node_vars(Fb, eq, ix, 4, el_x, el_y)
-
-            # r = @view res[:,ix,:,el_x,el_y]
 
             multiply_add_to_node_vars!(res, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
                                        -alpha * dt / (dy[el_y] * wg[1]),
@@ -543,43 +553,31 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
             multiply_add_to_node_vars!(res, # r[1] -= alpha*dt/(dy*wg[1])*Fn
                                        alpha * dt / (dx[el_x] * wg[nd]), Fr,
                                        eq, nd, ix, el_x, el_y)
+
+            multiply_add_to_node_vars!(blend_resl, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
+                                       -dt / (dy[el_y] * wg[1]),
+                                       Fd,
+                                       eq, ix, 1, el_x, el_y)
+
+            multiply_add_to_node_vars!(blend_resl, # r[1] -= alpha*dt/(dy*wg[1])*Fn
+                                       dt / (dy[el_y] * wg[nd]),
+                                       Fu,
+                                       eq, ix, nd, el_x, el_y)
+
+            multiply_add_to_node_vars!(blend_resl, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
+                                       -dt / (dx[el_x] * wg[1]), Fl,
+                                       eq, 1, ix, el_x, el_y)
+            multiply_add_to_node_vars!(blend_resl, # r[1] -= alpha*dt/(dy*wg[1])*Fn
+                                       dt / (dx[el_x] * wg[nd]), Fr,
+                                       eq, nd, ix, el_x, el_y)
         end
     end
+end
 
-    # TODO - Proper Multiple dispatch should be used here
-    if hasfield(typeof(blend.cache), :resl)
-        blend_resl = blend.cache.resl
-        @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
-            el_x, el_y = element[1], element[2]
-            for ix in Base.OneTo(nd)
-                Fd = get_node_vars(Fb, eq, ix, 3, el_x, el_y)
-                Fu = get_node_vars(Fb, eq, ix, 4, el_x, el_y)
-
-                # r = @view res[:,ix,:,el_x,el_y]
-
-                multiply_add_to_node_vars!(blend_resl, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
-                                           -dt / (dy[el_y] * wg[1]),
-                                           Fd,
-                                           eq, ix, 1, el_x, el_y)
-
-                multiply_add_to_node_vars!(blend_resl, # r[1] -= alpha*dt/(dy*wg[1])*Fn
-                                           dt / (dy[el_y] * wg[nd]),
-                                           Fu,
-                                           eq, ix, nd, el_x, el_y)
-
-                Fl = get_node_vars(Fb, eq, ix, 1, el_x, el_y)
-                Fr = get_node_vars(Fb, eq, ix, 2, el_x, el_y)
-                multiply_add_to_node_vars!(blend_resl, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
-                                           -dt / (dx[el_x] * wg[1]), Fl,
-                                           eq, 1, ix, el_x, el_y)
-                multiply_add_to_node_vars!(blend_resl, # r[1] -= alpha*dt/(dy*wg[1])*Fn
-                                           dt / (dx[el_x] * wg[nd]), Fr,
-                                           eq, nd, ix, el_x, el_y)
-            end
-        end
-    end
+function add_low_order_face_residual!(get_element_alpha::typeof(get_element_alpha_other_limiter),
+                                      eq::AbstractEquations{2}, grid, op, aux, dt, Fb,
+                                      res)
     return nothing
-    end # timer
 end
 
 #-------------------------------------------------------------------------------
