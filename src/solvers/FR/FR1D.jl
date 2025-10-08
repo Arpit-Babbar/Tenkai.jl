@@ -1530,7 +1530,7 @@ end
         return nothing
     end
 
-    resl = blend.resl
+    resl = @view blend.resl[:, :, cell]
     nvar = nvariables(eq)
     @unpack xxf, fn = blend
     # Get subcell faces
@@ -1564,6 +1564,8 @@ end
     end
 
     axpby!(blend.alpha[cell] * dt / dx, resl, 1.0 - blend.alpha[cell], r)
+
+    resl .*= dt / dx
     end # timer
 end
 
@@ -1664,12 +1666,18 @@ end
     for n in 1:nvar
         # r[n,nd] += alpha[i-1] * dt/dx[i-1] * Fn_[n]/wg[nd] # alpha[i-1] already in blend.lamx
         r[n, nd] += dt / dx[i - 1] * alpha[i - 1] * Fn[n] / wg[nd] # alpha[i-1] already in blend.lamx
+
+        # store for extra limiting (TODO - Multiple dispatch to avoid this unless needed?)
+        blend.resl[n, nd, i - 1] += dt / dx[i - 1] * Fn[n] / wg[nd]
     end
 
     r = @view res[:, :, i]
     for n in 1:nvar
         # r[n,1] -= alpha[i] * dt/dx[i] * Fn_[n]/wg[1] # alpha[i-1] already in blend.lamx
         r[n, 1] -= dt / dx[i] * alpha[i] * Fn[n] / wg[1] # alpha[i-1] already in blend.lamx
+
+        # store for extra limiting (TODO - Multiple dispatch to avoid this unless needed?)
+        blend.resl[n, 1, i] -= dt / dx[i] * Fn[n] / wg[1] # store for extra limiting
     end
     # lamx[i] = (1.0-alpha[i])*lamx[i] # factor of smooth part
     # Fn = (1.0 - alpha[i]) * Fn
@@ -1792,7 +1800,7 @@ end
                               (xxf[ii] - xxf[ii - 1])) # u_j^{n+1/2,+}
         end
     end
-    resl = blend.resl # resl pre-stored.
+    resl = @view blend.resl[:, :, cell] # resl pre-stored.
 
     fill!(resl, zero(eltype(resl)))
 
@@ -1832,6 +1840,7 @@ end
     # axpby!(blend.lamx[cell], resl, 1.0-blend.alpha[cell], r)
     # caused allocations
 
+    resl .*= dt / dx
     end # timer
 end
 
@@ -1996,12 +2005,18 @@ end
     for n in eachvariable(eq)
         # r[n,nd] += alpha[i-1] * dt/dx[i-1] * Fn_[n]/wg[nd] # alpha[i-1] already in blend.lamx
         r[n, nd] += dt / dx[i - 1] * alpha[i - 1] * Fn[n] / wg[nd] # alpha[i-1] already in blend.lamx
+
+        # store for extra limiting (TODO - Multiple dispatch to avoid this unless needed?)
+        blend.resl[n, nd, i - 1] += dt / dx[i - 1] * Fn[n] / wg[nd]
     end
 
     r = @view res[:, :, i]
     for n in eachvariable(eq)
         # r[n,1] -= alpha[i] * dt/dx[i] * Fn_[n]/wg[1] # alpha[i-1] already in blend.lamx
         r[n, 1] -= dt / dx[i] * alpha[i] * Fn[n] / wg[1] # alpha[i-1] already in blend.lamx
+
+        # store for extra limiting (TODO - Multiple dispatch to avoid this unless needed?)
+        blend.resl[n, 1, i] -= dt / dx[i] * Fn[n] / wg[1] # store for extra limiting
     end
 
     return Fn, (1.0 - alpha[i - 1], 1.0 - alpha[i])
@@ -2147,7 +2162,7 @@ struct Blend1D{F1, F2, F3, F4, F5, F6 <: Function, Parameters}
     fr::Vector{Float64}
     fn::Vector{Float64}
     unph::Array{Float64, 3} # solution
-    resl::Array{Float64, 2} # array for lower order FV residual
+    resl::OffsetArray{Float64, 3, Array{Float64, 3}} # array for lower order FV residual
     fn_low::OffsetArray{Float64, 3, Array{Float64, 3}}  # super cell sol points + faces
     amax::Float64           # upper bound for lower-order factor
     parameters::Parameters # Multiply constant node by this factor in indicator
@@ -2299,7 +2314,7 @@ function Blend(eq::AbstractEquations{1}, op, grid,
     fn_low = OffsetArray(zeros(nvar, 2, nx + 2),
                          OffsetArrays.Origin(1, 1, 0))
     unph = zeros(nvar, 2, nd)              # u at time n+1/2, for MUSCL
-    resl = zeros(nvar, nd)                 # lower order residual
+    resl = OffsetArray(zeros(nvar, nd, nx + 2), OffsetArrays.Origin(1, 1, 0)) # lower order residual
     ufl, ufr, fl, fr, fn = [zeros(nvar) for _ in 1:5]
 
     @unpack p_ua = plot_data

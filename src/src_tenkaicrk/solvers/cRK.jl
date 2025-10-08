@@ -162,12 +162,6 @@ struct DoublecRKSourceSolver{SolverSource <: cRKSolver} <: cRKSolver
     single_crk_solver::SolverSource
 end
 
-function fo_blend_imex(eq::AbstractEquations{1, <:Any})
-    (;
-     blend_cell_residual! = blend_cell_residual_fo_imex!,
-     blend_face_residual! = blend_face_residual_fo_imex!,
-     name = "fo_imex")
-end
 # TODO - Bad practice
 
 non_conservative_equation(eq::AbstractEquations) = EMPTY_EQUATIONS

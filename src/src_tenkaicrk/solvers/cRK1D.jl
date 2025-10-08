@@ -28,6 +28,13 @@ using Tenkai: refresh!
 @muladd begin
 #! format: noindent
 
+function fo_blend_imex(eq::AbstractEquations{1, <:Any})
+    (;
+     blend_cell_residual! = blend_cell_residual_fo_imex!,
+     blend_face_residual! = blend_face_residual_fo_imex!,
+     name = "fo_imex")
+end
+
 #-------------------------------------------------------------------------------
 # Ghost values function for the non-conservative part of the equation
 #-------------------------------------------------------------------------------
@@ -84,7 +91,7 @@ end
         return nothing
     end
 
-    resl = blend.resl
+    resl = @view blend.resl[:, :, cell]
     nvar = nvariables(eq)
     @unpack xxf, fn = blend
     # Get subcell faces

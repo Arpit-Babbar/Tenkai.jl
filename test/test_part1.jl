@@ -151,9 +151,32 @@ end
 end
 
 # Shu-Osher test
+# Shu-Osher test
 @testset "Shu-Osher 1D" begin
     γ = 1.4
     Eq = Tenkai.EqEuler1D
+    equation = Eq.get_equation(γ)
+
+    trixi_include(joinpath(examples_dir(), "1d", "run_shuosher.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 1.8, nx = 16,
+                  γ = γ, degree = 3,
+                  blend_type = fo_blend(equation))
+
+    data_name = "shuosher_1d_fo_blend.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(examples_dir(), "1d", "run_shuosher.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 1.8, nx = 16,
+                  γ = γ, degree = 3,
+                  blend_type = mh_blend(equation))
+
+    data_name = "shuosher_1d_mh_blend.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
     trixi_include(joinpath(examples_dir(), "1d", "run_shuosher.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,
@@ -161,7 +184,7 @@ end
                   γ = γ,
                   solver = TrixiRKSolver(), degree = 3,
                   solution_points = "gll", correction_function = "g2",
-                  limiter = setup_limiter_blend(blend_type = fo_blend(Eq.get_equation(γ)),
+                  limiter = setup_limiter_blend(blend_type = fo_blend(equation),
                                                 indicating_variables = Eq.rho_p_indicator!,
                                                 reconstruction_variables = conservative_reconstruction,
                                                 indicator_model = "gassner",
@@ -209,4 +232,22 @@ end
                   cfl_safety_factor = 0.98)
     data_name = "dwave_2d_trixi_rkfr_3_gl.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+end
+
+# Double Mach reflection
+@testset "Double Mach reflection" begin
+    Eq = Tenkai.EqEuler2D
+    equation = Eq.get_equation(1.4)
+    filenames = ("dmr_fo_blend.txt", "dmr_mh_blend.txt")
+    blend_types = (fo_blend(equation), mh_blend(equation))
+    for i in 1:2
+        trixi_include(joinpath(examples_dir(), "2d", "run_double_mach_reflection.jl"),
+                      save_time_interval = 0.0, save_iter_interval = 0,
+                      compute_error_interval = 0,
+                      animate = false, final_time = 0.1, ny = 5,
+                      degree = 3,
+                      blend_type = blend_types[i])
+        data_name = filenames[i]
+        compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+    end
 end

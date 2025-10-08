@@ -416,6 +416,15 @@ end
 #-------------------------------------------------------------------------------
 # Add numerical flux to residual
 #-------------------------------------------------------------------------------
+
+function get_element_alpha_blending_limiter(blend, el_x, el_y)
+    return blend.cache.alpha[el_x, el_y]
+end
+
+function get_element_alpha_other_limiter(blend, el_x, el_y)
+    return zero(Float64)
+end
+
 # res = ∂_x F_h + ∂_y G_h where F_h, G_h are continuous fluxes. We write it as
 # res = D1*F_δ + gL'*Fn_L + gR'*Fn_R + G_δ*D1T + gL'*Fn_D + gR'*Fn_U.
 # The gL,gR part is what we include in the face residual.
@@ -492,7 +501,7 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
     # This loop is slow with Threads.@threads so we use Polyster.jl threads
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
-        alpha = get_element_alpha(blend, el_x, el_y) # TODO - Use a function to get this
+        alpha = get_element_alpha(blend, el_x, el_y)
         one_m_alp = 1.0 - alpha
         for ix in Base.OneTo(nd)
             for jy in Base.OneTo(nd)
@@ -514,16 +523,26 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
         end
     end
 
-    # This loop is slow with Threads.@threads so we use Polyster.jl threads
+    add_low_order_face_residual!(get_element_alpha, eq, grid, op, aux, dt, Fb, res)
+    return nothing
+    end # timer
+end
+
+function add_low_order_face_residual!(get_element_alpha::typeof(get_element_alpha_blending_limiter),
+                                      eq::AbstractEquations{2}, grid, op, aux, dt, Fb,
+                                      res)
+    @unpack bl, br, wg, degree = op
+    nd = degree + 1
+    nx, ny = grid.size
+    @unpack dx, dy = grid
+    @unpack blend = aux
+    blend_resl = blend.cache.resl
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
         alpha = get_element_alpha(blend, el_x, el_y) # TODO - Use a function to get this
-        one_m_alp = 1.0 - alpha
         for ix in Base.OneTo(nd)
             Fd = get_node_vars(Fb, eq, ix, 3, el_x, el_y)
             Fu = get_node_vars(Fb, eq, ix, 4, el_x, el_y)
-
-            # r = @view res[:,ix,:,el_x,el_y]
 
             multiply_add_to_node_vars!(res, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
                                        -alpha * dt / (dy[el_y] * wg[1]),
@@ -543,10 +562,31 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
             multiply_add_to_node_vars!(res, # r[1] -= alpha*dt/(dy*wg[1])*Fn
                                        alpha * dt / (dx[el_x] * wg[nd]), Fr,
                                        eq, nd, ix, el_x, el_y)
+
+            multiply_add_to_node_vars!(blend_resl, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
+                                       -dt / (dy[el_y] * wg[1]),
+                                       Fd,
+                                       eq, ix, 1, el_x, el_y)
+
+            multiply_add_to_node_vars!(blend_resl, # r[1] -= alpha*dt/(dy*wg[1])*Fn
+                                       dt / (dy[el_y] * wg[nd]),
+                                       Fu,
+                                       eq, ix, nd, el_x, el_y)
+
+            multiply_add_to_node_vars!(blend_resl, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
+                                       -dt / (dx[el_x] * wg[1]), Fl,
+                                       eq, 1, ix, el_x, el_y)
+            multiply_add_to_node_vars!(blend_resl, # r[1] -= alpha*dt/(dy*wg[1])*Fn
+                                       dt / (dx[el_x] * wg[nd]), Fr,
+                                       eq, nd, ix, el_x, el_y)
         end
     end
+end
+
+function add_low_order_face_residual!(get_element_alpha::typeof(get_element_alpha_other_limiter),
+                                      eq::AbstractEquations{2}, grid, op, aux, dt, Fb,
+                                      res)
     return nothing
-    end # timer
 end
 
 #-------------------------------------------------------------------------------
@@ -1218,14 +1258,6 @@ end
     return Fn
 end
 
-function get_element_alpha_blending_limiter(blend, el_x, el_y)
-    return blend.cache.alpha[el_x, el_y]
-end
-
-function get_element_alpha_other_limiter(blend, el_x, el_y)
-    return zero(Float64)
-end
-
 # Create Blend2D struct
 function Blend(eq::AbstractEquations{2}, op, grid,
                problem::Problem,
@@ -1335,11 +1367,14 @@ function Blend(eq::AbstractEquations{2}, op, grid,
 
     Pn2m = nodal2modal(xg)
 
+    resl = OffsetArray(zeros(nvar, nd, nd, nx + 2, ny + 2),
+                       OffsetArrays.Origin(1, 1, 1, 0, 0))
+
     cache = (; alpha, alpha_temp, alpha_max, E, ue,
              subcell_faces,
              solution_points,
              fn_low, dt = MVector(1.0),
-             nodal_modal, unph, Pn2m, slopes,
+             nodal_modal, unph, Pn2m, slopes, resl,
              times = [], total_activations = [])
 
     println("Setting up $blend_type blending limiter with $indicator_model "
@@ -1642,6 +1677,7 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem, 
 
     u = @view u1[:, :, :, el_x, el_y]
     r = @view res[:, :, :, el_x, el_y]
+    blend_resl = @view blend.cache.resl[:, :, :, el_x, el_y]
 
     if alpha < 1e-12
         store_low_flux!(u, el_x, el_y, xf, yf, dx, dy, op, blend, eq,
@@ -1674,6 +1710,15 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem, 
             multiply_add_to_node_vars!(r, # r[ii,jj]+=alpha*dt/(dx*wg[ii])*fn
                                        -alpha * dt / (dx * wg[ii]),
                                        fn, eq, ii, jj)
+
+            # TODO - Maybe collect only in blend_resl and then copy to r
+            # or use multiple dispatch to do this only when needed
+            multiply_add_to_node_vars!(blend_resl, # r[ii-1,jj]+=dt/(dx*wg[ii-1])*fn
+                                       dt / (dx * wg[ii - 1]),
+                                       fn, eq, ii - 1, jj)
+            multiply_add_to_node_vars!(blend_resl, # r[ii,jj]+=dt/(dx*wg[ii])*fn
+                                       -dt / (dx * wg[ii]),
+                                       fn, eq, ii, jj)
             # TOTHINK - Can checking this in every step of the loop be avoided
             if ii == 2
                 set_node_vars!(fn_low, fn, eq, jj, 1, el_x, el_y)
@@ -1700,6 +1745,19 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem, 
                                        -alpha * dt / (dy * wg[jj]),
                                        fn,
                                        eq, ii, jj)
+
+            # TODO - Maybe collect only in blend_resl and then copy to r
+            # or use multiple dispatch to do this only when needed
+            multiply_add_to_node_vars!(blend_resl, # r[ii,jj-1]+=dt/(dy*wg[jj-1])*fn
+                                       dt / (dy * wg[jj - 1]),
+                                       fn,
+                                       eq, ii, jj - 1)
+
+            multiply_add_to_node_vars!(blend_resl, # r[ii,jj]+=dt/(dy*wg[jj])*fn
+                                       -dt / (dy * wg[jj]),
+                                       fn,
+                                       eq, ii, jj)
+
             # TOTHINK - Can checking this in every step of the loop be avoided
             if jj == 2
                 set_node_vars!(fn_low, fn, eq, ii, 3, el_x, el_y)
@@ -1718,6 +1776,10 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem, 
             s_node = calc_source(u_node, X, t, source_terms, eq)
             multiply_add_to_node_vars!(r,
                                        -alpha * dt, # / (dx * dy * wg[ii] * wg[jj]),
+                                       s_node, eq, ii, jj)
+
+            multiply_add_to_node_vars!(blend_resl,
+                                       -dt, # / (dx * dy * wg[ii] * wg[jj]),
                                        s_node, eq, ii, jj)
         end
     end
@@ -1751,6 +1813,7 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
 
     u = @view u1[:, :, :, el_x, el_y]
     r = @view res[:, :, :, el_x, el_y]
+    blend_resl = @view blend.cache.resl[:, :, :, el_x, el_y]
 
     if alpha < 1e-12
         store_low_flux!(u, el_x, el_y, xf, yf, dx, dy, op, blend, eq,
@@ -1954,6 +2017,18 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
                                        -alpha * dt / (dx * wg[ii]),
                                        fn,
                                        eq, ii, jj)
+
+            # TODO - Maybe collect only in blend_resl and then copy to r
+            # or use multiple dispatch to do this only when needed
+            multiply_add_to_node_vars!(blend_resl, # r[ii-1,jj]
+                                       dt / (dx * wg[ii - 1]),
+                                       fn,
+                                       eq, ii - 1, jj)
+
+            multiply_add_to_node_vars!(blend_resl, # r[ii,jj]
+                                       -dt / (dx * wg[ii]),
+                                       fn,
+                                       eq, ii, jj)
             # TOTHINK - Can checking this at every iteration be avoided?
             if ii == 2
                 set_node_vars!(fn_low, fn, eq, jj, 1, el_x, el_y)
@@ -1981,6 +2056,19 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
                                        -alpha * dt / (dy * wg[jj]),
                                        gn,
                                        eq, ii, jj)
+
+            # TODO - Maybe collect only in blend_resl and then copy to r
+            # or use multiple dispatch to do this only when needed
+            multiply_add_to_node_vars!(blend_resl, # r[ii,jj-1]+=dt/(dy*wg[jj-1])*gn
+                                       dt / (dy * wg[jj - 1]),
+                                       gn,
+                                       eq, ii, jj - 1)
+
+            multiply_add_to_node_vars!(blend_resl, # r[ii,jj]-=dt/(dy*wg[jj])*gn
+                                       -dt / (dy * wg[jj]),
+                                       gn,
+                                       eq, ii, jj)
+
             # TOTHINK - Can checking this at every iteration be avoided
             if jj == 2
                 set_node_vars!(fn_low, gn, eq, ii, 3, el_x, el_y)
