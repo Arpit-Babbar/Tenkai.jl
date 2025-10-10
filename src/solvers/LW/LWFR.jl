@@ -144,6 +144,7 @@ end
 function update_solution_lwfr!(u1, res, aux)
     @timeit aux.timer "Update solution" begin
     #! format: noindent
+    # TODO - This will be bad for one thread. Need to do a parallel axpy!
     axpy!(-1.0, res, u1) # u1 = (-1.0)*res + u1
     return nothing
     end # timer
