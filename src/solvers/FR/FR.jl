@@ -19,6 +19,7 @@ using LoopVectorization
 using MuladdMacro
 using JSON3
 using SimpleNonlinearSolve
+using ForwardDiff: Dual
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -344,6 +345,32 @@ end
     mul!(C, A1, B1)         # C = A1 * B1
     mul!(C, A2, B2, a2, a1) # C = a1 * C + a2 * A2 * B2
     return nothing
+end
+
+function newton_step(func, x)
+    d = func(Dual(x, 1.0))
+    # VERY INEFFICIENT TO BE COMPUTING THE STEP MULTIPLE TIMES
+    stepsize = d.value / (d.partials[1] + 1e-16)
+    while x - stepsize < 0.0 || x - stepsize > 1.0
+        stepsize *= 0.5
+    end
+    return x - stepsize
+end
+
+function newton_solver_scalar(func, y0, tol = 1e-14, maxiters = 1e3)
+    error = func(y0)
+    iter = 0
+    y = y0
+    while abs(error) > tol && iter < maxiters
+        y = newton_step(func, y)
+        error = func(y)
+        iter += 1
+    end
+
+    if error > 100 * tol
+        @warn "Newton solver did not converge: error = $error, iter = $iter"
+    end
+    return y
 end
 
 function newton_solver_tenkai(func, y0, tol = 1e-14, maxiters = 1e3)
