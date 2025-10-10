@@ -1,6 +1,7 @@
 using Tenkai.StaticArrays
 using Tenkai.TenkaicRK
 using Tenkai
+import Tenkai.TenkaicRK: implicit_source_solve
 
 # Submodules
 Eq = Tenkai.EqTenMoment2D
@@ -52,11 +53,12 @@ function (source::MyTenMomentSource)(u, x, t, equations::Eq.TenMoment2D)
     rho = u[1]
     rho_v1 = u[2]
     rho_v2 = u[3]
-    term1 = SVector(0.0, -0.5 * rho * Wx, 0.0, -0.5 * rho_v1 * Wx, -0.25 * rho_v2 * Wx,
-                    0.0)
-    term2 = SVector(0.0, 0.0, -0.5 * rho * Wy, 0.0, -0.25 * rho_v1 * Wy,
-                    -0.5 * rho_v2 * Wy)
-    return term1 + term2
+    return SVector(0.0,
+                   -0.5 * rho * Wx,
+                   -0.5 * rho * Wy,
+                   -0.5 * rho_v1 * Wx,
+                   -0.25 * rho_v2 * Wx - 0.25 * rho_v1 * Wy,
+                   -0.5 * rho_v2 * Wy)
 end
 
 source_term1 = (u, x, t, equations::Eq.TenMoment2D) -> Eq.ten_moment_source(u, x[1], x[2],
@@ -67,11 +69,24 @@ source_term1 = (u, x, t, equations::Eq.TenMoment2D) -> Eq.ten_moment_source(u, x
 
 source_term = MyTenMomentSource(gauss_source_x, gauss_source_y)
 
+function implicit_source_solve(lhs, eq, x, t, coefficient, source_terms::MyTenMomentSource,
+                               u_node,
+                               implicit_solver = nothing)
+    Wx = source_terms.Wx(x[1], x[2], t)
+    Wy = source_terms.Wy(x[1], x[2], t)
+    u1_np1 = lhs[1]
+    u2_np1 = lhs[2] - 0.5 * coefficient * u1_np1 * Wx
+    u3_np1 = lhs[3] - 0.5 * coefficient * u1_np1 * Wy
+    u4_np1 = lhs[4] - 0.5 * coefficient * u2_np1 * Wx
+    u5_np1 = lhs[5] - 0.25 * coefficient * u3_np1 * Wx - 0.25 * coefficient * u2_np1 * Wy
+    u6_np1 = lhs[6] - 0.5 * coefficient * u3_np1 * Wy
+    return SVector(u1_np1, u2_np1, u3_np1, u4_np1, u5_np1, u6_np1)
+end
+
 initial_value, exact_solution, boundary_value = initial_wave, exact_wave, dummy_bv
 
-degree = 0 # CHANGE TO 2 TO SEE THE CRASH
-# solver = cRK44() # (ALSO UNCOMMENT TO SEE THE CRASH)
-solver = cIMEX111()
+degree = 3
+solver = cAGSA343()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
@@ -79,8 +94,8 @@ bound_limit = "no" # CHANGE TO "yes" TO FAIRLY SEE THE CRASH
 bflux = extrapolate
 final_time = 0.02
 
-nx = 50
-ny = 50
+nx = 200
+ny = 200
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
@@ -97,14 +112,16 @@ problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution, source_terms = source_term)
 limiter = setup_limiter_none()
 
-# # (ALSO UNCOMMENT THE LIMITER TO SEE THE CRASH)
-# limiter = setup_limiter_blend(blend_type = fo_blend(eq),
-#                             #   indicating_variables = Eq.rho_p_indicator!,
-#                                 indicating_variables = Eq.conservative_indicator!,
-#                               reconstruction_variables = conservative_reconstruction,
-#                               indicator_model = "gassner",
-#                               amax = 0.5,
-#                               pure_fv = false)
+limiter = setup_limiter_blend(blend_type = fo_blend_imex(eq),
+                              #   indicating_variables = Eq.rho_p_indicator!,
+                              indicating_variables = Eq.conservative_indicator!,
+                              reconstruction_variables = conservative_reconstruction,
+                              indicator_model = "gassner",
+                              amax = 1.0,
+                              pure_fv = false,
+                              positivity_blending = PositivityBlending((Eq.density_constraint,
+                                                                        Eq.trace_constraint,
+                                                                        Eq.det_constraint)))
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,

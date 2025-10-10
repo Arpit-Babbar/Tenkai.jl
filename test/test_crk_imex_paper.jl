@@ -230,6 +230,7 @@ end
                   compute_error_interval = 0,
                   animate = false, final_time = 0.001, nx = 20, ny = 20,
                   degree = 1, bound_limit = "yes", limiter = limiter_pure_fv,
+                  cfl_safety_factor = 0.95,
                   solver = cRK22())
     data_name = "tenmom_two_rare_source_super_stiff_2d_pure_fv.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
@@ -247,8 +248,29 @@ end
                   compute_error_interval = 0,
                   animate = false, final_time = 0.001, nx = 20, ny = 20,
                   degree = 1, bound_limit = "yes", limiter = limiter_blend,
+                  cfl_safety_factor = 0.95,
                   solver = cHT112())
     data_name = "tenmom_two_rare_source_super_stiff_2d_blend.txt"
+
+    limiter_blend = setup_limiter_blend(blend_type = fo_blend_imex(eq),
+                                        indicating_variables = Eq.conservative_indicator!,
+                                        reconstruction_variables = conservative_reconstruction,
+                                        indicator_model = "gassner",
+                                        amax = 0.5,
+                                        pure_fv = false,
+                                        positivity_blending = PositivityBlending((Eq.density_constraint,
+                                                                                  Eq.trace_constraint,
+                                                                                  Eq.det_constraint)))
+
+    trixi_include(joinpath(cRK_examples_dir(), "2d",
+                           "run_tenmom_two_rare_source_super_stiff.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.01, nx = 20, ny = 20,
+                  cfl_safety_factor = 0.95,
+                  degree = 3, bound_limit = "no", limiter = limiter_blend,
+                  solver = cAGSA343())
+    data_name = "tenmom_two_rare_source_super_stiff_2d_blend_positivity.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
 

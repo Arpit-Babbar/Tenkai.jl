@@ -5,7 +5,8 @@ using Tenkai: periodic, dirichlet, neumann, reflect, extrapolate, evaluate,
               add_to_node_vars!, subtract_from_node_vars!,
               multiply_add_to_node_vars!, multiply_add_set_node_vars!,
               comp_wise_mutiply_node_vars!, flux, update_ghost_values_lwfr!,
-              PositivityBlending, NoPositivityBlending, update_solution_lwfr!
+              PositivityBlending, NoPositivityBlending, update_solution_lwfr!,
+              newton_solver_tenkai, newton_solver_scalar
 
 using SimpleUnPack
 using TimerOutputs
@@ -19,6 +20,8 @@ using Tenkai: refresh!
 
 import Tenkai: extrap_bflux!, get_bflux_function, setup_arrays,
                compute_cell_residual_cRK!, update_solution_cRK!
+
+using Tenkai.EqTenMoment2D: det_constraint
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -379,6 +382,8 @@ function blend_cell_residual_fo_imex!(el_x, el_y, eq::AbstractEquations{2}, prob
     num_flux = scheme.numerical_flux
     nd = length(xg)
 
+    @unpack positivity_blending = blend.parameters
+
     id = Threads.threadid()
     xxf, yyf = blend.cache.subcell_faces[id]
     @unpack fn_low = blend.cache
@@ -389,7 +394,7 @@ function blend_cell_residual_fo_imex!(el_x, el_y, eq::AbstractEquations{2}, prob
     blend_resl = @view blend.cache.resl[:, :, :, el_x, el_y]
     blend_resl .= zero(eltype(blend_resl))
 
-    if alpha < 1e-12
+    if alpha < 1e-12 && isa(positivity_blending, NoPositivityBlending)
         store_low_flux!(u, el_x, el_y, xf, yf, dx, dy, op, blend, eq,
                         scaling_factor)
         return nothing
@@ -517,6 +522,8 @@ end
 
             multiply_add_to_node_vars!(res, -dt * alpha, s_node_implicit, eq, i, j,
                                        el_x, el_y)
+            multiply_add_to_node_vars!(blend_res, -dt, s_node_implicit, eq, i, j,
+                                       el_x, el_y)
         end
     end
     end # timer
@@ -528,13 +535,181 @@ end
     return nothing
 end
 
-@inbounds @inline function update_with_residuals!(positivity_blending::PositivityBlending,
-                                                  eq::AbstractEquations{2}, u1,
-                                                  res, aux)
+@inbounds function update_with_residuals!(positivity_blending::PositivityBlending,
+                                          eq::AbstractEquations{2}, grid, op, u1,
+                                          res, aux)
+    @unpack blend = aux
+    res_blend = blend.cache.resl
+    @threaded for i in eachindex(res_blend)
+        res_blend[i] = u1[i] - res_blend[i]
+    end
+    update_solution_lwfr!(u1, res, aux) # u1 = u1 - res
+
+    u1_low = res_blend
+
+    @unpack variables = positivity_blending
+    apply_positivity_blending!(u1, u1_low, eq, grid, op, aux, variables)
+end
+
+function find_val_min(eq::AbstractEquations{2}, u, op, variable)
+    nd = op.degree + 1
+    val_min = 1e20
+    for j in 1:nd, i in 1:nd
+        val = variable(eq, get_node_vars(u, eq, i, j))
+        val_min = min(val_min, val)
+    end
+    return val_min
+end
+
+function find_avg(eq::AbstractEquations{2}, u, op)
+    @unpack wg = op
+    nd = op.degree + 1
+    u_avg = zero(get_node_vars(u, eq, 1, 1))
+    for j in 1:nd, i in 1:nd
+        u_avg += wg[i] * wg[j] * get_node_vars(u, eq, i, j)
+    end
+    return u_avg
+end
+
+function find_theta_positivity_blending(eq::AbstractEquations{2},
+                                        u_high_node, u_low_node, val_min, variable)
+    val_high = variable(eq, u_high_node)
+    if val_high > 0.0
+        return 1.0
+    end
+    val_low = variable(eq, u_low_node)
+
+    eps = 0.1 * val_min
+
+    theta = abs(eps - val_low) / (abs(val_high - val_low) + 1e-13)
+    return theta
+end
+
+function find_theta_positivity_blending(eq::AbstractEquations{2},
+                                        u_high_node, u_low_node, val_min,
+                                        variable::typeof(det_constraint))
+    val_high = variable(eq, u_high_node)
+    if val_high > 0.0
+        return 1.0
+    end
+
+    # eps = min(0.1 * val_min, 1e-10)
+    eps = 0.1 * val_min
+
+    func(theta) = variable(eq, theta * u_high_node + (1 - theta) * u_low_node) - eps
+
+    newton_accuracy = min(eps / 10, 1e-12)
+    local niters
+    if newton_accuracy < 1e-12
+        niters = 100
+    else
+        niters = 10
+    end
+
+    initial_guess = 0.5 # 1 would be better, but it was going above 1 too often
+    theta = newton_solver_scalar(func, initial_guess, newton_accuracy, niters)
+
+    @assert theta >= 0.0 && theta <= 1.0
+
+    return theta
+end
+
+@inbounds function apply_positivity_blending_to_variable!(u1, u1_low,
+                                                          eq::AbstractEquations{2},
+                                                          grid, op, aux, variable)
+    nx, ny = grid.size
+    nd = op.degree + 1
+    @unpack Vl, Vr = op
+    # If it falls below zero, we will lift it up to 0.1 * min(u1_low[:, :, el_x, el_y])
+
+    refresh!(u) = fill!(u, zero(eltype(u)))
+    @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
+        el_x, el_y = element[1], element[2]
+
+        u1_ = @view u1[:, :, :, el_x, el_y]
+        u1_low_ = @view u1_low[:, :, :, el_x, el_y]
+
+        val_min = find_val_min(eq, u1_low_, op, variable)
+        @assert val_min>0.0 "Low order minimum $variable is negative: $val_min in cell ($el_x, $el_y)"
+
+        theta = 1.0
+
+        for j in 1:nd, i in 1:nd
+            u_high_node = get_node_vars(u1_, eq, i, j)
+
+            u_low_node = get_node_vars(u1_low_, eq, i, j)
+            theta_ = find_theta_positivity_blending(eq, u_high_node, u_low_node,
+                                                    val_min, variable)
+            theta = min(theta, theta_)
+        end
+
+        if theta < 1.0
+            @. u1_ = theta * u1_ + (1.0 - theta) * u1_low_
+        end
+
+        # We now limit for the face values
+        u_ll, u_rr, u_dd, u_uu = aux.aux_cache.bound_limiter_cache[Threads.threadid()]
+        refresh!.((u_ll, u_rr, u_dd, u_uu))
+
+        for j in 1:nd, i in 1:nd
+            u_high_node = get_node_vars(u1_, eq, i, j)
+
+            # Perform extrapolations to faces
+            multiply_add_to_node_vars!(u_ll, Vl[i], u_high_node, eq, j)
+            multiply_add_to_node_vars!(u_rr, Vr[i], u_high_node, eq, j)
+            multiply_add_to_node_vars!(u_dd, Vl[j], u_high_node, eq, i)
+            multiply_add_to_node_vars!(u_uu, Vr[j], u_high_node, eq, i)
+        end
+
+        # This requires limiting with the cell average, and we use a new theta
+        theta = 1.0
+        u_low_avg = find_avg(eq, u1_low_, op)
+        v_avg = variable(eq, u_low_avg)
+        for k in 1:nd
+            u_ll_node = get_node_vars(u_ll, eq, k)
+            u_rr_node = get_node_vars(u_rr, eq, k)
+            u_dd_node = get_node_vars(u_dd, eq, k)
+            u_uu_node = get_node_vars(u_uu, eq, k)
+
+            theta_ll = find_theta_positivity_blending(eq, u_ll_node, u_low_avg, v_avg,
+                                                      variable)
+            theta_rr = find_theta_positivity_blending(eq, u_rr_node, u_low_avg, v_avg,
+                                                      variable)
+            theta_dd = find_theta_positivity_blending(eq, u_dd_node, u_low_avg, v_avg,
+                                                      variable)
+            theta_uu = find_theta_positivity_blending(eq, u_uu_node, u_low_avg, v_avg,
+                                                      variable)
+            theta = min(theta, theta_ll, theta_rr, theta_dd, theta_uu)
+        end
+
+        if theta < 1.0
+            for j in 1:nd, i in 1:nd
+                u_high_node = get_node_vars(u1_, eq, i, j)
+                u_node_new = theta * u_high_node + (1.0 - theta) * u_low_avg
+                set_node_vars!(u1_, u_node_new, eq, i, j)
+            end
+        end
+    end
+end
+
+@inbounds function apply_positivity_blending!(u1, u1_low, eq::AbstractEquations{2},
+                                              grid, op, aux,
+                                              variables::NTuple{N, Any}) where {N}
+    variable = first(variables)
+    remaining_variables = Base.tail(variables)
+
+    apply_positivity_blending_to_variable!(u1, u1_low, eq, grid, op, aux, variable)
+    apply_positivity_blending!(u1, u1_low, eq, grid, op, aux, remaining_variables)
+end
+
+@inbounds function apply_positivity_blending!(u1, u1_low, eq::AbstractEquations{2},
+                                              grid, op, aux, variables::Tuple{})
+    return nothing
 end
 
 @inbounds @inline function update_with_residuals!(positivity_blending::NoPositivityBlending,
-                                                  eq::AbstractEquations{2}, u1,
+                                                  eq::AbstractEquations{2}, grid, op,
+                                                  u1,
                                                   res, aux)
     update_solution_lwfr!(u1, res, aux)
 end
@@ -552,12 +727,11 @@ end
 
     # Do the source term evolution
     blend_cell_residual_stiff!(blend_cell_residual!, eq, u1, res, grid, problem, op,
-                               t, dt,
-                               aux)
+                               t, dt, aux)
 
     @unpack positivity_blending = blend.parameters
 
-    update_with_residuals!(positivity_blending, eq, u1, res, aux)
+    update_with_residuals!(positivity_blending, eq, grid, op, u1, res, aux)
     end
 end
 
