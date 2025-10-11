@@ -1,7 +1,8 @@
-using Tenkai.TenkaicRK, TenkaicRK.Tenkai
-using Tenkai.TenkaicRK.StaticArrays
-using Tenkai.TenkaicRK.Trixi: False, True
-using Tenkai.TenkaicRK.SimpleUnPack
+using Tenkai
+using Tenkai.TenkaicRK
+using Tenkai.StaticArrays
+using Tenkai.Trixi: False, True
+using Tenkai.SimpleUnPack
 
 Eq = TenkaicRK.EqMHD2D
 

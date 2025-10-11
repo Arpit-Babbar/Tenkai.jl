@@ -508,6 +508,50 @@ end
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
 
+@testset "MHD2D Orzag-Tang vortex positivity blending" begin
+    EqMHD2D = Tenkai.TenkaicRK.EqMHD2D
+    gamma = 5.0 / 3.0
+    trixi_include(joinpath(cRK_examples_dir(), "2d", "run_mhd_tang.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.1, nx = 5, ny = 5,
+                  degree = 2,
+                  bound_limit = "no",
+                  limiter = setup_limiter_blend(blend_type = fo_blend_imex(EqMHD2D.get_equation(gamma)),
+                                                indicating_variables = EqMHD2D.rho_p_indicator!,
+                                                reconstruction_variables = conservative_reconstruction,
+                                                indicator_model = "gassner",
+                                                amax = 0.5,
+                                                pure_fv = false,
+                                                positivity_blending = PositivityBlending((EqMHD2D.density,
+                                                                                          EqMHD2D.pressure))))
+    data_name = "mhd_tang_positivity_blending.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+end
+
+@testset "MHD2D rotor positivity blending" begin
+    EqMHD2D = Tenkai.TenkaicRK.EqMHD2D
+    gamma = 5.0 / 3.0
+    trixi_include(joinpath(cRK_examples_dir(), "2d", "run_mhd_rotor.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  # No idea why it crashes without higher resolution
+                  animate = false, final_time = 0.01, nx = 50, ny = 50,
+                  degree = 3,
+                  solver = cRK44(),
+                  bound_limit = "no",
+                  limiter = setup_limiter_blend(blend_type = fo_blend(EqMHD2D.get_equation(gamma)),
+                                                indicating_variables = EqMHD2D.rho_p_indicator!,
+                                                reconstruction_variables = conservative_reconstruction,
+                                                indicator_model = "gassner",
+                                                amax = 0.5,
+                                                pure_fv = false,
+                                                positivity_blending = PositivityBlending((EqMHD2D.density,
+                                                                                          EqMHD2D.pressure))))
+    data_name = "mhd_rotor_positivity_blending.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+end
+
 @testset "MultiIonMHD2D convergence" begin
     trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_convergence.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,

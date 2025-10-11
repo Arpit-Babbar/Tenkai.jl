@@ -7,7 +7,7 @@ import Tenkai: compute_face_residual!, compute_cell_residual_cRK!, evolve_soluti
 import Base: *, -, +
 import LinearAlgebra: adjoint
 
-using Tenkai: cRKSolver
+using Tenkai: cRKSolver, add_low_order_face_residual!
 
 struct MyZero end
 
@@ -191,6 +191,8 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractNonConservativeEquation
     xxf, yyf = blend.cache.subcell_faces[id]
     @unpack fn_low = blend.cache
     alpha = blend.cache.alpha[el_x, el_y]
+    blend_resl = @view blend.cache.resl[:, :, :, el_x, el_y]
+    blend_resl .= zero(eltype(blend_resl))
 
     u = @view u1[:, :, :, el_x, el_y]
     r = @view res[:, :, :, el_x, el_y]
@@ -231,6 +233,12 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractNonConservativeEquation
             multiply_add_to_node_vars!(r, # r[ii,jj]+=alpha*dt/(dx*wg[ii])*fn
                                        -alpha * dt / (dx * wg[ii]),
                                        fn_r, eq, ii, jj)
+            multiply_add_to_node_vars!(blend_resl,
+                                       dt / (dx * wg[ii - 1]),
+                                       fn_l, eq, ii - 1, jj)
+            multiply_add_to_node_vars!(blend_resl,
+                                       -dt / (dx * wg[ii]),
+                                       fn_r, eq, ii, jj)
             # TOTHINK - Can checking this in every step of the loop be avoided
             if ii == 2
                 set_node_vars!(fn_low, fn_l, eq, jj, 1, el_x, el_y)
@@ -263,6 +271,12 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractNonConservativeEquation
                                        -alpha * dt / (dy * wg[jj]),
                                        fn_r,
                                        eq, ii, jj)
+            multiply_add_to_node_vars!(blend_resl,
+                                       dt / (dy * wg[jj - 1]),
+                                       fn_l, eq, ii, jj - 1)
+            multiply_add_to_node_vars!(blend_resl,
+                                       -dt / (dy * wg[jj]),
+                                       fn_r, eq, ii, jj)
             # TOTHINK - Can checking this in every step of the loop be avoided
             if jj == 2
                 # TOTHINK - Does this need to be doubled? I don't think so...
@@ -282,6 +296,9 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractNonConservativeEquation
             s_node = calc_source(u_node, X, t, source_terms, eq)
             multiply_add_to_node_vars!(r,
                                        -alpha * dt, # / (dx * dy * wg[ii] * wg[jj]),
+                                       s_node, eq, ii, jj)
+            multiply_add_to_node_vars!(blend_resl,
+                                       -dt, # / (dx * dy * wg[ii] * wg[jj]),
                                        s_node, eq, ii, jj)
         end
     end
@@ -688,32 +705,10 @@ function compute_face_residual!(eq::AbstractNonConservativeEquations{2}, grid, o
                                                   bl[ix] * Fl[n]
                 end
             end
-
-            # For lower order residual
-            Fd = get_node_vars(Fb, eq, ix, 3, el_x, el_y)
-            Fu = get_node_vars(Fb, eq, ix, 4, el_x, el_y)
-
-            multiply_add_to_node_vars!(res, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
-                                       -alpha * dt / (dy[el_y] * wg[1]),
-                                       Fd,
-                                       eq, ix, 1, el_x, el_y)
-
-            multiply_add_to_node_vars!(res, # r[1] -= alpha*dt/(dy*wg[1])*Fn
-                                       alpha * dt / (dy[el_y] * wg[nd]),
-                                       Fu,
-                                       eq, ix, nd, el_x, el_y)
-
-            Fl = get_node_vars(Fb, eq, ix, 1, el_x, el_y)
-            Fr = get_node_vars(Fb, eq, ix, 2, el_x, el_y)
-
-            multiply_add_to_node_vars!(res, # r[nd] += alpha*dt/(dy*wg[nd])*Fn
-                                       -alpha * dt / (dx[el_x] * wg[1]), Fl,
-                                       eq, 1, ix, el_x, el_y)
-            multiply_add_to_node_vars!(res, # r[1] -= alpha*dt/(dy*wg[1])*Fn
-                                       alpha * dt / (dx[el_x] * wg[nd]), Fr,
-                                       eq, nd, ix, el_x, el_y)
         end
     end
+
+    add_low_order_face_residual!(get_element_alpha, eq, grid, op, aux, dt, Fb, res)
 
     return nothing
     end # timer
