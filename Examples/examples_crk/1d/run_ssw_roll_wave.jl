@@ -33,11 +33,6 @@ function initial_condition_roll_wave(x)
     return EqTenMom.tenmom_prim2con((h, v1, v2, R11, R12, R22))
 end
 
-function bottom(x)
-    rtheta = 0.05011
-    return -tan(rtheta) * x
-end
-
 function bottom_dx(x)
     rtheta = 0.05011
     return -tan(rtheta)

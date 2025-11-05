@@ -130,10 +130,9 @@ end
                            "run_burg1d_stiff_source_non_linear.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,
-                  animate = false, final_time = 0.001, nx = 5)
+                  animate = false, final_time = 5.0)
     data_name = "burg1d_stiff_source_non_linear.txt"
-    # TODO - Why is tolerance higher than in TenkaicRK.jl?
-    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 5e-8)
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
 
 @testset "Shock diffraction" begin

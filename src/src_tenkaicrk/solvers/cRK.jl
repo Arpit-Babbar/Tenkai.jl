@@ -268,13 +268,13 @@ function evolve_solution!(eq, grid, op, problem,
     @unpack scheme_single_solver = scheme.cache
 
     # Svard's paper suggests using old homogeneous solution as the initial guess
-    evolve_solution!(eq, grid, op, problem, scheme_single_solver, param, aux, iter, t, dt,
-                     fcount,
-                     cache)
-
     evolve_solution!(eq, grid, op, problem_homogeneous, scheme_single_solver, param, aux,
                      iter, t,
                      dt, fcount, cache_homogeneous)
+
+    evolve_solution!(eq, grid, op, problem, scheme_single_solver, param, aux, iter, t, dt,
+                     fcount,
+                     cache)
 
     return nothing
 end
