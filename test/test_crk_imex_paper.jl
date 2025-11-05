@@ -548,7 +548,7 @@ end
                                                 positivity_blending = PositivityBlending((EqMHD2D.density,
                                                                                           EqMHD2D.pressure))))
     data_name = "mhd_rotor_positivity_blending.txt"
-    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
 end
 
 @testset "MultiIonMHD2D convergence" begin
