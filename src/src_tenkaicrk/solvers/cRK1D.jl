@@ -21,6 +21,40 @@ using Tenkai: @threaded, alloc_for_threads
 using Tenkai.Equations: nvariables, eachvariable
 using Tenkai: refresh!
 
+function setup_arrays(grid, scheme::Scheme{<:cSSP2IMEX433},
+                      eq::AbstractEquations{1})
+    gArray(nvar, nx) = OffsetArray(zeros(nvar, nx + 2),
+                                   OffsetArrays.Origin(1, 0))
+    function gArray(nvar, n1, nx)
+        OffsetArray(zeros(nvar, n1, nx + 2),
+                    OffsetArrays.Origin(1, 1, 0))
+    end
+    # Allocate memory
+    @unpack degree = scheme
+    nd = degree + 1
+    nx = grid.size
+    nvar = nvariables(eq)
+    u1 = gArray(nvar, nd, nx)
+    ua = gArray(nvar, nx)
+    res = gArray(nvar, nd, nx)
+    Fb = gArray(nvar, 2, nx)
+    Ub = gArray(nvar, 2, nx)
+    u1_b = copy(Ub)
+    ub_N = gArray(nvar, 2, nx) # The final stage of cRK before communication
+
+    cell_data_size = 14
+    eval_data_size = 16
+
+    MArr = MArray{Tuple{nvariables(eq), nd}, Float64}
+    cell_data = alloc_for_threads(MArr, cell_data_size)
+
+    MArr = MArray{Tuple{nvariables(eq), 1}, Float64}
+    eval_data = alloc_for_threads(MArr, eval_data_size)
+
+    cache = (; u1, ua, res, Fb, Ub, u1_b, ub_N, cell_data, eval_data)
+    return cache
+end
+
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
 # we need to opt-in explicitly.
@@ -767,7 +801,10 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 
     @unpack cell_data, eval_data, ua, u1, res, Fb, Ub = cache
 
-    F, f, U, u2, u3, u4, u5, S = cell_data[Threads.threadid()]
+    # TODO - These u2_sec, u3_sec, u4_sec also needed to be added to other solvers.
+    # This is also a rather inefficient way of doing this.
+    # TODO (More urgent): Raise an issue about this
+    F, f, U, u2, u3, u4, u5, u2_sec, u3_sec, u4_sec, S = cell_data[Threads.threadid()]
 
     refresh!.((res, Ub, Fb)) # Reset previously used variables to zero
 
@@ -790,6 +827,11 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
                                             source_terms, aux_node)
             set_node_vars!(u2, u2_node, eq, i)
 
+            # These will be evolved without source terms for better initial guess
+            set_node_vars!(u2_sec, aux_node, eq, i)
+            set_node_vars!(u3_sec, aux_node, eq, i)
+            set_node_vars!(u4_sec, aux_node, eq, i)
+
             flux1 = flux(x_, u2_node, eq)
 
             s2_node = calc_source(u2_node, x_, t + c1 * dt, source_terms, eq)
@@ -798,7 +840,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             multiply_add_to_node_vars!(u5, a41 * dt, s2_node, eq, i)
 
             lhs = get_node_vars(u3, eq, i) # lhs in the implicit source solver
-            aux_node = get_cache_node_vars(aux, u2, problem, scheme, eq, i, 1)
+            aux_node = get_node_vars(u2_sec, eq, i)
             u3_node = implicit_source_solve(lhs, eq, x_, t + c2 * dt, a22 * dt,
                                             source_terms,
                                             aux_node)
@@ -817,6 +859,9 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             for ii in Base.OneTo(nd) # ut = -lamx * DmT * f
                 multiply_add_to_node_vars!(u4, -at32 * lamx * Dm[ii, i], flux1, eq, ii)
                 multiply_add_to_node_vars!(u5, -at42 * lamx * Dm[ii, i], flux1, eq, ii)
+
+                multiply_add_to_node_vars!(u4_sec, -at32 * lamx * Dm[ii, i], flux1, eq,
+                                           ii)
             end
         end
 
@@ -826,7 +871,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             # TODO - Should initial guess be lhs?
             guess_u4 = get_node_vars(u3, eq, i) # Initial guess in the implicit solver
             lhs = get_node_vars(u4, eq, i) # lhs in the implicit source solver
-            aux_node = get_cache_node_vars(aux, u3, problem, scheme, eq, i, 1)
+            aux_node = get_node_vars(u3_sec, eq, i)
             u4_node = implicit_source_solve(lhs, eq, x_, t + c3 * dt, a33 * dt,
                                             source_terms,
                                             aux_node)
@@ -850,7 +895,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             x_ = xc - 0.5 * dx + xg[i] * dx
             u_guess = get_node_vars(u4, eq, i) # Initial guess in the implicit solver
             lhs = get_node_vars(u5, eq, i) # lhs in the implicit source solver
-            aux_node = get_cache_node_vars(aux, u4, problem, scheme, eq, i, 1)
+            aux_node = get_node_vars(u4_sec, eq, i)
             u5_node = implicit_source_solve(lhs, eq, x_, t + c4 * dt,
                                             a44 * dt, source_terms, aux_node)
             set_node_vars!(u5, u5_node, eq, i)

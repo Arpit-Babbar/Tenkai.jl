@@ -158,8 +158,15 @@ end
 
 # SolverSource will be the actual solver with source terms, while
 # SolverHomogeneous will be the solver without source terms.
-struct DoublecRKSourceSolver{SolverSource <: cRKSolver} <: cRKSolver
+struct DoublecRKSourceSolver{SolverSource <: cRKSolver, InitialValue} <: cRKSolver
     single_crk_solver::SolverSource
+    initial_value::InitialValue
+end
+
+function DoublecRKSourceSolver(solver_single::cRKSolver;
+                               initial_value = nothing)
+    return DoublecRKSourceSolver{typeof(solver_single), typeof(initial_value)}(solver_single,
+                                                                               initial_value)
 end
 
 # TODO - Bad practice
@@ -230,12 +237,17 @@ function Tenkai.create_auxiliaries(eq, op, grid, problem,
                                    scheme::Scheme{<:DoublecRKSourceSolver{<:cRKSolver}},
                                    param, cache_source)
     @unpack scheme_single_solver = scheme.cache
+    @unpack initial_value = scheme.solver
 
     aux = create_auxiliaries(eq, op, grid, problem, scheme_single_solver, param,
                              cache_source)
 
     cache_homogeneous = deepcopy(cache_source)
     problem_homogeneous = @set problem.source_terms = nothing
+
+    if initial_value !== nothing
+        problem_homogeneous = @set problem_homogeneous.initial_value = initial_value
+    end
 
     aux = (; aux..., cache_homogeneous, problem_homogeneous, cache_source)
 

@@ -109,6 +109,26 @@ end
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
 
+@testset "Super Burg test" begin
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_super_burg_stiff_source.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  degree = 3,
+                  solver_single = cHT112(),
+                  animate = false, final_time = 4.0, nx = 5)
+    data_name = "super_burg_stiff_source_ht112.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_super_burg_stiff_source.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  degree = 3,
+                  solver_single = cSSP2IMEX433(),
+                  animate = false, final_time = 4.0, nx = 5)
+    data_name = "super_burg_stiff_source_ssp433.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+end
+
 @testset "Jin-Xin" begin
     trixi_include(joinpath(cRK_examples_dir(), "1d", "run_jin_xin_burg1d.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
