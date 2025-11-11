@@ -34,22 +34,21 @@ using Tenkai: cRKSolver, AbstractDissipation, cRK64, cRK44, cRK33, cRK22, cRK11
 
 # Functions used by implicit solvers
 
-function picard_iteration(func, y)
+function picard_iteration(func, y, stepsize = 0.1)
     F = func(y) # Update F
-    stepsize = 0.1 # TODO - Adaptively choose the stepsize
     y = y - stepsize * F
     return y, norm(F)
 end
 
-function picard_solver(func, y0, tol = 1e-12)
+function picard_solver(func, y0, tol = 1e-12, maxiters = 10000, stepsize = 0.1)
     y = y0
     n_iters = 0
-    y, norm_F = picard_iteration(func, y)
-    while norm_F > tol && n_iters < 10000
-        y, norm_F = picard_iteration(func, y)
+    y, norm_F = picard_iteration(func, y, stepsize)
+    while norm_F > tol && n_iters < maxiters
+        y, norm_F = picard_iteration(func, y, stepsize)
         n_iters += 1
     end
-    if norm_F > 1e-8
+    if norm_F > tol
         println("Picard solver did not converge and res = $norm_F")
     end
 
@@ -243,13 +242,18 @@ function Tenkai.create_auxiliaries(eq, op, grid, problem,
                              cache_source)
 
     cache_homogeneous = deepcopy(cache_source)
+
     problem_homogeneous = @set problem.source_terms = nothing
+
+    aux_homogeneous = create_auxiliaries(eq, op, grid, problem_homogeneous,
+                                         scheme_single_solver, param,
+                                         cache_homogeneous)
 
     if initial_value !== nothing
         problem_homogeneous = @set problem_homogeneous.initial_value = initial_value
     end
 
-    aux = (; aux..., cache_homogeneous, problem_homogeneous, cache_source)
+    aux = (; aux..., aux_homogeneous, cache_homogeneous, problem_homogeneous, cache_source)
 
     return aux
 end
@@ -275,18 +279,19 @@ end
 function evolve_solution!(eq, grid, op, problem,
                           scheme::Scheme{<:DoublecRKSourceSolver{<:cRKSolver}},
                           param, aux, iter, t, dt, fcount, cache)
-    @unpack cache_homogeneous, problem_homogeneous = aux
+    @unpack aux_homogeneous, cache_homogeneous, problem_homogeneous = aux
 
     @unpack scheme_single_solver = scheme.cache
 
     # Svard's paper suggests using old homogeneous solution as the initial guess
-    evolve_solution!(eq, grid, op, problem_homogeneous, scheme_single_solver, param, aux,
-                     iter, t,
-                     dt, fcount, cache_homogeneous)
-
     evolve_solution!(eq, grid, op, problem, scheme_single_solver, param, aux, iter, t, dt,
                      fcount,
                      cache)
+
+    evolve_solution!(eq, grid, op, problem_homogeneous, scheme_single_solver, param,
+                     aux_homogeneous,
+                     iter, t,
+                     dt, fcount, cache_homogeneous)
 
     return nothing
 end
