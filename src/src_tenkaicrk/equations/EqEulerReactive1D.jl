@@ -49,6 +49,7 @@ struct EulerReactive1D{RealT} <: AbstractEquations{1, 4}
     q0::RealT
     nvar::Int
     name::String
+    dt::Vector{RealT}
     initial_values::Dict{String, Function}
     numfluxes::Dict{String, Function}
     varnames::Vector{String}
@@ -130,6 +131,7 @@ function compute_time_step(eq::EulerReactive1D, problem, grid, aux, op, cfl, u1,
         den = max(den, smax / dx[i])
     end
     dt = cfl / den
+    eq.dt[1] = dt
     return dt
 end
 
@@ -645,7 +647,8 @@ end
 function get_equation(gamma, q0)
     numfluxes = Dict{String, Function}("rusanov" => rusanov)
     initial_values = Dict{String, Function}() # Maybe to be filled someday?
-    eq = EulerReactive1D(gamma, q0, 4, "EulerReactive1D",
+    dt = zeros(typeof(gamma), 1)
+    eq = EulerReactive1D(gamma, q0, 4, "EulerReactive1D", dt,
                          numfluxes, initial_values,
                          ["Density", "Velocity", "Pressure", "Z"])
     return eq
