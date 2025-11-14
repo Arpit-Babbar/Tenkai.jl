@@ -639,7 +639,19 @@ end
 function modal_smoothness_indicator(eq::AbstractEquations{1}, t, iter, fcount,
                                     dt, grid, scheme, problem, param, aux, op,
                                     u1, ua)
-    @unpack indicator_model = scheme.limiter
+    @unpack limiter = scheme
+    @unpack indicator_model = limiter
+    @unpack blend = aux
+
+    if limiter.pure_fv == true
+        @assert scheme.limiter.name == "blend"
+        @unpack alpha = blend
+        alpha .= 1.0
+        blend.dt[1] = dt # hacky fix for compatibility with OrdinaryDiffEq
+        blend.lamx .= alpha .* dt ./ grid.dx
+        return nothing
+    end
+
     if indicator_model == "gassner"
         modal_smoothness_indicator_gassner(eq, t, iter, fcount, dt, grid, scheme,
                                            problem, param, aux, op, u1, ua)
@@ -679,11 +691,6 @@ function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
 
     # some strings specifying the kind of blending
     @unpack indicator_model, indicating_variables = limiter
-
-    if limiter.pure_fv == true
-        @assert scheme.limiter.name == "blend"
-        alpha .= 1.0
-    end
 
     # Extend solution points to include boundary
     yg = zeros(nd + 2)
@@ -731,7 +738,7 @@ function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
             if indicator_model == "model1"
                 ind_num[n] = um[n, end - 1]^2 + um[n, end]^2 # energy in last 2 modes
             elseif indicator_model == "model2"
-                @assert indicating_variables == "conservative"
+                # @assert indicating_variables == "conservative"
                 Pn2m_xg = nodal2modal(xg)
                 for n in 1:nvar
                     um_xg[n, :] = @views Pn2m_xg * u[n, :]
@@ -986,10 +993,10 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
     end
 
     # smoothing in time
-    for i in 1:nx
-        alpha[i] = max(0.9 * alpha0[i], 0.5 * alpha0[i - 1], 0.5 * alpha0[i + 1],
-                       alpha[i])
-    end
+    # for i in 1:nx
+    #     alpha[i] = max(0.9 * alpha0[i], 0.5 * alpha0[i - 1], 0.5 * alpha0[i + 1],
+    #                    alpha[i])
+    # end
 
     # Smoothening of alpha
     alpha0 .= alpha
@@ -1013,11 +1020,6 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
 
     if dt > 0.0
         blend.dt[1] = dt # hacky fix for compatibility with OrdinaryDiffEq
-    end
-
-    if limiter.pure_fv == true
-        @assert scheme.limiter.name == "blend"
-        alpha .= 1.0
     end
 
     blend.lamx .= alpha .* dt ./ dx
@@ -1184,11 +1186,6 @@ function modal_smoothness_indicator_gassner_new(eq::AbstractEquations{1}, t,
 
     if dt > 0.0
         blend.dt[1] = dt # hacky fix for compatibility with OrdinaryDiffEq
-    end
-
-    if limiter.pure_fv == true
-        @assert scheme.limiter.name == "blend"
-        alpha .= 1.0
     end
 
     blend.lamx .= alpha .* dt ./ dx
@@ -1377,11 +1374,6 @@ function modal_smoothness_indicator_gassner_face(eq, t, iter, fcount, dt, grid,
         blend.dt[1] = dt # hacky fix for compatibility with OrdinaryDiffEq
     end
 
-    if limiter.pure_fv == true
-        @assert scheme.limiter.name == "blend"
-        alpha .= 1.0
-    end
-
     blend.lamx .= alpha .* dt ./ dx
 
     # KLUDGE - Should this be in apply_limiter! function?
@@ -1425,7 +1417,8 @@ function debug_blend_limiter!(eq::AbstractEquations{1}, grid, problem, scheme,
         end
     end
     if nvariables(eq) > 1 # KLUDGE - Create a p
-        ua_min, ua_max = [1e20, 1e20, 1e20], [-1e20, -1e20, -1e20]
+        ua_min = fill(1e20, nvar)
+        ua_max = fill(-1e20, nvar)
         for i in 1:nx
             @views up = con2prim(eq, ua[:, i])
             for n in 1:nvar
@@ -2193,7 +2186,8 @@ function Blend(eq::AbstractEquations{1}, op, grid,
                problem::Problem,
                scheme::Scheme,
                param::Parameters,
-               plot_data, bc_x = no_upwinding_x)
+               plot_data, bc_x = no_upwinding_x,
+               positivity_blending = NoPositivityBlending())
     @unpack xc, xf, dx = grid
     nx = grid.size
     nvar = nvariables(eq)
@@ -2201,6 +2195,7 @@ function Blend(eq::AbstractEquations{1}, op, grid,
     @unpack limiter = scheme
 
     if limiter.name != "blend"
+        parameters = (; positivity_blending = NoPositivityBlending())
         if limiter.name == "tvb"
             fn_low = OffsetArray(zeros(nvar, 2, nx + 2),
                                  OffsetArrays.Origin(1, 1, 0))
@@ -2209,12 +2204,14 @@ function Blend(eq::AbstractEquations{1}, op, grid,
                     blend_face_residual! = blend_flux_face_residual!,
                     dt = [1e20],
                     numflux = scheme.numerical_flux,
-                    fn_low = fn_low)
+                    fn_low = fn_low,
+                    parameters)
         else
             return (
                     ; blend_cell_residual! = trivial_cell_residual,
                     blend_face_residual! = trivial_face_residual,
-                    dt = [1e20])
+                    dt = [1e20],
+                    parameters)
         end
     end
     println("Setting up blending limiter...")
@@ -2225,9 +2222,9 @@ function Blend(eq::AbstractEquations{1}, op, grid,
     smooth_alpha,
     amax, constant_node_factor, constant_node_factor2, c, a, amin,
     indicator_model, debug_blend, pure_fv,
-    numflux) = limiter
+    numflux, positivity_blending) = limiter
     parameters = (; c, a, amin, smooth_alpha, constant_node_factor,
-                  constant_node_factor2)
+                  constant_node_factor2, positivity_blending, pure_fv)
     nd = degree + 1
     if numflux === nothing
         numflux = scheme.numerical_flux
