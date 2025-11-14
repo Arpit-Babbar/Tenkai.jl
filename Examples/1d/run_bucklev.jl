@@ -48,4 +48,6 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 #------------------------------------------------------------------------------
 problem, scheme, param, = ParseCommandLine(problem, param, scheme, eq, ARGS)
 #------------------------------------------------------------------------------
-Tenkai.solve(eq, problem, scheme, param)
+sol = Tenkai.solve(eq, problem, scheme, param)
+
+sol["plot_data"].p_ua
