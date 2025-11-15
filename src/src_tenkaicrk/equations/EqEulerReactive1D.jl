@@ -75,6 +75,16 @@ end
     return n_ind_var
 end
 
+@inbounds @inline function rho_p_and_cons_indicator!(un, eq::EulerReactive1D)
+    for ix in 1:size(un, 2) # loop over dofs and faces
+        u_node = get_node_vars(un, eq, ix)
+        p = pressure(eq, u_node)
+        un[1, ix] *= p # ρ * p
+    end
+    n_ind_var = 4
+    return n_ind_var
+end
+
 @inbounds @inline function flux(x, u, eq::EulerReactive1D)
     rho, rho_v1, E, rho_z = u
     v1 = rho_v1 / rho
@@ -135,16 +145,33 @@ function compute_time_step(eq::EulerReactive1D, problem, grid, aux, op, cfl, u1,
     return dt
 end
 
+@inbounds @inline function rusanov_dissipated(x, ual, uar, Fl, Fr, Ul, Ur,
+                                              eq::EulerReactive1D,
+                                              dir)
+    λ = max(max_abs_eigen_value(eq, ual), max_abs_eigen_value(eq, uar)) # local wave speed
+    # return 0.5 * (Fl + Fr - λ * (Ur - Ul))
+
+    u = 0.5 * (ual + uar)
+    density = u[1]
+    p = pressure(eq, u)
+    T = p / density
+    dt = eq.dt[1]
+    A, TA = 164180.0, 25.0
+    K = A * exp(-TA / T)
+    kK = K * dt
+
+    Wk = max(1.0 - kK, 0.0)
+
+    return SVector(0.5 * (Fl[1] + Fr[1] - λ * (Ur[1] - Ul[1])),
+                   0.5 * (Fl[2] + Fr[2] - λ * (Ur[2] - Ul[2])),
+                   0.5 * (Fl[3] + Fr[3] - λ * (Ur[3] - Ul[3])),
+                   0.5 * (Fl[4] + Fr[4] - Wk * λ * (Ur[4] - Ul[4])))
+end
+
 @inbounds @inline function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::EulerReactive1D,
                                    dir)
     λ = max(max_abs_eigen_value(eq, ual), max_abs_eigen_value(eq, uar)) # local wave speed
-
     return 0.5 * (Fl + Fr - λ * (Ur - Ul))
-
-    # return SVector(0.5*(Fl[1]+Fr[1]-λ*(Ur[1]-Ul[1])),
-    #         0.5*(Fl[2]+Fr[2]-λ*(Ur[2]-Ul[2])),
-    #         0.5*(Fl[3]+Fr[3]-λ*(Ur[3]-Ul[3])),
-    #         0.5*(Fl[4]+Fr[4]))
 end
 
 function Tenkai.apply_bound_limiter!(eq::EulerReactive1D, grid, scheme, param, op, ua,
@@ -641,7 +668,9 @@ function implicit_source_solve(lhs, eq, x, t, coefficient,
 
     u_new = SVector(lhs[1], lhs[2], lhs[3], u4)
 
-    return u_new
+    source = SVector(0.0, 0.0, 0.0, -KT * u_new[4])
+
+    return u_new, source
 end
 
 function get_equation(gamma, q0)

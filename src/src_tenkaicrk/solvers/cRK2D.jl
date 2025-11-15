@@ -159,15 +159,15 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
             # By default, it is just u_node but the user can use it to set something else here.
             aux_node = get_cache_node_vars(aux, u1_, problem, scheme, eq, i, j)
 
-            u2_node_implicit = implicit_source_solve(lhs, eq, X,
-                                                     t + dt, # TOTHINK - Somehow t instead of t + dt
-                                                     # gives better accuracy, although it is
-                                                     # not supposed to
-                                                     0.5 * dt, source_terms,
-                                                     aux_node) # aux_node used as initial guess
+            u2_node_implicit, s2_node = implicit_source_solve(lhs, eq, X,
+                                                              t + dt, # TOTHINK - Somehow t instead of t + dt
+                                                              # gives better accuracy, although it is
+                                                              # not supposed to
+                                                              0.5 * dt,
+                                                              source_terms,
+                                                              aux_node) # aux_node used as initial guess
             set_node_vars!(u2, u2_node_implicit, eq, i, j)
 
-            s2_node = calc_source(u2_node_implicit, X, t + dt, source_terms, eq)
             multiply_add_to_node_vars!(S, 0.5, s2_node, eq, i, j)
         end
 
@@ -485,7 +485,7 @@ function blend_cell_residual_fo_imex!(el_x, el_y, eq::AbstractEquations{2}, prob
 end
 
 @inbounds @inline function blend_cell_residual_stiff!(blend_cell_residual!::typeof(blend_cell_residual_fo_imex!),
-                                                      eq,
+                                                      eq::AbstractEquations{2},
                                                       u1, res, grid, problem, op, t, dt,
                                                       aux)
     @timeit aux.timer "Update solution implicit source" begin
@@ -513,12 +513,10 @@ end
             res_node = get_node_vars(blend_res, eq, i, j, el_x, el_y)
             lhs = u_node - res_node # lhs in the implicit source solver
 
-            u_node_implicit = implicit_source_solve(lhs, eq, X, t, dt,
-                                                    source_terms,
-                                                    u_node) # u_node used as initial guess
-
-            s_node_implicit = calc_source(u_node_implicit, X, t + dt, source_terms,
-                                          eq)
+            u_node_implicit, s_node_implicit = implicit_source_solve(lhs, eq, X, t,
+                                                                     dt,
+                                                                     source_terms,
+                                                                     u_node) # u_node used as initial guess
 
             multiply_add_to_node_vars!(res, -dt * alpha, s_node_implicit, eq, i, j,
                                        el_x, el_y)
@@ -760,10 +758,10 @@ end
         lhs = u_node - res_node # lhs in the implicit source solver
 
         # Implicit solver evolution
-        u_node_implicit = implicit_source_solve(lhs, eq, X, t, dt, source_terms,
-                                                u_node) # u_node used as initial guess
+        u_node_implicit, s_node_implicit = implicit_source_solve(lhs, eq, X, t, dt,
+                                                                 source_terms,
+                                                                 u_node) # u_node used as initial guess
 
-        s_node_implicit = calc_source(u_node_implicit, X, t + dt, source_terms, eq)
         multiply_add_to_node_vars!(u1, dt, s_node_implicit, eq, 1, 1, el_x, el_y)
         multiply_add_to_node_vars!(u1, -1.0, res_node, eq, 1, 1, el_x, el_y)
 

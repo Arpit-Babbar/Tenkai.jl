@@ -12,6 +12,7 @@ overwrite_errors = false
 # Reactive Euler 1D
 
 @testset "Reactive Euler 1D" begin
+    EqReactive = Tenkai.TenkaicRK.EqEulerReactive1D
     # Pure FV blending test
     trixi_include(joinpath(cRK_examples_dir(), "1d", "run_reactive_rp1.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
@@ -21,6 +22,7 @@ overwrite_errors = false
                   bound_limit = "yes",
                   pure_fv = true,
                   bflux = extrapolate,
+                  numerical_flux = EqReactive.rusanov,
                   cfl_safety_factor = 0.9,
                   animate = false, final_time = 1.0, nx = 4)
     data_name = "reactive_rp1_pure_fv.txt"
@@ -34,6 +36,7 @@ overwrite_errors = false
                   bound_limit = "no",
                   limiter = setup_limiter_none(),
                   bflux = extrapolate,
+                  numerical_flux = EqReactive.rusanov,
                   cfl_safety_factor = 0.9,
                   save_iter_interval = 0, save_time_interval = 0.0,
                   animate = false, final_time = 1.0, nx = 4)
@@ -41,8 +44,7 @@ overwrite_errors = false
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-5)
 
     # cHT112 test, requiring lower CFL
-    EqReactive = Tenkai.TenkaicRK.EqEulerReactive1D
-    equation = Eq.get_equation(1.4, 25.0)
+    equation = EqReactive.get_equation(1.4, 25.0)
     trixi_include(joinpath(cRK_examples_dir(), "1d", "run_reactive_rp1.jl"),
                   compute_error_interval = 0,
                   degree = 3,
@@ -50,6 +52,9 @@ overwrite_errors = false
                   bound_limit = "yes",
                   pure_fv = false,
                   bflux = extrapolate,
+                  numerical_flux = EqReactive.rusanov,
+                  indicating_variables = EqReactive.rho_p_indicator!,
+                  indicator_model = "gassner",
                   cfl_safety_factor = 0.1,
                   save_iter_interval = 0, save_time_interval = 0.0,
                   animate = false, final_time = 1.0, nx = 4,
@@ -64,11 +69,27 @@ overwrite_errors = false
                   bound_limit = "yes",
                   pure_fv = false,
                   bflux = extrapolate,
+                  numerical_flux = EqReactive.rusanov,
                   cfl_safety_factor = 0.9,
                   save_iter_interval = 0, save_time_interval = 0.0,
                   final_time = 1.0, nx = 4,
                   smoothing_in_time = true)
     data_name = "reactive_rp1_ssp433.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
+
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_reactive_rp1_tough.jl"),
+                  compute_error_interval = 0,
+                  degree = 4,
+                  solver = cSSP2IMEX433(),
+                  bound_limit = "yes",
+                  pure_fv = false,
+                  bflux = extrapolate,
+                  numerical_flux = EqReactive.rusanov_dissipated,
+                  cfl_safety_factor = 0.9,
+                  save_iter_interval = 0, save_time_interval = 0.0,
+                  final_time = 1.0, nx = 4,
+                  smoothing_in_time = true)
+    data_name = "reactive_rp1_tough_ssp433.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
 
     # IMEXSSP433 test (used in the paper)
@@ -79,6 +100,7 @@ overwrite_errors = false
                   bound_limit = "yes",
                   pure_fv = false,
                   bflux = extrapolate,
+                  numerical_flux = EqReactive.rusanov,
                   cfl_safety_factor = 0.9,
                   save_iter_interval = 0, save_time_interval = 0.0,
                   final_time = 1.0, nx = 4,
@@ -94,7 +116,8 @@ overwrite_errors = false
                   bound_limit = "yes",
                   limiter = setup_limiter_tvb(equation; tvbM = 0.0),
                   bflux = extrapolate,
-                  cfl_safety_factor = 0.8, # TVB needs a lower CFL for some reason
+                  numerical_flux = EqReactive.rusanov,
+                  cfl_safety_factor = 0.5, # TVB needs a lower CFL for some reason
                   save_iter_interval = 0, save_time_interval = 0.0,
                   final_time = 1.0, nx = 4,
                   smoothing_in_time = true)
@@ -122,7 +145,7 @@ end
                   animate = false, final_time = 4.0, nx = 5,
                   smoothing_in_time = true)
     data_name = "super_burg_stiff_source_ht112.txt"
-    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
 
     trixi_include(joinpath(cRK_examples_dir(), "1d", "run_super_burg_stiff_source.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
@@ -132,7 +155,7 @@ end
                   animate = false, final_time = 4.0, nx = 5,
                   smoothing_in_time = true)
     data_name = "super_burg_stiff_source_ssp433.txt"
-    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
 end
 
 @testset "Jin-Xin" begin

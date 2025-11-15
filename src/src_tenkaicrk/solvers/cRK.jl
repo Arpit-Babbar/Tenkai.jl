@@ -49,7 +49,7 @@ function picard_solver(func, y0, tol = 1e-12, maxiters = 10000, stepsize = 0.1)
         n_iters += 1
     end
     if norm_F > tol
-        println("Picard solver did not converge and res = $norm_F")
+        println("Picard solver did not converge after $n_iters iterations and res = $norm_F")
     end
 
     return y
@@ -199,10 +199,13 @@ function Scheme(solver::DoublecRKSourceSolver{<:cRKSolver},
                 dissipation = "2"; cache = (;))
     # KLUDGE - The dissipation should have been a key word argument, but
     # I don't want to change all the run files now.
+
+    limiter_single_stage = deepcopy(limiter)
+    limiter_single_stage = @set limiter_single_stage.pure_fv = true
+
     scheme_single_solver = Scheme(solver.single_crk_solver, degree, solution_points,
                                   correction_function, numerical_flux, bound_limit,
-                                  limiter, bflux, dissipation; cache = cache)
-
+                                  limiter_single_stage, bflux, dissipation; cache = cache)
     cache = (; cache..., scheme_single_solver = scheme_single_solver)
 
     # scheme = @set scheme_single_solver.solver = solver
@@ -212,7 +215,7 @@ function Scheme(solver::DoublecRKSourceSolver{<:cRKSolver},
     # be set automatically. This is bad design.
     scheme = Scheme{typeof(solver), typeof(scheme_single_solver.dissipation),
                     typeof(scheme_single_solver.numerical_flux),
-                    typeof(scheme_single_solver.limiter),
+                    typeof(limiter),
                     typeof(scheme_single_solver.bflux), typeof(cache),
                     scheme_single_solver.degree + 1,
                     (scheme_single_solver.degree + 1)^2}(solver,
@@ -222,7 +225,7 @@ function Scheme(solver::DoublecRKSourceSolver{<:cRKSolver},
                                                          scheme_single_solver.correction_function,
                                                          scheme_single_solver.numerical_flux,
                                                          scheme_single_solver.bound_limit,
-                                                         scheme_single_solver.limiter,
+                                                         limiter,
                                                          scheme_single_solver.bflux,
                                                          scheme_single_solver.dissipation,
                                                          cache)

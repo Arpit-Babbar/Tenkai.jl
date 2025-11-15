@@ -80,7 +80,11 @@ function implicit_source_solve(lhs, eq, x, t, coefficient, source_terms::MyTenMo
     u4_np1 = lhs[4] - 0.5 * coefficient * u2_np1 * Wx
     u5_np1 = lhs[5] - 0.25 * coefficient * u3_np1 * Wx - 0.25 * coefficient * u2_np1 * Wy
     u6_np1 = lhs[6] - 0.5 * coefficient * u3_np1 * Wy
-    return SVector(u1_np1, u2_np1, u3_np1, u4_np1, u5_np1, u6_np1)
+
+    u_new = SVector(u1_np1, u2_np1, u3_np1, u4_np1, u5_np1, u6_np1)
+    source = TenkaicRK.calc_source(u_new, x, t, source_terms, eq)
+
+    return u_new, source
 end
 
 initial_value, exact_solution, boundary_value = initial_wave, exact_wave, dummy_bv

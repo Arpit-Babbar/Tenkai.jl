@@ -115,7 +115,11 @@ function TenkaicRK.implicit_source_solve(lhs, eq, x, t, coefficient,
     # if implicit_F(initial_guess)[1] > 1e-4
     #     @show u_new, initial_guess, lhs, u_node
     # end
-    return u_new
+
+    # source = source_terms_stiff_burg_non_linear(u_new, x, t, mu_, eq)
+    source = TenkaicRK.calc_source(u_new, x, t, source_terms, eq)
+
+    return u_new, source
 end
 
 #------------------------------------------------------------------------------

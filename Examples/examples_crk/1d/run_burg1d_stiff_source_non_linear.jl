@@ -102,8 +102,9 @@ function TenkaicRK.implicit_source_solve(lhs, eq, x, t, coefficient,
     maxiters = 1000
     # u_new = TenkaicRK.picard_solver(implicit_F, initial_guess, tol)
     u_new = newton_solver(implicit_F, initial_guess, tol, maxiters)
+    source = TenkaicRK.calc_source(u_new, x, t, source_terms, eq)
     @assert maximum(implicit_F(u_new))<10 * tol implicit_F(u_new)
-    return u_new
+    return u_new, source
 end
 
 #------------------------------------------------------------------------------

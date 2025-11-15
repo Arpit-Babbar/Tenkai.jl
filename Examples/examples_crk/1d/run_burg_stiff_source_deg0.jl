@@ -131,8 +131,10 @@ function TenkaicRK.implicit_source_solve(lhs, eq, x, t, coefficient,
         # @assert false
     end
 
+    source = TenkaicRK.calc_source(u_new, x, t, source_terms, eq)
+
     # @assert maximum(implicit_F(u_new))<10 * tol implicit_F(u_new)
-    return u_new
+    return u_new, source
 end
 
 #------------------------------------------------------------------------------
