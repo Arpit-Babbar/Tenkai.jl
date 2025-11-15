@@ -784,14 +784,15 @@ function setup_limiter_blend(; blend_type, indicating_variables,
                              pure_fv = false,
                              bc_x = no_upwinding_x, tvbM = 0.0,
                              numflux = nothing,
-                             positivity_blending = NoPositivityBlending())
+                             positivity_blending = NoPositivityBlending(),
+                             smoothing_in_time = false)
     limiter = (; name = "blend", blend_type, indicating_variables,
                reconstruction_variables, indicator_model,
                amax, smooth_alpha, smooth_factor,
                constant_node_factor, constant_node_factor2,
                a, c, amin,
                super_debug, debug_blend, pure_fv, bc_x, tvbM, numflux,
-               positivity_blending)
+               positivity_blending, smoothing_in_time)
     return limiter
 end
 
