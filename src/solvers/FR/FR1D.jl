@@ -907,7 +907,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
     left_bc, right_bc = problem.boundary_condition
     @unpack blend = aux
     amax = blend.amax      # maximum factor of the lower order term
-    @unpack (constant_node_factor, constant_node_factor2, c, a, amin) = blend.parameters # Multiply constant node by this factor in indicator
+    @unpack (constant_node_factor, constant_node_factor2, c, a, amin, smoothing_in_time) = blend.parameters # Multiply constant node by this factor in indicator
     @unpack E1, E0 = blend # smoothness and discontinuity thresholds
     tolE = blend.tolE      # tolerance for denominator
     E = blend.E            # content in high frequency nodes
@@ -993,11 +993,13 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
     end
 
     # smoothing in time
-    # for i in 1:nx
-    #     alpha[i] = max(0.9 * alpha0[i], 0.5 * alpha0[i - 1], 0.5 * alpha0[i + 1],
-    #                    alpha[i])
-    # end
-
+    if smoothing_in_time
+        for i in 1:nx
+            alpha[i] = max(0.9 * alpha0[i], 0.5 * alpha0[i - 1],
+                           0.5 * alpha0[i + 1],
+                           alpha[i])
+        end
+    end
     # Smoothening of alpha
     alpha0 .= alpha
     for i in 1:nx
@@ -2186,8 +2188,7 @@ function Blend(eq::AbstractEquations{1}, op, grid,
                problem::Problem,
                scheme::Scheme,
                param::Parameters,
-               plot_data, bc_x = no_upwinding_x,
-               positivity_blending = NoPositivityBlending())
+               plot_data, bc_x = no_upwinding_x)
     @unpack xc, xf, dx = grid
     nx = grid.size
     nvar = nvariables(eq)
@@ -2222,9 +2223,10 @@ function Blend(eq::AbstractEquations{1}, op, grid,
     smooth_alpha,
     amax, constant_node_factor, constant_node_factor2, c, a, amin,
     indicator_model, debug_blend, pure_fv,
-    numflux, positivity_blending) = limiter
+    numflux, positivity_blending, smoothing_in_time) = limiter
     parameters = (; c, a, amin, smooth_alpha, constant_node_factor,
-                  constant_node_factor2, positivity_blending, pure_fv)
+                  constant_node_factor2, positivity_blending, pure_fv,
+                  smoothing_in_time)
     nd = degree + 1
     if numflux === nothing
         numflux = scheme.numerical_flux
