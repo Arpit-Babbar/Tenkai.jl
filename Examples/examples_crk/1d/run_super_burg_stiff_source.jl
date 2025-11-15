@@ -111,7 +111,8 @@ limiter = setup_limiter_blend(blend_type = fo_blend_imex(equation),
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner",
                               amax = 1.0,
-                              pure_fv = false)
+                              pure_fv = false,
+                              smoothing_in_time = false)
 # limiter = setup_limiter_tvb(equation; tvbM = tvbM)
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)

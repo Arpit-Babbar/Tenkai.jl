@@ -52,7 +52,8 @@ overwrite_errors = false
                   bflux = extrapolate,
                   cfl_safety_factor = 0.1,
                   save_iter_interval = 0, save_time_interval = 0.0,
-                  animate = false, final_time = 1.0, nx = 4)
+                  animate = false, final_time = 1.0, nx = 4,
+                  smoothing_in_time = true)
     data_name = "reactive_rp1_ht112.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
 
@@ -65,7 +66,8 @@ overwrite_errors = false
                   bflux = extrapolate,
                   cfl_safety_factor = 0.9,
                   save_iter_interval = 0, save_time_interval = 0.0,
-                  final_time = 1.0, nx = 4)
+                  final_time = 1.0, nx = 4,
+                  smoothing_in_time = true)
     data_name = "reactive_rp1_ssp433.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
 
@@ -79,7 +81,8 @@ overwrite_errors = false
                   bflux = extrapolate,
                   cfl_safety_factor = 0.9,
                   save_iter_interval = 0, save_time_interval = 0.0,
-                  final_time = 1.0, nx = 4)
+                  final_time = 1.0, nx = 4,
+                  smoothing_in_time = true)
     data_name = "reactive_rp1_ssp433.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
 
@@ -93,7 +96,8 @@ overwrite_errors = false
                   bflux = extrapolate,
                   cfl_safety_factor = 0.8, # TVB needs a lower CFL for some reason
                   save_iter_interval = 0, save_time_interval = 0.0,
-                  final_time = 1.0, nx = 4)
+                  final_time = 1.0, nx = 4,
+                  smoothing_in_time = true)
     data_name = "reactive_rp1_tvb.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
 end
@@ -115,7 +119,8 @@ end
                   compute_error_interval = 0,
                   degree = 3,
                   solver_single = cHT112(),
-                  animate = false, final_time = 4.0, nx = 5)
+                  animate = false, final_time = 4.0, nx = 5,
+                  smoothing_in_time = true)
     data_name = "super_burg_stiff_source_ht112.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 
@@ -124,7 +129,8 @@ end
                   compute_error_interval = 0,
                   degree = 3,
                   solver_single = cSSP2IMEX433(),
-                  animate = false, final_time = 4.0, nx = 5)
+                  animate = false, final_time = 4.0, nx = 5,
+                  smoothing_in_time = true)
     data_name = "super_burg_stiff_source_ssp433.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
@@ -150,7 +156,8 @@ end
                            "run_burg1d_stiff_source_non_linear.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,
-                  animate = false, final_time = 5.0)
+                  animate = false, final_time = 5.0,
+                  smoothing_in_time = true)
     data_name = "burg1d_stiff_source_non_linear.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end

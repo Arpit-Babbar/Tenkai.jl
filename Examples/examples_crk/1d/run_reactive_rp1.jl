@@ -80,7 +80,8 @@ limiter_blend = setup_limiter_blend(blend_type = FO,
                                     indicator_model = "gassner",
                                     debug_blend = false,
                                     pure_fv = false,
-                                    numflux = Eq.rusanov)
+                                    numflux = Eq.rusanov,
+                                    smoothing_in_time = false)
 # limiter_tvb = setup_limiter_tvb(equation; tvbM = tvbM)
 # limiter = setup_limiter_none()
 limiter = limiter_blend
