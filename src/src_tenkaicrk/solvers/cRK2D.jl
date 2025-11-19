@@ -533,6 +533,17 @@ end
     return nothing
 end
 
+function fast_update_solution_lwfr!(u1, res, aux)
+    @timeit aux.timer "Update solution" begin
+    #! format: noindent
+    # TODO - This will be bad for one thread. Need to do a parallel axpy!
+    @threaded for i in eachindex(u1)
+        u1[i] -= res[i]
+    end
+    return nothing
+    end # timer
+end
+
 @inbounds function update_with_residuals!(positivity_blending::PositivityBlending,
                                           eq::AbstractEquations{2}, grid, op, u1,
                                           res, aux)
@@ -541,7 +552,7 @@ end
     @threaded for i in eachindex(res_blend)
         res_blend[i] = u1[i] - res_blend[i]
     end
-    update_solution_lwfr!(u1, res, aux) # u1 = u1 - res
+    fast_update_solution_lwfr!(u1, res, aux) # u1 = u1 - res
 
     u1_low = res_blend
 
