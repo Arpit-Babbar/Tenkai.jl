@@ -95,6 +95,27 @@ function pressure(eq::MultiIonMHD2D, u)
     return Trixi.pressure(u, eq.trixi_equations)
 end
 
+function total_pressure(eq::MultiIonMHD2D, u)
+    return sum(pressure(eq, u))
+end
+
+function density_pressure(eq::MultiIonMHD2D, u)
+    dens = density(eq, u)
+    press = total_pressure(eq, u)
+    return dens * press
+end
+
+@inbounds @inline function rho_p_indicator!(un, eq::MultiIonMHD2D)
+    nd_p2 = size(un, 2) # nd + 2
+    for iy in 1:nd_p2, ix in 1:nd_p2 # loop over dofs and faces
+        u_node = get_node_vars(un, eq, ix, iy)
+        rho_p = density_pressure(eq, u_node)
+        un[1, ix, iy] = rho_p # ρ * p
+    end
+    n_ind_var = 1
+    return n_ind_var
+end
+
 function velocity(eq::MultiIonMHD2D, u)
     return Trixi.velocity(u, eq.trixi_equations)
 end
