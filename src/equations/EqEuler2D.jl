@@ -2185,9 +2185,7 @@ end
 #-------------------------------------------------------------------------------
 # Write solution to a vtk file
 #-------------------------------------------------------------------------------
-function Tenkai.initialize_plot(eq::Euler2D, op, grid, problem, scheme, timer, u1, ua)
-    return nothing
-end
+function Tenkai.initialize_plot(eq::Euler2D, op, grid, problem, scheme, timer, u1, ua) end
 
 function write_poly(eq::Euler2D, grid, op, u1, fcount)
     filename = get_filename("output/sol", 3, fcount)
