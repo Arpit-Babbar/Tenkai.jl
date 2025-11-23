@@ -31,13 +31,13 @@ function make_cartesian_grid(problem, size::Int64)
     xmin, xmax = domain
     nx = size
     dx1 = (xmax - xmin) / nx
-    xc = LinRange(xmin + 0.5 * dx1, xmax - 0.5 * dx1, nx)
+    xc = collect(LinRange(xmin + 0.5 * dx1, xmax - 0.5 * dx1, nx))
     @printf("   Grid size = %d \n", nx)
     @printf("   xmin,xmax = %e, %e\n", xmin, xmax)
     @printf("   dx        = %e\n", dx1)
     dx = OffsetArray(zeros(nx + 2), OffsetArrays.Origin(0))
     dx .= dx1
-    xf = LinRange(xmin, xmax, nx + 1)
+    xf = collect(LinRange(xmin, xmax, nx + 1))
     return CartesianGrid1D(domain, size, xc, xf, dx)
 end
 
@@ -48,8 +48,8 @@ function make_cartesian_grid(problem, size::Vector{Int64})
     nx, ny = size
     dx1 = (xmax - xmin) / nx
     dy1 = (ymax - ymin) / ny
-    xc = LinRange(xmin + 0.5 * dx1, xmax - 0.5 * dx1, nx)
-    yc = LinRange(ymin + 0.5 * dy1, ymax - 0.5 * dy1, ny)
+    xc = collect(LinRange(xmin + 0.5 * dx1, xmax - 0.5 * dx1, nx))
+    yc = collect(LinRange(ymin + 0.5 * dy1, ymax - 0.5 * dy1, ny))
     @printf("   Grid size = %d x %d\n", nx, ny)
     @printf("   xmin,xmax = %e, %e\n", xmin, xmax)
     @printf("   ymin,ymax = %e, %e\n", ymin, ymax)
@@ -58,8 +58,8 @@ function make_cartesian_grid(problem, size::Vector{Int64})
     dy = OffsetArray(zeros(ny + 2), OffsetArrays.Origin(0))
     dx .= dx1
     dy .= dy1
-    xf = LinRange(xmin, xmax, nx + 1)
-    yf = LinRange(ymin, ymax, ny + 1)
+    xf = collect(LinRange(xmin, xmax, nx + 1))
+    yf = collect(LinRange(ymin, ymax, ny + 1))
     return CartesianGrid2D(domain, size, xc, yc, xf, yf, dx, dy)
 end
 
