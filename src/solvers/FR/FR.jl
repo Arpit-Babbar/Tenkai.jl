@@ -1062,45 +1062,45 @@ end
 #------------------------------------------------------------------------------
 # Methods that are extended/defined in FR1D, FR2D
 #------------------------------------------------------------------------------
-set_initial_condition!() = nothing
-compute_cell_average!() = nothing
-get_cfl() = nothing
-compute_time_step() = nothing
-compute_face_residual!() = nothing
-apply_bound_limiter!() = nothing
-setup_limiter_tvb() = nothing
-setup_limiter_tvbβ() = nothing
-apply_tvb_limiter!() = nothing
-apply_tvb_limiterβ!() = nothing
-Hierarchical() = nothing
-apply_hierarchical_limiter!() = nothing
-set_blend_dt!() = nothing
-compute_error() = nothing
-initialize_plot() = nothing
-write_soln!() = nothing
-create_aux_cache() = nothing
-write_poly() = nothing
-post_process_soln() = nothing
-update_ghost_values_periodic!() = nothing
-update_ghost_values_u1!() = nothing
-update_ghost_values_fn_blend!() = nothing
-limit_slope() = nothing
-is_admissible() = nothing
-modal_smoothness_indicator() = nothing
-modal_smoothness_indicator_gassner() = nothing
-Blend() = nothing
-setup_arrays_lwfr() = nothing
-setup_arrays_rkfr() = nothing
-setup_arrays_mdrk() = nothing
+function set_initial_condition! end
+function compute_cell_average! end
+function get_cfl end
+function compute_time_step end
+function compute_face_residual! end
+function apply_bound_limiter! end
+function setup_limiter_tvb end
+function setup_limiter_tvbβ end
+function apply_tvb_limiter! end
+function apply_tvb_limiterβ! end
+function Hierarchical end
+function apply_hierarchical_limiter! end
+function set_blend_dt! end
+function compute_error end
+function initialize_plot end
+function write_soln! end
+function create_aux_cache end
+function write_poly end
+function post_process_soln end
+function update_ghost_values_periodic! end
+function update_ghost_values_u1! end
+function update_ghost_values_fn_blend! end
+function limit_slope end
+function is_admissible end
+function modal_smoothness_indicator end
+function modal_smoothness_indicator_gassner end
+function Blend end
+function setup_arrays_lwfr end
+function setup_arrays_rkfr end
+function setup_arrays_mdrk end
 
 # These methods are primarily for LWFR.jl, but are also needed here for
 # get_bflux_function()
-eval_bflux1!() = nothing
-eval_bflux2!() = nothing
-eval_bflux3!() = nothing
-eval_bflux4!() = nothing
-eval_bflux5!() = nothing
-extrap_bflux!() = nothing
+function eval_bflux1! end
+function eval_bflux2! end
+function eval_bflux3! end
+function eval_bflux4! end
+function eval_bflux5! end
+function extrap_bflux! end
 
 tenkai2trixiode(solver, equation, problem, scheme, param) = ()
 

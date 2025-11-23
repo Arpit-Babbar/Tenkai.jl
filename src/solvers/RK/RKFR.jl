@@ -33,8 +33,8 @@ abstract type AbstractRKSolver end
 # Methods to be defined in RKFR1D, RKFR2D
 #------------------------------------------------------------------------------
 (import Tenkai: setup_arrays_rkfr)
-compute_cell_residual_rkfr!() = nothing
-update_ghost_values_rkfr!() = nothing
+function compute_cell_residual_rkfr! end
+function update_ghost_values_rkfr! end
 
 #------------------------------------------------------------------------------
 function compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, t,
