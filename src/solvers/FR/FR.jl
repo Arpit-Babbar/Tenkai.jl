@@ -360,7 +360,7 @@ function newton_step(func, x)
     # VERY INEFFICIENT TO BE COMPUTING THE STEP MULTIPLE TIMES
     stepsize = d.value / (d.partials[1] + oftype(x, 1e-16))
     while x - stepsize < zero(x) || x - stepsize > one(x)
-        stepsize *= oftype(stepsize, 0.5)
+        stepsize *= 0.5f0
     end
     return x - stepsize
 end
@@ -883,17 +883,18 @@ function limit_variable_slope(eq, variable, slope, u_star_ll, u_star_rr, ue, xl,
     # By Jensen's inequality, we can find theta's directly for the primitives
     var_star_ll, var_star_rr = variable(eq, u_star_ll), variable(eq, u_star_rr)
     var_low = variable(eq, ue)
-    threshold = oftype(var_low, 0.1) * var_low
-    eps = oftype(var_low, 1e-10)
+    RealT = typeof(var_low)
+    threshold = convert(RealT, 0.1) * var_low
+    eps = convert(RealT, 1e-10)
     if var_star_ll < eps || var_star_rr < eps
         ratio_ll = abs(threshold - var_low) /
-                   (abs(var_star_ll - var_low) + oftype(var_low, 1e-13))
+                   (abs(var_star_ll - var_low) + convert(RealT, 1e-13))
         ratio_rr = abs(threshold - var_low) /
-                   (abs(var_star_rr - var_low) + oftype(var_low, 1e-13))
+                   (abs(var_star_rr - var_low) + convert(RealT, 1e-13))
         theta = min(ratio_ll, ratio_rr, one(var_low))
         slope *= theta
-        u_star_ll = ue + oftype(xl, 2) * xl * slope
-        u_star_rr = ue + oftype(xr, 2) * xr * slope
+        u_star_ll = ue + 2 * xl * slope
+        u_star_rr = ue + 2 * xr * slope
     end
     return slope, u_star_ll, u_star_rr
 end

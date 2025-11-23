@@ -94,8 +94,8 @@ function set_initial_condition!(u, eq::AbstractEquations{2}, grid, op, problem)
         dx, dy = grid.dx[el_x], grid.dy[el_y] # cell size
         xc, yc = grid.xc[el_x], grid.yc[el_y] # cell center
         for j in 1:nd, i in 1:nd
-            x = xc - oftype(dx, 0.5) * dx + xg[i] * dx
-            y = yc - oftype(dy, 0.5) * dy + xg[j] * dy
+            x = xc - 0.5f0 * dx + xg[i] * dx
+            y = yc - 0.5f0 * dy + xg[j] * dy
             iv = initial_value(x, y)
             set_node_vars!(u, iv, eq, i, j, el_x, el_y)
         end
@@ -853,15 +853,13 @@ function apply_tvb_limiter!(eq::AbstractEquations{2, 1}, problem, scheme, grid,
         # limit if jumps are detected
         if ((abs(dul - dulm) > 1e-06 || abs(dur - durm) > 1e-06) ||
             (abs(dub - dubm) > 1e-06 || abs(dut - dutm) > 1e-06))
-            dux, duy = oftype(dulm, 0.5) * (dulm + durm),
-                       oftype(dutm, 0.5) * (dutm + dubm)
+            dux, duy = 0.5f0 * (dulm + durm),
+                       0.5f0 * (dutm + dubm)
             for jj in 1:nd, ii in 1:nd # Adding @turbo here was giving bugs. WHY!?
                 u1_[ii, jj, el_x, el_y] = (ua_[el_x, el_y] +
-                                           oftype(dux, 2) *
-                                           (xg[ii] - oftype(xg[ii], 0.5)) * dux
+                                           2 * (xg[ii] - 0.5f0) * dux
                                            +
-                                           oftype(duy, 2) *
-                                           (xg[jj] - oftype(xg[jj], 0.5)) * duy)
+                                           2 * (xg[jj] - 0.5f0) * duy)
             end
         end
     end

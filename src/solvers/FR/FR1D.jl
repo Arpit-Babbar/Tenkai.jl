@@ -84,7 +84,7 @@ function set_initial_condition!(u, eq::AbstractEquations{1}, grid, op, problem)
         dx = grid.dx[i] # cell size
         xc = grid.xc[i] # cell center
         for ii in 1:nd
-            x = xc - oftype(dx, 0.5) * dx + xg[ii] * dx
+            x = xc - 0.5f0 * dx + xg[ii] * dx
             u[:, ii, i] .= initial_value(x)
         end
     end

@@ -24,9 +24,9 @@ function Legendre(n, x)
     elseif n == 1
         value = x
     else
-        value = ((oftype(x, 2) * n - one(x)) / n * x * Legendre(n - 1, x)
+        value = ((2 * n - 1) / n * x * Legendre(n - 1, x)
                  -
-                 (n - one(x)) / n * Legendre(n - 2, x))
+                 (n - 1) / n * Legendre(n - 2, x))
     end
 
     return value
@@ -50,7 +50,7 @@ end
 # Normalize Legendre polynomials to unit L2 norm in [0,1]
 #-------------------------------------------------------------------------------
 function nLegendre(n, x)
-    value = sqrt(oftype(x, 2) * n + one(x)) * Legendre(n, x)
+    value = sqrt(2 * n + 1) * Legendre(n, x)
     return value
 end
 
@@ -66,9 +66,8 @@ function weights_and_points(n, type)
         println("Unknown solution points")
         @assert false
     end
-    T = eltype(x)
-    w *= T(0.5)
-    x = T(0.5) * (x .+ one(T))
+    w *= 0.5f0
+    x = 0.5f0 * (x .+ 1)
     return SVector{n}(x), SVector{n}(w)
 end
 
@@ -118,7 +117,7 @@ function Vandermonde_leg(k, x)
     V = zeros(T, m, n)
     for j in 1:n
         for i in 1:m
-            V[i, j] = nLegendre(j - 1, oftype(x[i], 2) * x[i] - one(x[i]))
+            V[i, j] = nLegendre(j - 1, 2 * x[i] - one(x[i]))
         end
     end
     return V
@@ -259,12 +258,12 @@ end
 # x is in [-1,1]
 #-------------------------------------------------------------------------------
 function gl_radau(k, x)
-    value = oftype(x, 0.5) * (-1)^k * (Legendre(k, x) - Legendre(k + 1, x))
+    value = 0.5f0 * (-1)^k * (Legendre(k, x) - Legendre(k + 1, x))
     return value
 end
 
 function gr_radau(k, x)
-    value = oftype(x, 0.5) * (Legendre(k, x) + Legendre(k + 1, x))
+    value = 0.5f0 * (Legendre(k, x) + Legendre(k + 1, x))
     return value
 end
 
@@ -273,12 +272,12 @@ end
 # x is in [-1,1]
 #-------------------------------------------------------------------------------
 function dgl_radau(k, x)
-    value = oftype(x, 0.5) * (-1)^k * (dLegendre(k, x) - dLegendre(k + 1, x))
+    value = 0.5f0 * (-1)^k * (dLegendre(k, x) - dLegendre(k + 1, x))
     return value
 end
 
 function dgr_radau(k, x)
-    value = oftype(x, 0.5) * (dLegendre(k, x) + dLegendre(k + 1, x))
+    value = 0.5f0 * (dLegendre(k, x) + dLegendre(k + 1, x))
     return value
 end
 
@@ -287,10 +286,10 @@ end
 # x is in [-1,1]
 #-------------------------------------------------------------------------------
 function gl_g2(k, x)
-    value = oftype(x, 0.5) * (-1)^k *
+    value = 0.5f0 * (-1)^k *
             (Legendre(k, x) -
              ((k + one(x)) * Legendre(k - 1, x) +
-              k * Legendre(k + 1, x)) / (oftype(x, 2) * k + one(x)))
+              k * Legendre(k + 1, x)) / (2 * k + one(x)))
     return value
 end
 
@@ -304,7 +303,7 @@ end
 # x is in [-1,1]
 #-------------------------------------------------------------------------------
 function dgl_g2(k, x)
-    value = oftype(x, 0.5) * (-1)^k * (one(x) - x) * dLegendre(k, x)
+    value = 0.5f0 * (-1)^k * (one(x) - x) * dLegendre(k, x)
     return value
 end
 
@@ -347,8 +346,8 @@ function fr_operators(N, sol_pts, cor_fun)
     T = eltype(xg)
     bl, br = zeros(T, nd), zeros(T, nd)
     for i in 1:nd
-        bl[i] = oftype(xg[i], 2) * dgl(N, oftype(xg[i], 2) * xg[i] - one(xg[i]))
-        br[i] = oftype(xg[i], 2) * dgr(N, oftype(xg[i], 2) * xg[i] - one(xg[i]))
+        bl[i] = 2 * dgl(N, 2 * xg[i] - one(xg[i]))
+        br[i] = 2 * dgr(N, 2 * xg[i] - one(xg[i]))
     end
 
     # Convert vectors to SVector for optimized operations
@@ -359,7 +358,7 @@ function fr_operators(N, sol_pts, cor_fun)
     Dm = diff_mat(xg)
     bV = -bl * Vl' - br * Vr'
     D1 = Dm + bV
-    Dsplit = oftype(T(1), 2) * Dm + bV
+    Dsplit = 2 * Dm + bV
 
     DmT = SMatrix{nd, nd}(Dm')
     D1T = SMatrix{nd, nd}(D1')
