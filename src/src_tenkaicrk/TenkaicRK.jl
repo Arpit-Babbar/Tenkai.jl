@@ -33,7 +33,7 @@ cRK_elixirs_dir() = joinpath(dirname(pathof(Tenkai)), "..", "elixirs")
 
 # Compact Runge-Kutta Solvers
 export cIMEX111, cHT112, cHT112Explicit, cSSP2IMEX222,
-       cARS222, cBPR343, cAGSA343,
+       cARS222, cBPR343, cARS443, cAGSA343,
        cSSP2IMEX332, cSSP2IMEX433, DoublecRKSourceSolver
 
 # Flux differencing stuff

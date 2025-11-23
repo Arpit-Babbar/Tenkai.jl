@@ -74,7 +74,8 @@ end
 source_terms = source_terms_stiff_burg_non_linear
 
 function TenkaicRK.get_cache_node_vars(aux, u1,
-                                       problem::Problem{<:typeof(source_terms_stiff_burg_non_linear)},
+                                       problem::Problem{<:Real,
+                                                        <:typeof(source_terms_stiff_burg_non_linear)},
                                        scheme,
                                        eq, i, cell)
     # u_node = get_node_vars(u1, eq, i, cell)

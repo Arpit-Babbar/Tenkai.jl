@@ -1688,7 +1688,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
                               (A_rk[2][1], A_rk[3][1], A_rk[4][1], A_rk[5][1]),
                               b_rk[1], c_rk[1], u1_, op, local_grid,
                               source_terms, eq)
-        source_term_implicit!((u2, u3), F_G_U_S, (A_rk[2][2], A_rk[3][2]), b_rk[2],
+        source_term_implicit!((u2, u3, u4, u5), F_G_U_S,
+                              (A_rk[2][2], A_rk[3][2], A_rk[4][2], A_rk[5][2]), b_rk[2],
                               c_rk[2], u1_, op,
                               local_grid,
                               problem, scheme, implicit_solver, source_terms, aux, eq)
@@ -1698,7 +1699,138 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
                   local_grid, eq)
         noncons_flux_der!(volume_integral, (u3,), r1, (tA_rk[3][2],), tb_rk[2], u2, op,
                           local_grid, eq)
-        source_term_implicit!((u3, u5), F_G_U_S, (A_rk[3][3], A_rk[5][3]), b_rk[3],
+        source_term_implicit!((u3, u4, u5), F_G_U_S,
+                              (A_rk[3][3], A_rk[4][3], A_rk[5][3]), b_rk[3],
+                              c_rk[3], u2, op,
+                              local_grid,
+                              problem, scheme, implicit_solver, source_terms, aux, eq)
+
+        # Stage 3
+        flux_der!(volume_integral, r1, (u4, u5), F_G_U_S, (tA_rk[4][3], tA_rk[5][3]),
+                  tb_rk[3], u3, op,
+                  local_grid, eq)
+        noncons_flux_der!(volume_integral, (u4, u5), r1, (tA_rk[4][3], tA_rk[5][3]),
+                          tb_rk[3], u3, op,
+                          local_grid, eq)
+        source_term_implicit!((u4, u5), F_G_U_S, (A_rk[4][4], A_rk[5][4]), b_rk[4],
+                              c_rk[4], u3, op,
+                              local_grid,
+                              problem, scheme, implicit_solver, source_terms, aux, eq)
+
+        # Stage 4
+        source_term_implicit!((u5,), F_G_U_S, (A_rk[5][5],), b_rk[5], c_rk[5], u4, op,
+                              local_grid,
+                              problem, scheme, implicit_solver, source_terms, aux, eq)
+
+        F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
+                         eq)
+
+        Bb_to_res!(eq, local_grid, op, Ub_, r1)
+
+        u = @view u1[:, :, :, el_x, el_y]
+        blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
+                             dy,
+                             grid.xf[el_x], grid.yf[el_y], op, u1, u, nothing, res)
+        # Interpolate to faces
+        @views cell_data = (u, u2, el_x, el_y)
+        @views compute_bflux!(eq, scheme, grid, cell_data, eval_data, xg, Vl, Vr,
+                              F, G, Fb[:, :, :, el_x, el_y], aux)
+    end
+    end # timer
+end
+
+function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, op,
+                                    problem, scheme::Scheme{<:cARS443}, aux, t, dt,
+                                    cache)
+    @timeit aux.timer "Cell residual" begin
+    #! format: noindent
+    @unpack source_terms = problem
+    @unpack xg, wg, Dm, D1, Vl, Vr = op
+    nd = length(xg)
+    nx, ny = grid.size
+    @unpack compute_bflux! = scheme.bflux
+    @unpack solver = scheme
+    @unpack volume_integral = solver
+    @unpack implicit_solver = solver
+    @unpack blend = aux
+    @unpack bl, br = op
+    get_dissipation_node_vars = scheme.dissipation
+    @unpack blend_cell_residual! = aux.blend.subroutines
+
+    @unpack cell_arrays, eval_data, ua, u1, res, Fb, Ub = cache
+
+    refresh!.((res, Ub, Fb)) # Reset previously used variables to zero
+
+    # ARS(4,4,3) / ARS443 (Ascher–Ruuth–Spiteri)
+    z0 = MyZero()
+
+    # explicit (non-stiff) tableau (tA_rk, tb_rk)
+    tA_rk = ((z0, z0, z0, z0, z0),                    # stage 1
+             (1 / 2, z0, z0, z0, z0),                    # stage 2
+             (11 / 18, 1 / 18, z0, z0, z0),                    # stage 3
+             (5 / 6, -5 / 6, 1 / 2, z0, z0),                    # stage 4
+             (1 / 4, 7 / 4, 3 / 4, -7 / 4, z0))
+    tb_rk = (1 / 4, 7 / 4, 3 / 4, -7 / 4, 0.0)
+
+    # implicit (stiff) tableau (A_rk, b_rk, c_rk)
+    A_rk = ((z0, z0, z0, z0, z0),      # stage 1
+            (z0, 1 / 2, z0, z0, z0),      # stage 2
+            (z0, 1 / 6, 1 / 2, z0, z0),      # stage 3
+            (z0, -1 / 2, 1 / 2, 1 / 2, z0),      # stage 4
+            (z0, 3 / 2, -3 / 2, 1 / 2, 1 / 2))
+    b_rk = (0.0, 3 / 2, -3 / 2, 1 / 2, 1 / 2)
+
+    # stage times (common representation; first entry is the zero placeholder)
+    c_rk = (z0, 1 / 2, 2 / 3, 1 / 2, 1.0)
+
+    @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
+        el_x, el_y = element[1], element[2]
+        dx, dy = grid.dx[el_x], grid.dy[el_y]
+        xc, yc = grid.xc[el_x], grid.yc[el_y]
+        lamx, lamy = dt / dx, dt / dy
+        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt)
+
+        id = Threads.threadid()
+        u2, u3, u4, u5, F, G, U, S = cell_arrays[id]
+        F_G_U_S = (F, G, U, S)
+        refresh!.(F_G_U_S)
+
+        # TODO - FIX THIS HARDCODING!!
+        u1_ = @view u1[:, :, :, el_x, el_y]
+        u2 .= u1_
+        u3 .= u1_
+        u4 .= u1_
+        u5 .= u1_
+        r1 = @view res[:, :, :, el_x, el_y]
+        Ub_ = @view Ub[:, :, :, el_x, el_y]
+
+        # u1_ .= u
+
+        # Stage 1
+        flux_der!(volume_integral, r1, (u2, u3, u4, u5), F_G_U_S,
+                  (tA_rk[2][1], tA_rk[3][1], tA_rk[4][1], tA_rk[5][1]),
+                  tb_rk[1], u1_, op, local_grid, eq)
+        noncons_flux_der!(volume_integral, (u2, u3, u4, u5), r1,
+                          (tA_rk[2][1], tA_rk[3][1], tA_rk[4][1], tA_rk[5][1]),
+                          tb_rk[1], u1_, op,
+                          local_grid, eq)
+        source_term_explicit!((u2, u3, u4, u5), F_G_U_S,
+                              (A_rk[2][1], A_rk[3][1], A_rk[4][1], A_rk[5][1]),
+                              b_rk[1], c_rk[1], u1_, op, local_grid,
+                              source_terms, eq)
+        source_term_implicit!((u2, u3, u4, u5), F_G_U_S,
+                              (A_rk[2][2], A_rk[3][2], A_rk[4][2], A_rk[5][2]), b_rk[2],
+                              c_rk[2], u1_, op,
+                              local_grid,
+                              problem, scheme, implicit_solver, source_terms, aux, eq)
+
+        # Stage 2
+        flux_der!(volume_integral, r1, (u3,), F_G_U_S, (tA_rk[3][2],), tb_rk[2], u2, op,
+                  local_grid, eq)
+        noncons_flux_der!(volume_integral, (u3,), r1, (tA_rk[3][2],), tb_rk[2], u2, op,
+                          local_grid, eq)
+        source_term_implicit!((u3, u4, u5), F_G_U_S,
+                              (A_rk[3][3], A_rk[4][3], A_rk[5][3]), b_rk[3],
                               c_rk[3], u2, op,
                               local_grid,
                               problem, scheme, implicit_solver, source_terms, aux, eq)

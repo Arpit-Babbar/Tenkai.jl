@@ -40,20 +40,29 @@ function picard_iteration(func, y, stepsize = 0.1)
     return y, norm(F)
 end
 
-function picard_solver(func, y0, tol = 1e-12, maxiters = 10000, stepsize = 0.1)
+struct PicardSolver{RealT <: Real}
+    tol::RealT
+    super_tol::RealT
+    max_iters::Int
+end
+
+function (s::PicardSolver)(func, y0, tol = s.tol, max_iters = s.max_iters, stepsize = 0.1)
     y = y0
     n_iters = 0
-    y, norm_F = picard_iteration(func, y, stepsize)
-    while norm_F > tol && n_iters < maxiters
+    @unpack super_tol = s
+    y, norm_F = picard_iteration(func, y)
+    while norm_F > tol && n_iters < max_iters
         y, norm_F = picard_iteration(func, y, stepsize)
         n_iters += 1
     end
-    if norm_F > tol
-        println("Picard solver did not converge after $n_iters iterations and res = $norm_F")
+    if norm_F > super_tol
+        println("Picard solver did not converge and res = $norm_F")
     end
 
     return y
 end
+
+const global picard_solver = PicardSolver(1e-12, 1e-12, 10000)
 
 function newton_solver(func, y0, tol = 1e-14, maxiters = 1e3)
     p = nothing # The func doesn't have any parameters
@@ -113,6 +122,18 @@ end # Three-stage third order BRB scheme with three implicit solves
 function cBPR343(; implicit_solver = newton_solver,
                  volume_integral = VolumeIntegralWeak())
     return cBPR343{typeof(implicit_solver), typeof(volume_integral)}(implicit_solver,
+                                                                     volume_integral)
+end
+
+struct cARS443{ImplicitSolver, VolumeIntegral} <: cRKSolver
+    implicit_solver::ImplicitSolver
+    volume_integral::VolumeIntegral
+end # Three-stage third order BRB scheme with three implicit solves
+
+# Constructor for cBPR343 with a default implicit solver
+function cARS443(; implicit_solver = newton_solver,
+                 volume_integral = VolumeIntegralWeak())
+    return cARS443{typeof(implicit_solver), typeof(volume_integral)}(implicit_solver,
                                                                      volume_integral)
 end
 
@@ -201,7 +222,9 @@ function Scheme(solver::DoublecRKSourceSolver{<:cRKSolver},
     # I don't want to change all the run files now.
 
     limiter_single_stage = deepcopy(limiter)
-    limiter_single_stage = @set limiter_single_stage.pure_fv = true
+    if limiter.name == "blend"
+        limiter_single_stage = @set limiter_single_stage.pure_fv = true
+    end
 
     scheme_single_solver = Scheme(solver.single_crk_solver, degree, solution_points,
                                   correction_function, numerical_flux, bound_limit,

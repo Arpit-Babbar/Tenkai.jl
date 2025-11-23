@@ -26,7 +26,8 @@ numerical_flux = Eq.rusanov
 bound_limit = "no"
 
 function TenkaicRK.get_cache_node_vars(aux, u1,
-                                       problem::Problem{<:typeof(burg_smooth_source_terms)},
+                                       problem::Problem{<:Real,
+                                                        <:typeof(burg_smooth_source_terms)},
                                        scheme_cache::Scheme{<:TenkaicRK.cRKSolver},
                                        eq, i, cell)
     # @assert false

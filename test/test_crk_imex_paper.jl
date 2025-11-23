@@ -683,13 +683,29 @@ end
 end
 
 @testset "MultiIonMHD2D Collisions" begin
+    function check_tmp(sol, eq, testname; overwrite_errors, tol = 1e-14)
+        datafile = joinpath(test_data_dir, testname)
+        gvr = Tenkai.get_node_vars
+        u = sol["u"]
+        tmp1 = temperature1(gvr(u, eq, 1, 1, 1, 1), eq.trixi_equations)
+        tmp2 = temperature2(gvr(u, eq, 1, 1, 1, 1), eq.trixi_equations)
+        if overwrite_errors
+            println("Overwriting $datafile, this should not be triggered in actual testing.")
+            writedlm(datafile, [tmp1, tmp2])
+        end
+        data = readdlm(datafile)
+        ref_tmp1, ref_tmp2 = data
+        @test isapprox(tmp1, ref_tmp1; atol = tol, rtol = tol)
+        @test isapprox(tmp2, ref_tmp2; atol = tol, rtol = tol)
+    end
+
     trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_collisions.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,
                   cfl_safety_factor = 0.37, # It crashes for any higher cfl_safety_factor
-                  animate = false, final_time = 0.1, nx = 4, ny = 4)
-    @show get_errors(sol)
-    compare_errors_txt(sol, "multiion_collisions.txt"; overwrite_errors = overwrite_errors)
+                  animate = false, final_time = 0.1, nx = 4, ny = 4,
+                  solver = cRK22())
+    check_tmp(sol, eq, "collisions_rk22.txt"; overwrite_errors = overwrite_errors)
 
     trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_collisions.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
@@ -701,17 +717,31 @@ end
     @show get_errors(sol)
     compare_errors_txt(sol, "multiion_collisions_ht112.txt";
                        overwrite_errors = overwrite_errors)
+    check_tmp(sol, eq, "collisions_ht112.txt"; overwrite_errors = overwrite_errors)
 
-    # This does not work. Is there a bug?
+    # This does not work. Is there a bug? It is probably the bug that was fixed for some
+    # implicit solvers in https://github.com/Arpit-Babbar/TenkaiIMEXPaper/pull/12
     # trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_collisions.jl"),
     #               save_time_interval = 0.0, save_iter_interval = 0,
     #               compute_error_interval = 0,
-    #               solver = cSSP2IMEX222(picard_solver),
+    #               solver = cSSP2IMEX222(implicit_solver = picard_solver),
     #               cfl_safety_factor = 0.99,
     #               bflux = extrapolate,
     #               animate = false, final_time = 0.1, nx = 4, ny = 4)
     # @show get_errors(sol)
     # compare_errors(sol, 0.0, 0.0, 0.0)
+    # check_tmp(sol, eq, "collisions_ssp222.txt"; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_collisions.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  solver = cARS443(implicit_solver = picard_solver),
+                  cfl_safety_factor = 0.99,
+                  bflux = extrapolate,
+                  animate = false, final_time = 0.1, nx = 4, ny = 4)
+    @show get_errors(sol)
+    compare_errors(sol, 0.0, 0.0, 0.0)
+    check_tmp(sol, eq, "collisions_ars443.txt"; overwrite_errors = overwrite_errors)
 
     trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_collisions.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
@@ -723,6 +753,7 @@ end
     @show get_errors(sol)
     compare_errors_txt(sol, "multiion_collisions_ars222.txt";
                        overwrite_errors = overwrite_errors)
+    check_tmp(sol, eq, "collisions_ars222.txt"; overwrite_errors = overwrite_errors)
 
     trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_collisions.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
@@ -735,7 +766,10 @@ end
     compare_errors_txt(sol, "multiion_collisions_bpr343.txt";
                        overwrite_errors = overwrite_errors)
 
-    # Doesn't work. Is there a bug?
+    check_tmp(sol, eq, "collisions_bpr343.txt"; overwrite_errors = overwrite_errors)
+
+    # Doesn't work. Is there a bug? It is probably the bug that was fixed for some
+    # implicit solvers in https://github.com/Arpit-Babbar/TenkaiIMEXPaper/pull/12
     # trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_collisions.jl"),
     #               save_time_interval = 0.0, save_iter_interval = 0,
     #               compute_error_interval = 0,
