@@ -267,9 +267,9 @@ end
     @test eltype(sol["grid"].xf) == Float32
     @test eltype(sol["grid"].dx) == Float32
     
-    # Check solution array type
-    if sol["u_f"] isa AbstractArray
-        elem_type = eltype(eltype(sol["u_f"]))
+    # Check solution array type (sol has "u", not "u_f")
+    if sol["u"] isa AbstractArray
+        elem_type = eltype(eltype(sol["u"]))
         @test elem_type == Float32
         println("✓ Float32 type preserved in solution: ", elem_type)
     end

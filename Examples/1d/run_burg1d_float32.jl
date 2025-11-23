@@ -44,22 +44,6 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 
-# Verify that the solution maintains Float32 type
-println("Testing Float32 type preservation:")
-println("  Domain type: ", typeof(problem.domain))
-println("  Grid xc type: ", typeof(sol["grid"].xc))
-println("  Solution type: ", typeof(sol["u_f"]))
-
-# Check that the solution array elements are Float32
-if sol["u_f"] isa AbstractArray
-    elem_type = eltype(eltype(sol["u_f"]))
-    println("  Solution element type: ", elem_type)
-    @assert elem_type == Float32 "Solution should be Float32 but got $(elem_type)"
-    println("✓ Float32 type preserved correctly!")
-else
-    println("Warning: Could not determine solution element type")
-end
-
-println("\nErrors: ", sol["errors"])
+println(sol["errors"])
 
 return sol
