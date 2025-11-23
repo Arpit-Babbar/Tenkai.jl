@@ -244,18 +244,13 @@ end
 # Constructor
 function Parameters(grid_size, cfl, bounds, save_iter_interval,
                     save_time_interval, compute_error_interval;
-                    animate = false, cfl_safety_factor = nothing,
+                    animate = false, cfl_safety_factor = convert(typeof(cfl), 0.98),
                     time_scheme = "by degree",
                     saveto = "none",
                     cfl_style = "optimal",
-                    eps = nothing)
+                    eps = convert(typeof(cfl), 1e-12))
     # Infer RealT from cfl argument
     RealT = typeof(cfl)
-
-    # Set defaults with correct type
-    cfl_safety_factor_val = cfl_safety_factor === nothing ? convert(RealT, 0.98) :
-                            cfl_safety_factor
-    eps_val = eps === nothing ? convert(RealT, 1e-12) : eps
 
     @assert (cfl>=zero(RealT)) "cfl must be >= 0.0"
     @assert (save_iter_interval>=0) "save_iter_interval must be >= 0"
@@ -266,7 +261,7 @@ function Parameters(grid_size, cfl, bounds, save_iter_interval,
 
     Parameters(grid_size, cfl, bounds, save_iter_interval,
                save_time_interval, compute_error_interval, animate,
-               saveto, time_scheme, cfl_safety_factor_val, cfl_style, eps_val)
+               saveto, time_scheme, cfl_safety_factor, cfl_style, eps)
 end
 
 #------------------------------------------------------------------------------
@@ -365,30 +360,30 @@ function newton_step(func, x)
     return x - stepsize
 end
 
-function newton_solver_scalar(func, y0, tol = nothing, maxiters = 1e3)
-    tol_val = tol === nothing ? oftype(y0, 1e-14) : tol
+function newton_solver_scalar(func, y0, tol = convert(typeof(y0), 1e-14),
+                              maxiters = 1e3)
     error = func(y0)
     iter = 0
     y = y0
-    while abs(error) > tol_val && iter < maxiters
+    while abs(error) > tol && iter < maxiters
         y = newton_step(func, y)
         error = func(y)
         iter += 1
     end
 
-    if error > oftype(error, 100) * tol_val
+    if error > oftype(error, 100) * tol
         @warn "Newton solver did not converge: error = $error, iter = $iter"
     end
     return y
 end
 
-function newton_solver_tenkai(func, y0, tol = nothing, maxiters = 1e3)
-    tol_val = tol === nothing ? oftype(y0, 1e-14) : tol
+function newton_solver_tenkai(func, y0, tol = convert(typeof(y0), 1e-14),
+                              maxiters = 1e3)
     p = nothing # The func doesn't have any parameters
     f = (x, p) -> func(x)
     prob = NonlinearProblem{false}(f, y0, p)
-    sol = SimpleNonlinearSolve.solve(prob, SimpleNewtonRaphson(), abstol = tol_val,
-                                     reltol = tol_val, verbose = true,
+    sol = SimpleNonlinearSolve.solve(prob, SimpleNewtonRaphson(), abstol = tol,
+                                     reltol = tol, verbose = true,
                                      maxiters = maxiters)
     return sol.u
 end
