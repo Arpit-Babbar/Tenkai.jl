@@ -3,54 +3,45 @@ using Tenkai
 Eq = Tenkai.EqBurg2D
 
 #------------------------------------------------------------------------------
-xmin, xmax = -1.0, 1.0
-ymin, ymax = -1.0, 1.0
-burg_smooth_ic = (x, y) -> SVector(sinpi(2.0 * x) + sinpi(2.0 * y))
-burg_smooth_exact = (x, y, t) -> SVector(sinpi(2.0 * (x - t)) + sinpi(2.0 * (y - t)))
-boundary_value = burg_smooth_exact # dummy function
+xmin, xmax = 0.0f0, 1.0f0
+ymin, ymax = 0.0f0, 1.0f0
+initial_value = Eq.burger_sin_iv
+exact_solution = Eq.burger_sin_exact
+boundary_value = exact_solution # dummy function
+zero_source_terms = (u, x, t, eq) -> zero(u)
 
-function burg_smooth_source(u, x_, t, eq)
-    x, y = x_
-    xt, yt = x - t, y - t
-    u_ex = sinpi(2.0 * xt) + sinpi(2.0 * yt)
-    ut = -2.0 * pi * (cospi(2.0 * xt) + cospi(2.0 * yt))
-    ux = 2.0 * pi * cospi(2.0 * xt)
-    uy = 2.0 * pi * cospi(2.0 * yt)
-
-    return SVector(ut + u_ex * (ux + uy))
-end
 boundary_condition = (periodic, periodic, periodic, periodic)
-final_time = 0.1
+final_time = 0.1f0
 
-degree = 1
-solver = cRK22()
+degree = 4
+solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
 bound_limit = "no"
 bflux = evaluate
 numerical_flux = Eq.rusanov
 
-nx = 100
-ny = 100
-bounds = ([-Inf], [Inf])
-cfl = 0.0
+nx = 10
+ny = 10
+bounds = (Float32[-Inf], Float32[Inf])
+cfl = 0.0f0
 save_iter_interval = 0
-save_time_interval = 0.0 # final_time / 10.0
+save_time_interval = 0.0f0 # final_time / 10.0
 compute_error_interval = 0
 animate = true
 #------------------------------------------------------------------------------
 grid_size = [nx, ny]
 domain = [xmin, xmax, ymin, ymax]
-problem = Problem(domain, burg_smooth_ic, boundary_value, boundary_condition,
-                  final_time, burg_smooth_exact, source_terms = burg_smooth_source)
+problem = Problem(domain, initial_value, boundary_value, boundary_condition,
+                  final_time, exact_solution, source_terms = zero_source_terms)
 equation = Eq.get_equation()
-limiter = setup_limiter_blend(blend_type = fo_blend(equation),
+limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner",
-                              constant_node_factor = 1.0,
+                              constant_node_factor = 1.0f0,
                               debug_blend = false,
-                              pure_fv = true)
+                              pure_fv = false)
 limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)

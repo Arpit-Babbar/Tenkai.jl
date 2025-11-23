@@ -22,10 +22,11 @@ using ..Equations: AbstractEquations, nvariables, eachvariable
 # Allocate solution arrays needed by MDRK in 1d
 #-------------------------------------------------------------------------------
 function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{1})
-    gArray(nvar, nx) = OffsetArray(zeros(nvar, nx + 2),
+    RealT = eltype(grid.xc)
+    gArray(nvar, nx) = OffsetArray(zeros(RealT, nvar, nx + 2),
                                    OffsetArrays.Origin(1, 0))
     function gArray(nvar, n1, nx)
-        OffsetArray(zeros(nvar, n1, nx + 2),
+        OffsetArray(zeros(RealT, nvar, n1, nx + 2),
                     OffsetArrays.Origin(1, 1, 0))
     end
     # Allocate memory
@@ -34,9 +35,9 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{1})
     nx = grid.size
     nvar = nvariables(eq)
     u1 = gArray(nvar, nd, nx)
-    F2 = zeros(nvar, nd, nx)
-    U2 = zeros(nvar, nd, nx)
-    S2 = zeros(nvar, nd, nx)
+    F2 = zeros(RealT, nvar, nd, nx)
+    U2 = zeros(RealT, nvar, nd, nx)
+    S2 = zeros(RealT, nvar, nd, nx)
     us = gArray(nvar, nd, nx)
     ua = gArray(nvar, nx)
     res = gArray(nvar, nd, nx)
@@ -61,10 +62,10 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{1})
         @assert false "Degree not implemented"
     end
 
-    MArr = MArray{Tuple{nvariables(eq), nd}, Float64}
+    MArr = MArray{Tuple{nvariables(eq), nd}, RealT}
     cell_data = alloc_for_threads(MArr, cell_data_size)
 
-    MArr = MArray{Tuple{nvariables(eq), 1}, Float64}
+    MArr = MArray{Tuple{nvariables(eq), 1}, RealT}
     eval_data = alloc_for_threads(MArr, eval_data_size)
 
     cache = (; u1, U2, F2, S2, ua, us, res, Fb, Fb2, Ub, Ub2, cell_data, eval_data)

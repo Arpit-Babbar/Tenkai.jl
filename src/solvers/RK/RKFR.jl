@@ -128,8 +128,9 @@ function apply_rk11_muscl!(eq, problem, param, grid, op, scheme, aux, t, dt,
         @views eq.con2prim!(u[:, i])
     end
 
-    ufl, ufr = zeros(nvar), zeros(nvar)
-    fl, fr, fn = zeros(nvar), zeros(nvar), zeros(nvar)
+    RealT = eltype(grid.xc)
+    ufl, ufr = zeros(RealT, nvar), zeros(RealT, nvar)
+    fl, fr, fn = zeros(RealT, nvar), zeros(RealT, nvar), zeros(RealT, nvar)
     for i in 1:nx
         for n in 1:nvar
             # s = minmod( (u[n,i] - u[n,i-1]  ) / dx,
