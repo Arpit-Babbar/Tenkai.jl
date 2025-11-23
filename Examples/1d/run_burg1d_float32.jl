@@ -40,7 +40,7 @@ scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
-                   animate = animate)
+                   animate = animate, cfl_safety_factor = 0.95f0, eps = 1.0f0)
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 

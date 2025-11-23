@@ -128,7 +128,8 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2, 1},
     # For Dirichlet bc, use upwind flux at faces by assigning both physical
     # and ghost cells through the bc.
     if left == dirichlet
-        pre_allocated = [(zeros(RealT, nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
+        pre_allocated = [(zeros(RealT, nvar) for _ in 1:2)
+                         for _ in 1:Threads.nthreads()]
         @threaded for j in 1:ny
             x = xf[1]
             for k in 1:nd
@@ -171,7 +172,8 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2, 1},
     end
 
     if right == dirichlet
-        pre_allocated = [(zeros(RealT, nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
+        pre_allocated = [(zeros(RealT, nvar) for _ in 1:2)
+                         for _ in 1:Threads.nthreads()]
         @threaded for j in 1:ny
             x = xf[nx + 1]
             for k in 1:nd
@@ -214,7 +216,8 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2, 1},
     end
 
     if bottom == dirichlet
-        pre_allocated = [(zeros(RealT, nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
+        pre_allocated = [(zeros(RealT, nvar) for _ in 1:2)
+                         for _ in 1:Threads.nthreads()]
         @threaded for i in 1:nx
             y = yf[1]
             for k in 1:nd
@@ -258,7 +261,8 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2, 1},
         bc!(grid, eq, op, Fb, Ub)
     end
     if top == dirichlet
-        pre_allocated = [(zeros(RealT, nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
+        pre_allocated = [(zeros(RealT, nvar) for _ in 1:2)
+                         for _ in 1:Threads.nthreads()]
         @threaded for i in 1:nx
             y = yf[ny + 1]
             for k in 1:nd

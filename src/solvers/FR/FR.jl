@@ -251,14 +251,15 @@ function Parameters(grid_size, cfl, bounds, save_iter_interval,
                     eps = nothing)
     # Infer RealT from cfl argument
     RealT = typeof(cfl)
-    
+
     # Set defaults with correct type
-    cfl_safety_factor_val = cfl_safety_factor === nothing ? convert(RealT, 0.98) : cfl_safety_factor
+    cfl_safety_factor_val = cfl_safety_factor === nothing ? convert(RealT, 0.98) :
+                            cfl_safety_factor
     eps_val = eps === nothing ? convert(RealT, 1e-12) : eps
-    
-    @assert (cfl >= zero(RealT)) "cfl must be >= 0.0"
+
+    @assert (cfl>=zero(RealT)) "cfl must be >= 0.0"
     @assert (save_iter_interval>=0) "save_iter_interval must be >= 0"
-    @assert (save_time_interval >= zero(RealT)) "save_time_interval must be >= 0.0"
+    @assert (save_time_interval>=zero(RealT)) "save_time_interval must be >= 0.0"
     @assert (!(save_iter_interval > 0 &&
                save_time_interval > zero(RealT))) "Both save_(iter,time)_interval > 0"
     @assert cfl_style in ["lw", "optimal"]
@@ -885,8 +886,10 @@ function limit_variable_slope(eq, variable, slope, u_star_ll, u_star_rr, ue, xl,
     threshold = oftype(var_low, 0.1) * var_low
     eps = oftype(var_low, 1e-10)
     if var_star_ll < eps || var_star_rr < eps
-        ratio_ll = abs(threshold - var_low) / (abs(var_star_ll - var_low) + oftype(var_low, 1e-13))
-        ratio_rr = abs(threshold - var_low) / (abs(var_star_rr - var_low) + oftype(var_low, 1e-13))
+        ratio_ll = abs(threshold - var_low) /
+                   (abs(var_star_ll - var_low) + oftype(var_low, 1e-13))
+        ratio_rr = abs(threshold - var_low) /
+                   (abs(var_star_rr - var_low) + oftype(var_low, 1e-13))
         theta = min(ratio_ll, ratio_rr, one(var_low))
         slope *= theta
         u_star_ll = ue + oftype(xl, 2) * xl * slope

@@ -1088,7 +1088,8 @@ function modal_smoothness_indicator_gassner_new(eq::AbstractEquations{1}, t,
 
         RealT = eltype(un)
         ind = zeros(RealT, n_ind_nvar)
-        ind_nd, ind_nd_m_1, ind_nd_m_2 = zeros(RealT, n_ind_nvar), zeros(RealT, n_ind_nvar),
+        ind_nd, ind_nd_m_1, ind_nd_m_2 = zeros(RealT, n_ind_nvar),
+                                         zeros(RealT, n_ind_nvar),
                                          zeros(RealT, n_ind_nvar)
         for n in 1:n_ind_nvar
             @views um[n, 1] *= 0.1 # FIXME - Replace with 0.1*cell_max/global_max
@@ -2304,7 +2305,8 @@ function Blend(eq::AbstractEquations{1}, op, grid,
 
     E0 = E1 * 1e-2 # E < E0 implies smoothness
     tolE = 1.0e-6  # If denominator < tolE, do purely high order
-    E, alpha = zeros(RealT, nx), OffsetArray(zeros(RealT, nx + 2), OffsetArrays.Origin(0))
+    E, alpha = zeros(RealT, nx),
+               OffsetArray(zeros(RealT, nx + 2), OffsetArrays.Origin(0))
     alpha0 = copy(alpha)
     a0 = 1.0 / 3.0
     a1 = 1.0 - 2.0 * a0              # smoothing coefficients
@@ -2412,10 +2414,10 @@ function compute_error(problem, grid, eq::AbstractEquations{1}, aux, op, u1, t)
     nx = grid.size
     xc = grid.xc
     dx = grid.dx
-
-    l1_error, l2_error, linf_error, energy = 0.0, 0.0, 0.0, 0.0
+    error_type = Float64
+    l1_error, l2_error, linf_error, energy = (zero(error_type) for _ in 1:4)
     for i in 1:nx
-        un, ue = zeros(RealT, nq), zeros(RealT, nq) # exact solution
+        un, ue = zeros(error_type, nq), zeros(error_type, nq) # exact solution
         x = xc[i] - 0.5 * dx[i] .+ dx[i] * xq
         for i in 1:nq
             ue[i] = exact_solution(x[i], t)[1] # Error only for first variable
@@ -2546,6 +2548,7 @@ function write_soln!(base_name, fcount, iter, time, dt,
     # write equispaced values within each cell
     sol_filename = get_filename("output/sol", ndigits, fcount)
     sol_file = open("$sol_filename.txt", "w")
+    RealT = eltype(xc)
     x, u = zeros(RealT, nu), zeros(RealT, nu) # Set up to store equispaced point values
     for i in 1:nx
         @views mul!(u, Vu, u1[1, :, i])
