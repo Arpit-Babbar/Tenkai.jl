@@ -94,7 +94,8 @@ end
 function Vandermonde_lag(xp, x)
     n = length(xp)
     m = length(x)
-    V = zeros(Float64, m, n)
+    T = promote_type(eltype(xp), eltype(x))
+    V = zeros(T, m, n)
     for j in 1:n
         for i in 1:m
             V[i, j] = Lagrange(j, xp, x[i])
@@ -111,7 +112,8 @@ end
 function Vandermonde_leg(k, x)
     n = k + 1
     m = length(x)
-    V = zeros(Float64, m, n)
+    T = eltype(x)
+    V = zeros(T, m, n)
     for j in 1:n
         for i in 1:m
             V[i, j] = nLegendre(j - 1, 2.0 * x[i] - 1.0)
@@ -129,7 +131,8 @@ end
 function Vandermonde_leg_krivodonova(k, x)
     n = k + 1
     m = length(x)
-    V = zeros(Float64, m, n)
+    T = eltype(x)
+    V = zeros(T, m, n)
     for j in 1:n
         for i in 1:m
             # krivodonova's normalization, the division is redundant
@@ -152,12 +155,13 @@ function nodal2modal_krivodonova(xg)
     # Legendre polynomials evaluated at quadrature points
     Vlag = Vandermonde_lag(xg, x)
 
-    M = zeros(Float64, nd)
+    T = eltype(xg)
+    M = zeros(T, nd)
     for i in 1:nd
         M[i] = @views sum(Vleg[:, i] .* Vleg[:, i] .* w)
     end
 
-    A = zeros(Float64, nd, nd) # projection matrix
+    A = zeros(T, nd, nd) # projection matrix
     for j in 1:nd
         for i in 1:nd
             A[i, j] = @views sum(Vleg[:, i] .* Vlag[:, j] .* w)
@@ -185,7 +189,8 @@ function nodal2modal(xg)
     Vleg = Vandermonde_leg(k, x)
     Vlag = Vandermonde_lag(xg, x)
 
-    M = zeros(Float64, nd)
+    T = eltype(xg)
+    M = zeros(T, nd)
     for i in 1:nd
         M[i] = @views sum(Vleg[:, i] .* Vleg[:, i] .* w)
     end
@@ -195,7 +200,7 @@ function nodal2modal(xg)
         @assert false
     end
 
-    A = zeros(Float64, nd, nd) # projection matrix
+    A = zeros(T, nd, nd) # projection matrix
     for j in 1:nd
         for i in 1:nd
             A[i, j] = @views sum(Vleg[:, i] .* Vlag[:, j] .* w)
@@ -211,7 +216,8 @@ end
 #-------------------------------------------------------------------------------
 function barycentric_weights(x)
     n = length(x)
-    w = ones(Float64, n)
+    T = eltype(x)
+    w = ones(T, n)
 
     for j in 2:n
         for k in 1:(j - 1)
@@ -231,7 +237,8 @@ end
 function diff_mat(x)
     w = barycentric_weights(x)
     n = length(x)
-    D = zeros(Float64, n, n)
+    T = eltype(x)
+    D = zeros(T, n, n)
 
     for j in 1:n
         for i in 1:n
@@ -317,7 +324,8 @@ function fr_operators(N, sol_pts, cor_fun)
     xg, wg = weights_and_points(nd, sol_pts)
 
     # Required to evaluate solution at face
-    Vl, Vr = zeros(Float64, nd), zeros(Float64, nd)
+    T = eltype(xg)
+    Vl, Vr = zeros(T, nd), zeros(T, nd)
     for i in 1:nd
         Vl[i] = Lagrange(i, xg, 0.0)
         Vr[i] = Lagrange(i, xg, 1.0)

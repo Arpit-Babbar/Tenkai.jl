@@ -41,8 +41,8 @@ using MuladdMacro
 @muladd begin
 #! format: noindent
 
-struct Euler1D{HLLSpeeds <: Function} <: AbstractEquations{1, 3}
-    γ::Float64
+struct Euler1D{RealT <: Real, HLLSpeeds <: Function} <: AbstractEquations{1, 3}
+    γ::RealT
     hll_speeds::HLLSpeeds
     nvar::Int64
     name::String

@@ -422,7 +422,7 @@ function get_element_alpha_blending_limiter(blend, el_x, el_y)
 end
 
 function get_element_alpha_other_limiter(blend, el_x, el_y)
-    return zero(Float64)
+    return zero(eltype(blend.cache.alpha))
 end
 
 # res = ∂_x F_h + ∂_y G_h where F_h, G_h are continuous fluxes. We write it as

@@ -49,9 +49,9 @@ import Tenkai.EqEuler1D: tenkai2trixiequation
 @muladd begin
 #! format: noindent
 
-struct Euler2D{HLLSpeeds <: Function} <: AbstractEquations{2, 4}
-    γ::Float64
-    γ_minus_1::Float64
+struct Euler2D{RealT <: Real, HLLSpeeds <: Function} <: AbstractEquations{2, 4}
+    γ::RealT
+    γ_minus_1::RealT
     hll_speeds::HLLSpeeds
     nvar::Int64
     name::String

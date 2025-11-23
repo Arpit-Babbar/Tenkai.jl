@@ -7,23 +7,23 @@ using OffsetArrays
 
 using HDF5: h5open, attributes
 
-struct CartesianGrid1D
-    domain::Vector{Float64}   # xmin,xmax
+struct CartesianGrid1D{RealT <: Real}
+    domain::Vector{RealT}   # xmin,xmax
     size::Int64               # nx, ny
-    xc::Array{Float64, 1}      # x coord of cell center
-    xf::Array{Float64, 1}      # x coord of faces
-    dx::OffsetVector{Float64, Vector{Float64}}      # cell size along x
+    xc::Array{RealT, 1}      # x coord of cell center
+    xf::Array{RealT, 1}      # x coord of faces
+    dx::OffsetVector{RealT, Vector{RealT}}      # cell size along x
 end
 
-struct CartesianGrid2D
-    domain::Vector{Float64}   # xmin,xmax,ymin,ymax
+struct CartesianGrid2D{RealT <: Real}
+    domain::Vector{RealT}   # xmin,xmax,ymin,ymax
     size::Vector{Int64}       # nx, ny
-    xc::Array{Float64, 1}      # x coord of cell center
-    yc::Array{Float64, 1}      # y coord of cell center
-    xf::Array{Float64, 1}      # x coord of faces
-    yf::Array{Float64, 1}      # y coord of faces
-    dx::OffsetVector{Float64, Vector{Float64}}      # cell size along x
-    dy::OffsetVector{Float64, Vector{Float64}}      # cell size along y
+    xc::Array{RealT, 1}      # x coord of cell center
+    yc::Array{RealT, 1}      # y coord of cell center
+    xf::Array{RealT, 1}      # x coord of faces
+    yf::Array{RealT, 1}      # y coord of faces
+    dx::OffsetVector{RealT, Vector{RealT}}      # cell size along x
+    dy::OffsetVector{RealT, Vector{RealT}}      # cell size along y
 end
 
 # 1D/2D Uniform Cartesian grid

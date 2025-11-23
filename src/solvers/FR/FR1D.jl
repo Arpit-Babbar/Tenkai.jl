@@ -2140,37 +2140,37 @@ end
     @assert false "Not implemented"
 end
 
-struct Blend1D{F1, F2, F3, F4, F5, F6 <: Function, Parameters}
-    alpha::OffsetVector{Float64, Vector{Float64}}
-    alpha0::OffsetVector{Float64, Vector{Float64}}
-    # alpha_prev::Vector{Float64}
-    space_time_alpha::ElasticArray{Float64, 2, 1, Array{Float64, 1}}
-    time_levels_anim::ElasticArray{Float64, 1, 0, Array{Float64, 1}}
-    xc::Array{Float64, 1}
-    lamx::OffsetVector{Float64, Vector{Float64}} # lamx with (1-alpha[i]) factor
-    ue::OffsetArray{Float64, 2, Array{Float64, 2}}
-    xxf::OffsetArray{Float64, 1, Array{Float64, 1}} # faces of subcells
-    xe::OffsetArray{Float64, 1, Array{Float64, 1}}  # super cell sol points + faces
-    ufl::Vector{Float64}
-    ufr::Vector{Float64}
-    fl::Vector{Float64}
-    fr::Vector{Float64}
-    fn::Vector{Float64}
-    unph::Array{Float64, 3} # solution
-    resl::OffsetArray{Float64, 3, Array{Float64, 3}} # array for lower order FV residual
-    fn_low::OffsetArray{Float64, 3, Array{Float64, 3}}  # super cell sol points + faces
-    amax::Float64           # upper bound for lower-order factor
+struct Blend1D{RealT <: Real, F1, F2, F3, F4, F5, F6 <: Function, Parameters}
+    alpha::OffsetVector{RealT, Vector{RealT}}
+    alpha0::OffsetVector{RealT, Vector{RealT}}
+    # alpha_prev::Vector{RealT}
+    space_time_alpha::ElasticArray{RealT, 2, 1, Array{RealT, 1}}
+    time_levels_anim::ElasticArray{RealT, 1, 0, Array{RealT, 1}}
+    xc::Array{RealT, 1}
+    lamx::OffsetVector{RealT, Vector{RealT}} # lamx with (1-alpha[i]) factor
+    ue::OffsetArray{RealT, 2, Array{RealT, 2}}
+    xxf::OffsetArray{RealT, 1, Array{RealT, 1}} # faces of subcells
+    xe::OffsetArray{RealT, 1, Array{RealT, 1}}  # super cell sol points + faces
+    ufl::Vector{RealT}
+    ufr::Vector{RealT}
+    fl::Vector{RealT}
+    fr::Vector{RealT}
+    fn::Vector{RealT}
+    unph::Array{RealT, 3} # solution
+    resl::OffsetArray{RealT, 3, Array{RealT, 3}} # array for lower order FV residual
+    fn_low::OffsetArray{RealT, 3, Array{RealT, 3}}  # super cell sol points + faces
+    amax::RealT           # upper bound for lower-order factor
     parameters::Parameters # Multiply constant node by this factor in indicator
-    E1::Float64             # chosen so that E > E1 implies non-smooth
-    E0::Float64             # chosen so that E < E0 implies smooth
-    tolE::Float64           # Tolerance for denominator
-    dt::Array{Float64, 1}   # Store MUSCL dt for DiffEq package compatibility
-    E::Vector{Float64}
-    beta::Float64           # \beta parameter in MC limiter for MUSCL
+    E1::RealT             # chosen so that E > E1 implies non-smooth
+    E0::RealT             # chosen so that E < E0 implies smooth
+    tolE::RealT           # Tolerance for denominator
+    dt::Array{RealT, 1}   # Store MUSCL dt for DiffEq package compatibility
+    E::Vector{RealT}
+    beta::RealT           # \beta parameter in MC limiter for MUSCL
     debug::Bool
-    a0::Float64             # Smoothing factor
-    a1::Float64             # Smoothing factor
-    idata::Vector{Float64}  # indicator data
+    a0::RealT             # Smoothing factor
+    a1::RealT             # Smoothing factor
+    idata::Vector{RealT}  # indicator data
     blend_cell_residual!::F1
     blend_face_residual!::F2
     get_indicating_variables!::F3
@@ -2324,8 +2324,9 @@ function Blend(eq::AbstractEquations{1}, op, grid,
     end
 
     # Elastic arrays to create space time diagrams
-    space_time_alpha = ElasticArray{Float64}(undef, nx, 0) # alpha values
-    time_levels_anim = ElasticArray{Float64}(undef, 0)     # Time  levels
+    RealT = eltype(grid.xc)
+    space_time_alpha = ElasticArray{RealT}(undef, nx, 0) # alpha values
+    time_levels_anim = ElasticArray{RealT}(undef, 0)     # Time  levels
 
     @unpack blend_cell_residual!, blend_face_residual! = blend_type
     @unpack conservative2recon!, recon2conservative! = reconstruction_variables
@@ -2430,7 +2431,8 @@ function compute_error(problem, grid, eq::AbstractEquations{1}, aux, op, u1, t)
     l2_error = sqrt(l2_error / domain_size)
     energy = energy / domain_size
     @printf(error_file, "%.16e %.16e %.16e %.16e\n", t, l1_error, l2_error, energy)
-    return Dict{String, Float64}("l1_error" => l1_error, "l2_error" => l2_error,
+    RealT = typeof(l1_error)
+    return Dict{String, RealT}("l1_error" => l1_error, "l2_error" => l2_error,
                                  "linf_error" => linf_error, "energy" => energy)
     end # timer
 end

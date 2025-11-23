@@ -29,12 +29,13 @@ using ..Tenkai: update_ghost_values_periodic!
 
 #------------------------------------------------------------------------------
 function setup_arrays_rkfr(grid, scheme, eq::AbstractEquations{1})
+    RealT = eltype(grid.xc)
     function gArray(nvar, nx)
-        OffsetArray(zeros(Float64, nvar, nx + 2),
+        OffsetArray(zeros(RealT, nvar, nx + 2),
                     OffsetArrays.Origin(1, 0))
     end
     function gArray(nvar, n1, nx)
-        OffsetArray(zeros(Float64, nvar, n1, nx + 2),
+        OffsetArray(zeros(RealT, nvar, n1, nx + 2),
                     OffsetArrays.Origin(1, 1, 0))
     end
     # Allocate memory

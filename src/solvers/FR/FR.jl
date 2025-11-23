@@ -38,26 +38,26 @@ using FastGaussQuadrature
 #-------------------------------------------------------------------------------
 # Create a struct of problem description
 #-------------------------------------------------------------------------------
-struct Problem{SourceTerms, BoundaryCondition <: Tuple, F1, F2, F3}
-    domain::Vector{Float64}
+struct Problem{RealT <: Real, SourceTerms, BoundaryCondition <: Tuple, F1, F2, F3}
+    domain::Vector{RealT}
     initial_value::F1
     boundary_value::F2
     boundary_condition::BoundaryCondition
     source_terms::SourceTerms
     periodic_x::Bool
     periodic_y::Bool
-    final_time::Float64
+    final_time::RealT
     exact_solution::F3
 end
 
 # Constructor
-function Problem(domain::Vector{Float64},
+function Problem(domain::Vector{RealT},
                  initial_value,
                  boundary_value,
                  boundary_condition::Tuple,
-                 final_time::Float64,
+                 final_time::RealT,
                  exact_solution;
-                 source_terms = nothing)
+                 source_terms = nothing) where {RealT <: Real}
     if length(domain) == 2
         @assert length(boundary_condition)==2 "Invalid Problem"
         left, right = boundary_condition
