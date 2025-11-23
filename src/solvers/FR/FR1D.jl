@@ -2433,7 +2433,7 @@ function compute_error(problem, grid, eq::AbstractEquations{1}, aux, op, u1, t)
     @printf(error_file, "%.16e %.16e %.16e %.16e\n", t, l1_error, l2_error, energy)
     RealT = typeof(l1_error)
     return Dict{String, RealT}("l1_error" => l1_error, "l2_error" => l2_error,
-                                 "linf_error" => linf_error, "energy" => energy)
+                               "linf_error" => linf_error, "energy" => energy)
     end # timer
 end
 
