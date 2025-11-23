@@ -367,7 +367,7 @@ function fr_operators(N, sol_pts, cor_fun)
     Dm = diff_mat(xg)
     bV = -bl * Vl' - br * Vr'
     D1 = Dm + bV
-    Dsplit = 2one(T) * Dm + bV
+    Dsplit = T(2) * Dm + bV
 
     DmT = SMatrix{nd, nd}(Dm')
     D1T = SMatrix{nd, nd}(D1')
