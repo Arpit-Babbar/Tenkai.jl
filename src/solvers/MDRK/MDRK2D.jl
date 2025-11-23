@@ -23,11 +23,11 @@ using ..Equations: AbstractEquations, nvariables, eachvariable
 
 function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
     function gArray(nvar, nx, ny)
-        OffsetArray(zeros(nvar, nx + 2, ny + 2),
+        OffsetArray(zeros(RealT, nvar, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 0, 0))
     end
     function gArray(nvar, n1, n2, nx, ny)
-        OffsetArray(zeros(nvar, n1, n2, nx + 2, ny + 2),
+        OffsetArray(zeros(RealT, nvar, n1, n2, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 1, 1, 0, 0))
     end
     # Allocate memory
@@ -36,12 +36,13 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
     nvar = nvariables(eq)
     nd = degree + 1
     nx, ny = grid.size
+    RealT = eltype(grid.xc)
     u1 = gArray(nvar, nd, nd, nx, ny)
     us = gArray(nvar, nd, nd, nx, ny)
-    F2 = zeros(nvar, nd, nd, nx, ny)
-    G2 = zeros(nvar, nd, nd, nx, ny)
-    U2 = zeros(nvar, nd, nd, nx, ny)
-    S2 = zeros(nvar, nd, nd, nx, ny)
+    F2 = zeros(RealT, nvar, nd, nd, nx, ny)
+    G2 = zeros(RealT, nvar, nd, nd, nx, ny)
+    U2 = zeros(RealT, nvar, nd, nd, nx, ny)
+    S2 = zeros(RealT, nvar, nd, nd, nx, ny)
     ua = gArray(nvar, nx, ny)
     res = gArray(nvar, nd, nd, nx, ny)
     Fb = gArray(nvar, nd, 4, nx, ny)
@@ -67,17 +68,17 @@ function setup_arrays_mdrk(grid, scheme, eq::AbstractEquations{2})
         SVector{nt}([alloc(constructor, cache_size) for _ in Base.OneTo(nt)])
     end
 
-    MArr = MArray{Tuple{nvariables(eq), nd, nd}, Float64}
+    MArr = MArray{Tuple{nvariables(eq), nd, nd}, RealT}
     cell_arrays = alloc_for_threads(MArr, 8)
 
-    MEval = MArray{Tuple{nvariables(eq), nd}, Float64}
+    MEval = MArray{Tuple{nvariables(eq), nd}, RealT}
     eval_data_big = alloc_for_threads(MEval, 20)
 
     eval_data = (; eval_data_big)
 
     # Ghost values cache
 
-    Marr = MArray{Tuple{nvariables(eq), 1}, Float64}
+    Marr = MArray{Tuple{nvariables(eq), 1}, RealT}
 
     ghost_cache = alloc_for_threads(Marr, 2)
 

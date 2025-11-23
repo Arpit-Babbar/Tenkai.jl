@@ -118,7 +118,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
 
     refresh!.((ub, Fb, res))
     nvar = nvariables(eq)
-    f = zeros(nvar, nd)
+    f = zeros(RealT, nvar, nd)
     @timeit aux.timer "Cell loop" begin
     #! format: noindent
     @inbounds for cell in 1:nx

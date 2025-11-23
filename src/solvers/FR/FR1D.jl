@@ -477,7 +477,7 @@ end
 
 function setup_limiter_tvb(eq::AbstractEquations{1}; tvbM = 0.0, beta = 1.0)
     cache_size = 13
-    cache = SVector{cache_size}([MArray{Tuple{nvariables(eq), 1}, Float64}(undef)
+    cache = SVector{cache_size}([MArray{Tuple{nvariables(eq), 1}, RealT}(undef)
                                  for _ in Base.OneTo(cache_size)])
     limiter = (; name = "tvb", tvbM = tvbM, beta, cache)
     return limiter
@@ -825,7 +825,7 @@ function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
             E1 = [0.00548948, 0.0125556, 0.0873583, 0.0563234]
             E0 = 10^(-2) * E1
             M = length(E1)
-            alpha_ = zeros(M)
+            alpha_ = zeros(RealT, M)
             for m in 1:M
                 m_ = m - 1
                 for n in 1:n_ind_nvar
@@ -943,7 +943,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
             um[n, :] = @views Pn2m * un[n, :]
         end
 
-        ind = zeros(n_ind_nvar)
+        ind = zeros(RealT, n_ind_nvar)
 
         for n in 1:n_ind_nvar
             # um[n,1] *= constant_node_factor
@@ -1232,7 +1232,7 @@ function modal_smoothness_indicator_gassner_face(eq, t, iter, fcount, dt, grid,
     @unpack indicator_model, indicating_variables = limiter
 
     # Extend solution points to include boundary
-    yg = zeros(nd + 2)
+    yg = zeros(RealT, nd + 2)
     yg[1] = 0.0
     yg[2:(nd + 1)] = xg
     yg[nd + 2] = 1.0
@@ -1240,7 +1240,7 @@ function modal_smoothness_indicator_gassner_face(eq, t, iter, fcount, dt, grid,
     # Get nodal basis from values at extended solution points
     Pn2m = nodal2modal(yg)
 
-    un, um = zeros(nvar, nd + 2), zeros(nvar, nd + 2) # Nodal, modal values in a cell
+    un, um = zeros(RealT, nvar, nd + 2), zeros(RealT, nvar, nd + 2) # Nodal, modal values in a cell
 
     for i in 1:nx
         # Continuous extension to faces
@@ -1269,11 +1269,11 @@ function modal_smoothness_indicator_gassner_face(eq, t, iter, fcount, dt, grid,
             um[n, :] = @views Pn2m * un[n, :]
         end
 
-        ind = zeros(n_ind_nvar)
-        ind_nd, ind_nd_m_1, ind_nd_m_2, ind_nd_m_3 = (zeros(n_ind_nvar),
-                                                      zeros(n_ind_nvar),
-                                                      zeros(n_ind_nvar),
-                                                      zeros(n_ind_nvar))
+        ind = zeros(RealT, n_ind_nvar)
+        ind_nd, ind_nd_m_1, ind_nd_m_2, ind_nd_m_3 = (zeros(RealT, n_ind_nvar),
+                                                      zeros(RealT, n_ind_nvar),
+                                                      zeros(RealT, n_ind_nvar),
+                                                      zeros(RealT, n_ind_nvar))
         for n in 1:n_ind_nvar
             # Last node
             ind_den = @views sum(um[n, 1:end] .^ 2)      # Gassner takes constant node
@@ -2205,7 +2205,7 @@ function Blend(eq::AbstractEquations{1}, op, grid,
     if limiter.name != "blend"
         parameters = (; positivity_blending = NoPositivityBlending())
         if limiter.name == "tvb"
-            fn_low = OffsetArray(zeros(nvar, 2, nx + 2),
+            fn_low = OffsetArray(zeros(RealT, nvar, 2, nx + 2),
                                  OffsetArrays.Origin(1, 1, 0))
             return (
                     ; blend_cell_residual! = store_fn_cell_residual!,
@@ -2304,24 +2304,24 @@ function Blend(eq::AbstractEquations{1}, op, grid,
 
     E0 = E1 * 1e-2 # E < E0 implies smoothness
     tolE = 1.0e-6  # If denominator < tolE, do purely high order
-    E, alpha = zeros(nx), OffsetArray(zeros(nx + 2), OffsetArrays.Origin(0))
+    E, alpha = zeros(RealT, nx), OffsetArray(zeros(RealT, nx + 2), OffsetArrays.Origin(0))
     alpha0 = copy(alpha)
     a0 = 1.0 / 3.0
     a1 = 1.0 - 2.0 * a0              # smoothing coefficients
-    idata = zeros(nx + 1)                          # t, alpha[1:nx]
-    lamx = OffsetArray(zeros(nx + 2),
+    idata = zeros(RealT, nx + 1)                          # t, alpha[1:nx]
+    lamx = OffsetArray(zeros(RealT, nx + 2),
                        OffsetArrays.Origin(0))   # alpha[i] * dt/dx[i]
-    xxf = OffsetArray(zeros(nd + 1),
+    xxf = OffsetArray(zeros(RealT, nd + 1),
                       OffsetArrays.Origin(0))   # faces of subcells
-    xe = OffsetArray(zeros(nd + 2),
+    xe = OffsetArray(zeros(RealT, nd + 2),
                      OffsetArrays.Origin(0))   # solution points + faces
-    ue = OffsetArray(zeros(nvar, nd + 2),
+    ue = OffsetArray(zeros(RealT, nvar, nd + 2),
                      OffsetArrays.Origin(1, 0))   # u extended by face extrapolation
-    fn_low = OffsetArray(zeros(nvar, 2, nx + 2),
+    fn_low = OffsetArray(zeros(RealT, nvar, 2, nx + 2),
                          OffsetArrays.Origin(1, 1, 0))
-    unph = zeros(nvar, 2, nd)              # u at time n+1/2, for MUSCL
-    resl = OffsetArray(zeros(nvar, nd, nx + 2), OffsetArrays.Origin(1, 1, 0)) # lower order residual
-    ufl, ufr, fl, fr, fn = [zeros(nvar) for _ in 1:5]
+    unph = zeros(RealT, nvar, 2, nd)              # u at time n+1/2, for MUSCL
+    resl = OffsetArray(zeros(RealT, nvar, nd, nx + 2), OffsetArrays.Origin(1, 1, 0)) # lower order residual
+    ufl, ufr, fl, fr, fn = [zeros(RealT, nvar) for _ in 1:5]
 
     @unpack p_ua = plot_data
 
@@ -2343,7 +2343,7 @@ function Blend(eq::AbstractEquations{1}, op, grid,
             ue, xxf, xe, ufl, ufr, fl, fr, fn, unph, resl, fn_low, amax,
             parameters, E1, E0,
             tolE,
-            zeros(1), E, beta_muscl, debug_blend, a0, a1, idata,
+            zeros(RealT, 1), E, beta_muscl, debug_blend, a0, a1, idata,
             blend_cell_residual!,
             blend_face_residual!, indicating_variables, conservative2recon!,
             recon2conservative!, numflux)
@@ -2361,10 +2361,10 @@ function Hierarchical(eq::AbstractEquations{1}, op, grid,
     @unpack reconstruction, alpha = limiter
     @unpack conservative2recon!, recon2conservative! = reconstruction
     nd = degree + 1
-    modes_cache = (OffsetArray(zeros(nvar, nd, nx + 2),
+    modes_cache = (OffsetArray(zeros(RealT, nvar, nd, nx + 2),
                                OffsetArrays.Origin(1, 1, 0)) for _ in 1:2)
 
-    local_cache = (MArray{Tuple{nvar, nd}}(zeros(nvar, nd)) for _ in 1:3)
+    local_cache = (MArray{Tuple{nvar, nd}, RealT}(zeros(RealT, nvar, nd)) for _ in 1:3)
 
     hierarchical = (; modes_cache, local_cache, alpha, conservative2recon!,
                     recon2conservative!)
@@ -2415,7 +2415,7 @@ function compute_error(problem, grid, eq::AbstractEquations{1}, aux, op, u1, t)
 
     l1_error, l2_error, linf_error, energy = 0.0, 0.0, 0.0, 0.0
     for i in 1:nx
-        un, ue = zeros(nq), zeros(nq) # exact solution
+        un, ue = zeros(RealT, nq), zeros(RealT, nq) # exact solution
         x = xc[i] - 0.5 * dx[i] .+ dx[i] * xq
         for i in 1:nq
             ue[i] = exact_solution(x[i], t)[1] # Error only for first variable
@@ -2546,7 +2546,7 @@ function write_soln!(base_name, fcount, iter, time, dt,
     # write equispaced values within each cell
     sol_filename = get_filename("output/sol", ndigits, fcount)
     sol_file = open("$sol_filename.txt", "w")
-    x, u = zeros(nu), zeros(nu) # Set up to store equispaced point values
+    x, u = zeros(RealT, nu), zeros(RealT, nu) # Set up to store equispaced point values
     for i in 1:nx
         @views mul!(u, Vu, u1[1, :, i])
         @. x = grid.xf[i] + grid.dx[i] * xu

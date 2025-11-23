@@ -797,7 +797,7 @@ end
 function setup_limiter_tvb(eq::AbstractEquations{2}; tvbM = 0.0, beta = 1.0)
     cache_size = 28
     # Make the particular initializers into functions
-    MArr = MArray{Tuple{nvariables(eq), 1}, Float64}
+    MArr = MArray{Tuple{nvariables(eq), 1}, RealT}
     cache = alloc_for_threads(MArr, cache_size)
     limiter = (; name = "tvb", tvbM = tvbM, cache, beta = beta)
     return limiter
@@ -806,7 +806,7 @@ end
 function setup_limiter_tvbβ(eq::AbstractEquations{2}; tvbM = 0.0, beta = 1.0)
     cache_size = 24
     # Make the particular initializers into functions
-    MArr = MArray{Tuple{nvariables(eq), 1}, Float64}
+    MArr = MArray{Tuple{nvariables(eq), 1}, RealT}
     cache = alloc_for_threads(MArr, cache_size)
     limiter = (; name = "tvbβ", tvbM = tvbM, cache, beta = beta)
     return limiter
@@ -1272,7 +1272,7 @@ function Blend(eq::AbstractEquations{2}, op, grid,
 
     if limiter.name != "blend"
         if limiter.name == "tvb"
-            fn_low = OffsetArray(zeros(nvar,
+            fn_low = OffsetArray(zeros(RealT, nvar,
                                        nd, # Dofs on each face
                                        4,  # 4 faces
                                        nx + 2, ny + 2),
@@ -1285,11 +1285,11 @@ function Blend(eq::AbstractEquations{2}, op, grid,
                            numflux = scheme.numerical_flux)
             parameters = (; positivity_blending = NoPositivityBlending())
             cache = (;
-                     dt = MVector(1.0e20), fn_low, alpha = EmptyZeros(Float64))
+                     dt = MVector(1.0e20), fn_low, alpha = EmptyZeros(RealT))
             # If limiter is not blend, replace blending with 'do nothing functions'
-            return (; subroutines, cache, parameters, uEltype = Float64) # TODO - Load uEltype from aux.cache
+            return (; subroutines, cache, parameters, uEltype = RealT) # TODO - Load uEltype from aux.cache
         else
-            fn_low = OffsetArray(zeros(nvar,
+            fn_low = OffsetArray(zeros(RealT, nvar,
                                        nd, # Dofs on each face
                                        4,  # 4 faces
                                        nx + 2, ny + 2),
@@ -1302,7 +1302,7 @@ function Blend(eq::AbstractEquations{2}, op, grid,
             cache = (;
                      dt = MVector(1.0e20), fn_low)
             # If limiter is not blend, replace blending with 'do nothing functions'
-            return (; subroutines, cache, parameters, uEltype = Float64) # TODO - Load uEltype from aux.cache
+            return (; subroutines, cache, parameters, uEltype = RealT) # TODO - Load uEltype from aux.cache
         end
     end
 
@@ -1344,7 +1344,7 @@ function Blend(eq::AbstractEquations{2}, op, grid,
 
     # Small cache of many MMatrix with one copy per thread
     function abstract_constructor(tuple_, x, origin)
-        [OffsetArray(MArray{tuple_, Float64}(x),
+        [OffsetArray(MArray{tuple_, RealT}(x),
                      OffsetArrays.Origin(origin))]
     end
     # These square brackets are needed when cache_size = 1. Also, when
@@ -1362,15 +1362,15 @@ function Blend(eq::AbstractEquations{2}, op, grid,
                                             (1, 1, 0, 0))
     unph = alloc_for_threads(constructor, 1)
 
-    constructor = MArray{Tuple{nvar, nd, nd}, Float64}
+    constructor = MArray{Tuple{nvar, nd, nd}, RealT}
     nodal_modal = alloc_for_threads(constructor, 3) # stores un, um and a temp
 
-    constructor = MArray{Tuple{nvar}, Float64}
+    constructor = MArray{Tuple{nvar}, RealT}
     slopes = alloc_for_threads(constructor, 2)
 
     Pn2m = nodal2modal(xg)
 
-    resl = OffsetArray(zeros(nvar, nd, nd, nx + 2, ny + 2),
+    resl = OffsetArray(zeros(RealT, nvar, nd, nd, nx + 2, ny + 2),
                        OffsetArrays.Origin(1, 1, 1, 0, 0))
 
     cache = (; alpha, alpha_temp, alpha_max, E, ue,
@@ -3555,7 +3555,7 @@ function create_aux_cache(eq, op)
     V = Vandermonde_lag(xg, xq) # matrix evaluating at `xq`
     # using values at solution points `xg`
 
-    MArr = MArray{Tuple{nvar, nq, nq}, Float64}
+    MArr = MArray{Tuple{nvar, nq, nq}, RealT}
 
     # for each thread, construct `cache_size` number of objects with
     # `constructor` and store them in an SVector
@@ -3565,7 +3565,7 @@ function create_aux_cache(eq, op)
 
     error_cache = (; xq, w2d, V, arr_cache)
 
-    MArr = MArray{Tuple{nvar, nd}, Float64}
+    MArr = MArray{Tuple{nvar, nd}, RealT}
 
     bound_limiter_cache = alloc_for_threads(MArr, 4) # ul, ur, ud, uu
 
@@ -3585,8 +3585,8 @@ function write_poly(::AbstractEquations{2, 1}, grid, op, u1, fcount)
     xu = LinRange(0.0, 1.0, nu)
     Vu = Vandermonde_lag(xg, xu)
     Mx, My = nx * nu, ny * nu
-    grid_x = zeros(Mx)
-    grid_y = zeros(My)
+    grid_x = zeros(RealT, Mx)
+    grid_y = zeros(RealT, My)
     for i in 1:nx
         i_min = (i - 1) * nu + 1
         i_max = i_min + nu - 1
@@ -3603,8 +3603,8 @@ function write_poly(::AbstractEquations{2, 1}, grid, op, u1, fcount)
 
     vtk_sol = vtk_grid(filename, grid_x, grid_y)
 
-    u_density = zeros(Mx, My)
-    u = zeros(nu)
+    u_density = zeros(RealT, Mx, My)
+    u = zeros(RealT, nu)
     for j in 1:ny
         for i in 1:nx
             # KLUDGE - Don't do this, use all values in the cell

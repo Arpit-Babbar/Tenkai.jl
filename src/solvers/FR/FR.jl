@@ -267,7 +267,7 @@ end
 struct EmptyZeros{RealT <: Real} end
 @inline Base.getindex(::EmptyZeros{RealT}, i...) where {RealT} = zero(RealT)
 EmptyZeros(RealT) = EmptyZeros{RealT}()
-EmptyZeros() = EmptyZeros{Float64}()
+EmptyZeros() = EmptyZeros{Float64}()  # Default for backwards compatibility
 
 #------------------------------------------------------------------------------
 # Methods which need to be defined in Equation modules
