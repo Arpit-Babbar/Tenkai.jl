@@ -445,7 +445,8 @@ function apply_bound_limiter!(eq::AbstractEquations{1, 1}, grid, scheme, param, 
     V = op.Vgll # Vandermonde matrix to convert to gll point values
     nx = grid.size
     nd = op.degree + 1
-    ue, up = zeros(nd), zeros(nd) # for gl, gll point values
+    RealT = eltype(ua)
+    ue, up = zeros(RealT, nd), zeros(RealT, nd) # for gl, gll point values
     eps = 1e-12
     ua_ = @view ua[1, :]
     if (minimum(ua_) < m - eps || maximum(ua_) > M + eps)
@@ -593,7 +594,8 @@ function apply_hierarchical_limiter!(eq::AbstractEquations{1}, # 1D equations
     # Limit modes as needed
     df, db, Dc = hierarchical.local_cache
 
-    dcn = MVector{nvar}(zeros(nvar))
+    RealT = eltype(ua)
+    dcn = MVector{nvar}(zeros(RealT, nvar))
 
     for cell in 1:nx
         ua_ = @view ua[:, cell]
@@ -692,17 +694,18 @@ function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
     # some strings specifying the kind of blending
     @unpack indicator_model, indicating_variables = limiter
 
+    RealT = eltype(u1)
     # Extend solution points to include boundary
-    yg = zeros(nd + 2)
-    yg[1] = 0.0
+    yg = zeros(RealT, nd + 2)
+    yg[1] = zero(RealT)
     yg[2:(nd + 1)] = xg
-    yg[nd + 2] = 1.0
+    yg[nd + 2] = one(RealT)
 
     # Get nodal basis from values at extended solution points
     Pn2m = nodal2modal(yg)
 
-    un, um = zeros(nvar, nd + 2), zeros(nvar, nd + 2) # Nodal, modal values in a cell
-    um_xg = zeros(nvar, nd)
+    un, um = zeros(RealT, nvar, nd + 2), zeros(RealT, nvar, nd + 2) # Nodal, modal values in a cell
+    um_xg = zeros(RealT, nvar, nd)
 
     for i in 1:nx
         # Continuous extension to faces
@@ -731,8 +734,9 @@ function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
             um[n, :] = @views Pn2m * un[n, :]
         end
 
-        ind_den, ind_num, ind = (zeros(n_ind_nvar), zeros(n_ind_nvar),
-                                 zeros(n_ind_nvar))
+        RealT = eltype(un)
+        ind_den, ind_num, ind = (zeros(RealT, n_ind_nvar), zeros(RealT, n_ind_nvar),
+                                 zeros(RealT, n_ind_nvar))
         for n in 1:n_ind_nvar
             ind_den[n] = sum(um[n, 2:end] .^ 2)      # energy excluding constant node
             if indicator_model == "model1"
@@ -917,10 +921,11 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
     # some strings specifying the kind of blending
     @unpack (indicator_model, indicating_variables) = limiter
 
+    RealT = eltype(u1)
     # Get nodal basis from values at extended solution points
     Pn2m = nodal2modal(xg)
 
-    un, um = zeros(nvar, nd), zeros(nvar, nd) # Nodal, modal values in a cell
+    un, um = zeros(RealT, nvar, nd), zeros(RealT, nvar, nd) # Nodal, modal values in a cell
 
     for i in 1:nx
         # Continuous extension to faces
@@ -1059,10 +1064,11 @@ function modal_smoothness_indicator_gassner_new(eq::AbstractEquations{1}, t,
     # some strings specifying the kind of blending
     @unpack indicator_model, indicating_variables = limiter
 
+    RealT = eltype(u1)
     # Get nodal basis from values at extended solution points
     Pn2m = nodal2modal(xg)
 
-    un, um = zeros(nvar, nd), zeros(nvar, nd) # Nodal, modal values in a cell
+    un, um = zeros(RealT, nvar, nd), zeros(RealT, nvar, nd) # Nodal, modal values in a cell
 
     for i in 1:nx
         # Continuous extension to faces
@@ -1080,9 +1086,10 @@ function modal_smoothness_indicator_gassner_new(eq::AbstractEquations{1}, t,
             um[n, :] = @views Pn2m * un[n, :]
         end
 
-        ind = zeros(n_ind_nvar)
-        ind_nd, ind_nd_m_1, ind_nd_m_2 = zeros(n_ind_nvar), zeros(n_ind_nvar),
-                                         zeros(n_ind_nvar)
+        RealT = eltype(un)
+        ind = zeros(RealT, n_ind_nvar)
+        ind_nd, ind_nd_m_1, ind_nd_m_2 = zeros(RealT, n_ind_nvar), zeros(RealT, n_ind_nvar),
+                                         zeros(RealT, n_ind_nvar)
         for n in 1:n_ind_nvar
             @views um[n, 1] *= 0.1 # FIXME - Replace with 0.1*cell_max/global_max
 

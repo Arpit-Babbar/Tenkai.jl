@@ -1332,10 +1332,11 @@ function Blend(eq::AbstractEquations{2}, op, grid,
                   pure_fv, positivity_blending, debug = debug_blend)
 
     # Big arrays
-    E = zeros(nx, ny)
-    alpha = OffsetArray(zeros(nx + 2, ny + 2), OffsetArrays.Origin(0, 0))
+    RealT = eltype(grid.xc)
+    E = zeros(RealT, nx, ny)
+    alpha = OffsetArray(zeros(RealT, nx + 2, ny + 2), OffsetArrays.Origin(0, 0))
     alpha_temp, alpha_max = (similar(alpha) for _ in 1:2)
-    fn_low = OffsetArray(zeros(nvar,
+    fn_low = OffsetArray(zeros(RealT, nvar,
                                nd, # Dofs on each face
                                4,  # 4 faces
                                nx + 2, ny + 2),
