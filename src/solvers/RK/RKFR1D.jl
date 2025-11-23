@@ -163,7 +163,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
         xl, xr = grid.xf[cell], grid.xf[cell + 1]
         for ix in Base.OneTo(nd)
             # Solution points
-            x = xc - 0.5 * dx + xg[ix] * dx
+            x = xc - oftype(dx, 0.5) * dx + xg[ix] * dx
             u_node = get_node_vars(u1, eq, ix, cell)
             # Compute flux at all solution points
             flux1 = flux(x, u_node, eq)
