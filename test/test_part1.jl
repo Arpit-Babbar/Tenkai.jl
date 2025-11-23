@@ -253,3 +253,24 @@ end
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
     end
 end
+
+@testset "Float32 type preservation" begin
+    # Test that Float32 is properly preserved throughout the computation
+    trixi_include(joinpath(examples_dir(), "1d", "run_burg1d_float32.jl"),
+                  save_time_interval = 0.0f0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.01f0, nx = 10)
+    
+    # Verify Float32 types are preserved
+    @test typeof(sol["problem"].domain) == Vector{Float32}
+    @test eltype(sol["grid"].xc) == Float32
+    @test eltype(sol["grid"].xf) == Float32
+    @test eltype(sol["grid"].dx) == Float32
+    
+    # Check solution array type
+    if sol["u_f"] isa AbstractArray
+        elem_type = eltype(eltype(sol["u_f"]))
+        @test elem_type == Float32
+        println("✓ Float32 type preserved in solution: ", elem_type)
+    end
+end
