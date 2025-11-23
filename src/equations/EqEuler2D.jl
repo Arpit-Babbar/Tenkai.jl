@@ -321,8 +321,8 @@ zero_bv(x, t) = 0.0
     end
     ρ_v1 = ρ * v1
     ρ_v2 = ρ * v2
-    return SVector{4, Float64}(ρ, ρ_v1, ρ_v2,
-                               p / (γ - 1.0) + 0.5 * (ρ_v1 * v1 + ρ_v2 * v2))
+    return SVector(ρ, ρ_v1, ρ_v2,
+                   p / (γ - 1.0) + 0.5 * (ρ_v1 * v1 + ρ_v2 * v2))
 end
 
 function isentropic_dumbser_iv(x, y)

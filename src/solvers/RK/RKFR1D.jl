@@ -149,11 +149,12 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
     nx = grid.size
     nd = length(xg)
     @unpack bflux_ind = scheme.bflux
-    refresh!(u) = fill!(u, 0.0)
+    RealT = eltype(grid.xc)
+    refresh!(u) = fill!(u, zero(RealT))
 
     refresh!.((ub, Fb, res))
     nvar = nvariables(eq)
-    f = zeros(nvar, nd)
+    f = zeros(RealT, nvar, nd)
     @timeit aux.timer "Cell loop" begin
     #! format: noindent
     @inbounds for cell in 1:nx
