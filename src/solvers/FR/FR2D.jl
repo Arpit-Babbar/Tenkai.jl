@@ -94,8 +94,8 @@ function set_initial_condition!(u, eq::AbstractEquations{2}, grid, op, problem)
         dx, dy = grid.dx[el_x], grid.dy[el_y] # cell size
         xc, yc = grid.xc[el_x], grid.yc[el_y] # cell center
         for j in 1:nd, i in 1:nd
-            x = xc - 0.5 * dx + xg[i] * dx
-            y = yc - 0.5 * dy + xg[j] * dy
+            x = xc - oftype(dx, 0.5) * dx + xg[i] * dx
+            y = yc - oftype(dy, 0.5) * dy + xg[j] * dy
             iv = initial_value(x, y)
             set_node_vars!(u, iv, eq, i, j, el_x, el_y)
         end
@@ -852,11 +852,11 @@ function apply_tvb_limiter!(eq::AbstractEquations{2, 1}, problem, scheme, grid,
         # limit if jumps are detected
         if ((abs(dul - dulm) > 1e-06 || abs(dur - durm) > 1e-06) ||
             (abs(dub - dubm) > 1e-06 || abs(dut - dutm) > 1e-06))
-            dux, duy = 0.5 * (dulm + durm), 0.5 * (dutm + dubm)
+            dux, duy = oftype(dulm, 0.5) * (dulm + durm), oftype(dutm, 0.5) * (dutm + dubm)
             for jj in 1:nd, ii in 1:nd # Adding @turbo here was giving bugs. WHY!?
                 u1_[ii, jj, el_x, el_y] = (ua_[el_x, el_y] +
-                                           2.0 * (xg[ii] - 0.5) * dux
-                                           + 2.0 * (xg[jj] - 0.5) * duy)
+                                           oftype(dux, 2) * (xg[ii] - oftype(xg[ii], 0.5)) * dux
+                                           + oftype(duy, 2) * (xg[jj] - oftype(xg[jj], 0.5)) * duy)
             end
         end
     end
@@ -1930,53 +1930,53 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
 
         multiply_add_set_node_vars!(unph, # u_{i-1/2+,j}=u_{i-1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
                                     ufl,  # u_{i-1/2,j}
-                                    -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
+                                    -oftype(scaled_dt, 0.5) * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                     fr,
-                                    -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
+                                    -oftype(scaled_dt, 0.5) * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                     -fl,
                                     eq,
                                     1, # Left face
                                     ii, jj)
         multiply_add_set_node_vars!(unph, # u_{i+1/2-,j}=u_{i+1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
                                     ufr,  # u_{i+1/2,j}
-                                    -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
+                                    -oftype(scaled_dt, 0.5) * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                     fr,
-                                    -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
+                                    -oftype(scaled_dt, 0.5) * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                     -fl,
                                     eq,
                                     2, # Right face
                                     ii, jj)
         multiply_add_set_node_vars!(unph, # u_{i,j-1/2+}=u_{i,j-1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
                                     ufd,  # u_{i,j-1/2}
-                                    -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                    -oftype(scaled_dt, 0.5) * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                     gu,
-                                    -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                    -oftype(scaled_dt, 0.5) * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                     -gd,
                                     eq,
                                     3, # Bottom face
                                     ii, jj)
         multiply_add_set_node_vars!(unph, # u_{i,j+1/2-}=u_{i,j+1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
                                     ufu,  # u_{i,j+1/2}
-                                    -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                    -oftype(scaled_dt, 0.5) * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                     gu,
-                                    -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                    -oftype(scaled_dt, 0.5) * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                     -gd,
                                     eq,
                                     4, # Top face
                                     ii, jj)
 
         multiply_add_to_node_vars!(unph, # u_{i-1/2+,j}=u_{i,j-1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
-                                   -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                   -oftype(scaled_dt, 0.5) * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                    gu,
-                                   -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                   -oftype(scaled_dt, 0.5) * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                    -gd,
                                    eq,
                                    1, # Left face
                                    ii, jj)
         multiply_add_to_node_vars!(unph, # u_{i+1/2+,j}=u_{i+1/2,j}-0.5*dt*(gu-gd)/(yfu-yfd)
-                                   -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                   -oftype(scaled_dt, 0.5) * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                    gu,
-                                   -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                   -oftype(scaled_dt, 0.5) * scaled_dt / (yyf[jj] - yyf[jj - 1]),
                                    -gd,
                                    eq,
                                    2, # Right face

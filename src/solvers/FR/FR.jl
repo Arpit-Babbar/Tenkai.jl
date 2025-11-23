@@ -226,19 +226,19 @@ end
 #------------------------------------------------------------------------------
 # Create a struct of parameters
 #------------------------------------------------------------------------------
-struct Parameters{T1 <: Union{Int64, Vector{<:Any}}}
+struct Parameters{T1 <: Union{Int64, Vector{<:Any}}, RealT <: Real}
     grid_size::T1
-    cfl::Float64
-    bounds::Tuple{Vector{Float64}, Vector{Float64}}
+    cfl::RealT
+    bounds::Tuple{Vector{RealT}, Vector{RealT}}
     save_iter_interval::Int64
-    save_time_interval::Float64
+    save_time_interval::RealT
     compute_error_interval::Int64
     animate::Bool
     saveto::String      # Directory where a copy of output will be sent
     time_scheme::String # Time integration used by Runge-Kutta
-    cfl_safety_factor::Float64
+    cfl_safety_factor::RealT
     cfl_style::String
-    eps::Float64
+    eps::RealT
 end
 
 # Constructor
