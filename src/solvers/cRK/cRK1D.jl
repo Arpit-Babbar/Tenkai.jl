@@ -74,9 +74,10 @@ function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44},
     nvar = nvariables(eq)
     @unpack boundary_value, boundary_condition = problem
     left, right = boundary_condition
-    refresh!(u) = fill!(u, 0.0)
+    RealT = eltype(grid.xc)
+    refresh!(u) = fill!(u, zero(RealT))
 
-    ub, fb = zeros(nvar), zeros(nvar)
+    ub, fb = zeros(RealT, nvar), zeros(RealT, nvar)
 
     # For Dirichlet bc, use upwind flux at faces by assigning both physical
     # and ghost cells through the bc.
@@ -160,10 +161,11 @@ end
 
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
                       eq::AbstractEquations{1})
-    gArray(nvar, nx) = OffsetArray(zeros(nvar, nx + 2),
+    RealT = eltype(grid.xc)
+    gArray(nvar, nx) = OffsetArray(zeros(RealT, nvar, nx + 2),
                                    OffsetArrays.Origin(1, 0))
     function gArray(nvar, n1, nx)
-        OffsetArray(zeros(nvar, n1, nx + 2),
+        OffsetArray(zeros(RealT, nvar, n1, nx + 2),
                     OffsetArrays.Origin(1, 1, 0))
     end
     # Allocate memory
@@ -198,10 +200,11 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
         @assert false "Degree not implemented"
     end
 
-    MArr = MArray{Tuple{nvariables(eq), nd}, Float64}
+    RealT = eltype(grid.xc)
+    MArr = MArray{Tuple{nvariables(eq), nd}, RealT}
     cell_data = alloc_for_threads(MArr, cell_data_size)
 
-    MArr = MArray{Tuple{nvariables(eq), 1}, Float64}
+    MArr = MArray{Tuple{nvariables(eq), 1}, RealT}
     eval_data = alloc_for_threads(MArr, eval_data_size)
 
     cache = (; u1, ua, res, Fb, Ub, u1_b, ub_N, cell_data, eval_data)
@@ -210,10 +213,11 @@ end
 
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver, <:DCSX},
                       eq::AbstractEquations{1})
-    gArray(nvar, nx) = OffsetArray(zeros(nvar, nx + 2),
+    RealT = eltype(grid.xc)
+    gArray(nvar, nx) = OffsetArray(zeros(RealT, nvar, nx + 2),
                                    OffsetArrays.Origin(1, 0))
     function gArray(nvar, n1, nx)
-        OffsetArray(zeros(nvar, n1, nx + 2),
+        OffsetArray(zeros(RealT, nvar, n1, nx + 2),
                     OffsetArrays.Origin(1, 1, 0))
     end
     # Allocate memory
@@ -248,10 +252,11 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver, <:DCSX},
         @assert false "Degree not implemented"
     end
 
-    MArr = MArray{Tuple{nvariables(eq), nd}, Float64}
+    RealT = eltype(grid.xc)
+    MArr = MArray{Tuple{nvariables(eq), nd}, RealT}
     cell_data = alloc_for_threads(MArr, cell_data_size)
 
-    MArr = MArray{Tuple{nvariables(eq), 1}, Float64}
+    MArr = MArray{Tuple{nvariables(eq), 1}, RealT}
     eval_data = alloc_for_threads(MArr, eval_data_size)
 
     cache = (; u1, ua, res, Fb, Ub, ub_N, u2b, u3b, u4b, cell_data, eval_data)

@@ -20,13 +20,13 @@ using MuladdMacro
 #-------------------------------------------------------------------------------
 function Legendre(n, x)
     if n == 0
-        value = 1.0
+        value = one(x)
     elseif n == 1
         value = x
     else
-        value = ((2.0 * n - 1.0) / n * x * Legendre(n - 1, x)
+        value = ((2 * n - 1) / n * x * Legendre(n - 1, x)
                  -
-                 (n - 1.0) / n * Legendre(n - 2, x))
+                 (n - 1) / n * Legendre(n - 2, x))
     end
 
     return value
@@ -37,9 +37,9 @@ end
 #-------------------------------------------------------------------------------
 function dLegendre(n, x)
     if n == 0
-        value = 0.0
+        value = zero(x)
     elseif n == 1
-        value = 1.0
+        value = one(x)
     else
         value = n * Legendre(n - 1, x) + x * dLegendre(n - 1, x)
     end
@@ -50,7 +50,7 @@ end
 # Normalize Legendre polynomials to unit L2 norm in [0,1]
 #-------------------------------------------------------------------------------
 function nLegendre(n, x)
-    value = sqrt(2.0 * n + 1.0) * Legendre(n, x)
+    value = sqrt(2 * n + 1) * Legendre(n, x)
     return value
 end
 
@@ -66,8 +66,8 @@ function weights_and_points(n, type)
         println("Unknown solution points")
         @assert false
     end
-    w *= 0.5
-    x = 0.5 * (x .+ 1.0)
+    w *= 0.5f0
+    x = 0.5f0 * (x .+ 1)
     return SVector{n}(x), SVector{n}(w)
 end
 
@@ -76,7 +76,8 @@ end
 # Returns i'th Lagrange polynomial value at x
 #-------------------------------------------------------------------------------
 function Lagrange(i, xp, x)
-    value = 1.0
+    T = promote_type(eltype(xp), typeof(x))
+    value = one(T)
     n = length(xp)
     for j in 1:n
         if j != i
@@ -94,7 +95,8 @@ end
 function Vandermonde_lag(xp, x)
     n = length(xp)
     m = length(x)
-    V = zeros(Float64, m, n)
+    T = promote_type(eltype(xp), eltype(x))
+    V = zeros(T, m, n)
     for j in 1:n
         for i in 1:m
             V[i, j] = Lagrange(j, xp, x[i])
@@ -111,10 +113,11 @@ end
 function Vandermonde_leg(k, x)
     n = k + 1
     m = length(x)
-    V = zeros(Float64, m, n)
+    T = eltype(x)
+    V = zeros(T, m, n)
     for j in 1:n
         for i in 1:m
-            V[i, j] = nLegendre(j - 1, 2.0 * x[i] - 1.0)
+            V[i, j] = nLegendre(j - 1, 2 * x[i] - one(x[i]))
         end
     end
     return V
@@ -129,11 +132,12 @@ end
 function Vandermonde_leg_krivodonova(k, x)
     n = k + 1
     m = length(x)
-    V = zeros(Float64, m, n)
+    T = eltype(x)
+    V = zeros(T, m, n)
     for j in 1:n
         for i in 1:m
             # krivodonova's normalization, the division is redundant
-            V[i, j] = Legendre(j - 1, x[i]) / Legendre(j - 1, 1.0)
+            V[i, j] = Legendre(j - 1, x[i]) / Legendre(j - 1, one(x[i]))
         end
     end
     return V
@@ -152,12 +156,13 @@ function nodal2modal_krivodonova(xg)
     # Legendre polynomials evaluated at quadrature points
     Vlag = Vandermonde_lag(xg, x)
 
-    M = zeros(Float64, nd)
+    T = eltype(xg)
+    M = zeros(T, nd)
     for i in 1:nd
         M[i] = @views sum(Vleg[:, i] .* Vleg[:, i] .* w)
     end
 
-    A = zeros(Float64, nd, nd) # projection matrix
+    A = zeros(T, nd, nd) # projection matrix
     for j in 1:nd
         for i in 1:nd
             A[i, j] = @views sum(Vleg[:, i] .* Vlag[:, j] .* w)
@@ -185,7 +190,8 @@ function nodal2modal(xg)
     Vleg = Vandermonde_leg(k, x)
     Vlag = Vandermonde_lag(xg, x)
 
-    M = zeros(Float64, nd)
+    T = eltype(xg)
+    M = zeros(T, nd)
     for i in 1:nd
         M[i] = @views sum(Vleg[:, i] .* Vleg[:, i] .* w)
     end
@@ -195,7 +201,7 @@ function nodal2modal(xg)
         @assert false
     end
 
-    A = zeros(Float64, nd, nd) # projection matrix
+    A = zeros(T, nd, nd) # projection matrix
     for j in 1:nd
         for i in 1:nd
             A[i, j] = @views sum(Vleg[:, i] .* Vlag[:, j] .* w)
@@ -211,7 +217,8 @@ end
 #-------------------------------------------------------------------------------
 function barycentric_weights(x)
     n = length(x)
-    w = ones(Float64, n)
+    T = eltype(x)
+    w = ones(T, n)
 
     for j in 2:n
         for k in 1:(j - 1)
@@ -220,7 +227,8 @@ function barycentric_weights(x)
         end
     end
 
-    value = 1.0 ./ w
+    T = eltype(x)
+    value = one(T) ./ w
     return value
 end
 
@@ -231,12 +239,13 @@ end
 function diff_mat(x)
     w = barycentric_weights(x)
     n = length(x)
-    D = zeros(Float64, n, n)
+    T = eltype(x)
+    D = zeros(T, n, n)
 
     for j in 1:n
         for i in 1:n
             if j != i
-                D[i, j] = (w[j] / w[i]) * 1.0 / (x[i] - x[j])
+                D[i, j] = (w[j] / w[i]) * one(T) / (x[i] - x[j])
                 D[i, i] -= D[i, j]
             end
         end
@@ -249,12 +258,12 @@ end
 # x is in [-1,1]
 #-------------------------------------------------------------------------------
 function gl_radau(k, x)
-    value = 0.5 * (-1)^k * (Legendre(k, x) - Legendre(k + 1, x))
+    value = 0.5f0 * (-1)^k * (Legendre(k, x) - Legendre(k + 1, x))
     return value
 end
 
 function gr_radau(k, x)
-    value = 0.5 * (Legendre(k, x) + Legendre(k + 1, x))
+    value = 0.5f0 * (Legendre(k, x) + Legendre(k + 1, x))
     return value
 end
 
@@ -263,12 +272,12 @@ end
 # x is in [-1,1]
 #-------------------------------------------------------------------------------
 function dgl_radau(k, x)
-    value = 0.5 * (-1)^k * (dLegendre(k, x) - dLegendre(k + 1, x))
+    value = 0.5f0 * (-1)^k * (dLegendre(k, x) - dLegendre(k + 1, x))
     return value
 end
 
 function dgr_radau(k, x)
-    value = 0.5 * (dLegendre(k, x) + dLegendre(k + 1, x))
+    value = 0.5f0 * (dLegendre(k, x) + dLegendre(k + 1, x))
     return value
 end
 
@@ -277,10 +286,10 @@ end
 # x is in [-1,1]
 #-------------------------------------------------------------------------------
 function gl_g2(k, x)
-    value = 0.5 * (-1)^k *
+    value = 0.5f0 * (-1)^k *
             (Legendre(k, x) -
-             ((k + 1.0) * Legendre(k - 1, x) +
-              k * Legendre(k + 1, x)) / (2.0 * k + 1.0))
+             ((k + one(x)) * Legendre(k - 1, x) +
+              k * Legendre(k + 1, x)) / (2 * k + one(x)))
     return value
 end
 
@@ -294,7 +303,7 @@ end
 # x is in [-1,1]
 #-------------------------------------------------------------------------------
 function dgl_g2(k, x)
-    value = 0.5 * (-1)^k * (1.0 - x) * dLegendre(k, x)
+    value = 0.5f0 * (-1)^k * (one(x) - x) * dLegendre(k, x)
     return value
 end
 
@@ -317,10 +326,11 @@ function fr_operators(N, sol_pts, cor_fun)
     xg, wg = weights_and_points(nd, sol_pts)
 
     # Required to evaluate solution at face
-    Vl, Vr = zeros(Float64, nd), zeros(Float64, nd)
+    T = eltype(xg)
+    Vl, Vr = zeros(T, nd), zeros(T, nd)
     for i in 1:nd
-        Vl[i] = Lagrange(i, xg, 0.0)
-        Vr[i] = Lagrange(i, xg, 1.0)
+        Vl[i] = Lagrange(i, xg, zero(T))
+        Vr[i] = Lagrange(i, xg, one(T))
     end
 
     # Correction terms
@@ -333,10 +343,11 @@ function fr_operators(N, sol_pts, cor_fun)
         @assert false
     end
 
-    bl, br = zeros(nd), zeros(nd)
+    T = eltype(xg)
+    bl, br = zeros(T, nd), zeros(T, nd)
     for i in 1:nd
-        bl[i] = 2.0 * dgl(N, 2.0 * xg[i] - 1.0)
-        br[i] = 2.0 * dgr(N, 2.0 * xg[i] - 1.0)
+        bl[i] = 2 * dgl(N, 2 * xg[i] - one(xg[i]))
+        br[i] = 2 * dgr(N, 2 * xg[i] - one(xg[i]))
     end
 
     # Convert vectors to SVector for optimized operations
@@ -357,11 +368,11 @@ function fr_operators(N, sol_pts, cor_fun)
         xgll, wgll = weights_and_points(nd, "gll")
         Vgll = Vandermonde_lag(xg, xgll)
     else # GLL points not defined for nd=1, so we put identity matrix then
-        Vgll = Matrix(1.0 * I, nd, nd)
+        Vgll = Matrix(one(T) * I, nd, nd)
         Vgll = SMatrix{nd, nd}(Vgll)
     end
 
-    wg_inv = 1.0 ./ wg
+    wg_inv = one(T) ./ wg
 
     op = (; degree = N, xg, wg, wg_inv, Vl, Vr, bl, br, Dm, DmT, bV, D1, D1T, Dsplit,
           Vgll)

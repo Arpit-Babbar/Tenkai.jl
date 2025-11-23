@@ -2,16 +2,17 @@
 #! format: noindent
 
 function setup_arrays(grid, scheme::Scheme{<:LWEnzymeTower}, eq::AbstractEquations{1})
-    gArray(nvar, nx) = OffsetArray(zeros(nvar, nx + 2),
+    gArray(nvar, nx) = OffsetArray(zeros(RealT, nvar, nx + 2),
                                    OffsetArrays.Origin(1, 0))
     function gArray(nvar, n1, nx)
-        OffsetArray(zeros(nvar, n1, nx + 2),
+        OffsetArray(zeros(RealT, nvar, n1, nx + 2),
                     OffsetArrays.Origin(1, 1, 0))
     end
     # Allocate memory
     @unpack degree = scheme
     nd = degree + 1
     nx = grid.size
+    RealT = eltype(grid.xc)
     nvar = nvariables(eq)
     u1 = gArray(nvar, nd, nx)
     ua = gArray(nvar, nx)
@@ -41,10 +42,10 @@ function setup_arrays(grid, scheme::Scheme{<:LWEnzymeTower}, eq::AbstractEquatio
         @assert false "Degree not implemented"
     end
 
-    MArr = MArray{Tuple{nvariables(eq), nd}, Float64}
+    MArr = MArray{Tuple{nvariables(eq), nd}, RealT}
     cell_data = alloc_for_threads(MArr, cell_data_size)
 
-    MArr = MArray{Tuple{nvariables(eq), 1}, Float64}
+    MArr = MArray{Tuple{nvariables(eq), 1}, RealT}
     eval_data = alloc_for_threads(MArr, eval_data_size)
 
     cache = (; u1, ua, res, Fb, Ub, cell_data, eval_data)

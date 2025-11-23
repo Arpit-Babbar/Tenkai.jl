@@ -26,11 +26,11 @@ using ..Equations: AbstractEquations, nvariables, eachvariable
 
 function setup_arrays_lwfr(grid, scheme, eq::AbstractEquations{2})
     function gArray(nvar, nx, ny)
-        OffsetArray(zeros(nvar, nx + 2, ny + 2),
+        OffsetArray(zeros(RealT, nvar, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 0, 0))
     end
     function gArray(nvar, n1, n2, nx, ny)
-        OffsetArray(zeros(nvar, n1, n2, nx + 2, ny + 2),
+        OffsetArray(zeros(RealT, nvar, n1, n2, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 1, 1, 0, 0))
     end
     # Allocate memory
@@ -39,6 +39,7 @@ function setup_arrays_lwfr(grid, scheme, eq::AbstractEquations{2})
     nvar = nvariables(eq)
     nd = degree + 1
     nx, ny = grid.size
+    RealT = eltype(grid.xc)
     u1 = gArray(nvar, nd, nd, nx, ny)
     ua = gArray(nvar, nx, ny)
     res = gArray(nvar, nd, nd, nx, ny)
@@ -77,20 +78,20 @@ function setup_arrays_lwfr(grid, scheme, eq::AbstractEquations{2})
         SVector{nt}([alloc(constructor, cache_size) for _ in Base.OneTo(nt)])
     end
 
-    MArr = MArray{Tuple{nvariables(eq), nd, nd}, Float64}
+    MArr = MArray{Tuple{nvariables(eq), nd, nd}, RealT}
     cell_arrays = alloc_for_threads(MArr, cell_array_size)
 
-    MEval = MArray{Tuple{nvariables(eq), nd}, Float64}
+    MEval = MArray{Tuple{nvariables(eq), nd}, RealT}
     eval_data_big = alloc_for_threads(MEval, big_eval_data_size)
 
-    MEval_small = MArray{Tuple{nvariables(eq), 1}, Float64}
+    MEval_small = MArray{Tuple{nvariables(eq), 1}, RealT}
     eval_data_small = alloc_for_threads(MEval_small, small_eval_data_size)
 
     eval_data = (; eval_data_big, eval_data_small)
 
     # Ghost values cache
 
-    Marr = MArray{Tuple{nvariables(eq), 1}, Float64}
+    Marr = MArray{Tuple{nvariables(eq), 1}, RealT}
 
     ghost_cache = alloc_for_threads(Marr, 2)
 
@@ -127,7 +128,8 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2, 1},
     # For Dirichlet bc, use upwind flux at faces by assigning both physical
     # and ghost cells through the bc.
     if left == dirichlet
-        pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
+        pre_allocated = [(zeros(RealT, nvar) for _ in 1:2)
+                         for _ in 1:Threads.nthreads()]
         @threaded for j in 1:ny
             x = xf[1]
             for k in 1:nd
@@ -170,7 +172,8 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2, 1},
     end
 
     if right == dirichlet
-        pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
+        pre_allocated = [(zeros(RealT, nvar) for _ in 1:2)
+                         for _ in 1:Threads.nthreads()]
         @threaded for j in 1:ny
             x = xf[nx + 1]
             for k in 1:nd
@@ -213,7 +216,8 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2, 1},
     end
 
     if bottom == dirichlet
-        pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
+        pre_allocated = [(zeros(RealT, nvar) for _ in 1:2)
+                         for _ in 1:Threads.nthreads()]
         @threaded for i in 1:nx
             y = yf[1]
             for k in 1:nd
@@ -257,7 +261,8 @@ function update_ghost_values_lwfr!(problem, scheme, eq::AbstractEquations{2, 1},
         bc!(grid, eq, op, Fb, Ub)
     end
     if top == dirichlet
-        pre_allocated = [(zeros(nvar) for _ in 1:2) for _ in 1:Threads.nthreads()]
+        pre_allocated = [(zeros(RealT, nvar) for _ in 1:2)
+                         for _ in 1:Threads.nthreads()]
         @threaded for i in 1:nx
             y = yf[ny + 1]
             for k in 1:nd
