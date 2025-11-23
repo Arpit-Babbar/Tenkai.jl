@@ -94,8 +94,8 @@ function set_initial_condition!(u, eq::AbstractEquations{2}, grid, op, problem)
         dx, dy = grid.dx[el_x], grid.dy[el_y] # cell size
         xc, yc = grid.xc[el_x], grid.yc[el_y] # cell center
         for j in 1:nd, i in 1:nd
-            x = xc - 0.5 * dx + xg[i] * dx
-            y = yc - 0.5 * dy + xg[j] * dy
+            x = xc - 0.5f0 * dx + xg[i] * dx
+            y = yc - 0.5f0 * dy + xg[j] * dy
             iv = initial_value(x, y)
             set_node_vars!(u, iv, eq, i, j, el_x, el_y)
         end
@@ -422,7 +422,7 @@ function get_element_alpha_blending_limiter(blend, el_x, el_y)
 end
 
 function get_element_alpha_other_limiter(blend, el_x, el_y)
-    return zero(Float64)
+    return zero(eltype(blend.cache.dt))
 end
 
 # res = ∂_x F_h + ∂_y G_h where F_h, G_h are continuous fluxes. We write it as
@@ -797,7 +797,7 @@ end
 function setup_limiter_tvb(eq::AbstractEquations{2}; tvbM = 0.0, beta = 1.0)
     cache_size = 28
     # Make the particular initializers into functions
-    MArr = MArray{Tuple{nvariables(eq), 1}, Float64}
+    MArr = MArray{Tuple{nvariables(eq), 1}, RealT}
     cache = alloc_for_threads(MArr, cache_size)
     limiter = (; name = "tvb", tvbM = tvbM, cache, beta = beta)
     return limiter
@@ -806,7 +806,8 @@ end
 function setup_limiter_tvbβ(eq::AbstractEquations{2}; tvbM = 0.0, beta = 1.0)
     cache_size = 24
     # Make the particular initializers into functions
-    MArr = MArray{Tuple{nvariables(eq), 1}, Float64}
+    RealT = typeof(tvbM)
+    MArr = MArray{Tuple{nvariables(eq), 1}, RealT}
     cache = alloc_for_threads(MArr, cache_size)
     limiter = (; name = "tvbβ", tvbM = tvbM, cache, beta = beta)
     return limiter
@@ -852,11 +853,13 @@ function apply_tvb_limiter!(eq::AbstractEquations{2, 1}, problem, scheme, grid,
         # limit if jumps are detected
         if ((abs(dul - dulm) > 1e-06 || abs(dur - durm) > 1e-06) ||
             (abs(dub - dubm) > 1e-06 || abs(dut - dutm) > 1e-06))
-            dux, duy = 0.5 * (dulm + durm), 0.5 * (dutm + dubm)
+            dux, duy = 0.5f0 * (dulm + durm),
+                       0.5f0 * (dutm + dubm)
             for jj in 1:nd, ii in 1:nd # Adding @turbo here was giving bugs. WHY!?
                 u1_[ii, jj, el_x, el_y] = (ua_[el_x, el_y] +
-                                           2.0 * (xg[ii] - 0.5) * dux
-                                           + 2.0 * (xg[jj] - 0.5) * duy)
+                                           2 * (xg[ii] - 0.5f0) * dux
+                                           +
+                                           2 * (xg[jj] - 0.5f0) * duy)
             end
         end
     end
@@ -1269,10 +1272,10 @@ function Blend(eq::AbstractEquations{2}, op, grid,
     nvar = nvariables(eq)
     @unpack degree, xg = op
     nd = degree + 1
-
+    RealT = eltype(grid.xc)
     if limiter.name != "blend"
         if limiter.name == "tvb"
-            fn_low = OffsetArray(zeros(nvar,
+            fn_low = OffsetArray(zeros(RealT, nvar,
                                        nd, # Dofs on each face
                                        4,  # 4 faces
                                        nx + 2, ny + 2),
@@ -1285,11 +1288,12 @@ function Blend(eq::AbstractEquations{2}, op, grid,
                            numflux = scheme.numerical_flux)
             parameters = (; positivity_blending = NoPositivityBlending())
             cache = (;
-                     dt = MVector(1.0e20), fn_low, alpha = EmptyZeros(Float64))
+                     dt = MVector(convert(RealT, 1.0e20)), fn_low,
+                     alpha = EmptyZeros(RealT))
             # If limiter is not blend, replace blending with 'do nothing functions'
-            return (; subroutines, cache, parameters, uEltype = Float64) # TODO - Load uEltype from aux.cache
+            return (; subroutines, cache, parameters, uEltype = RealT) # TODO - Load uEltype from aux.cache
         else
-            fn_low = OffsetArray(zeros(nvar,
+            fn_low = OffsetArray(zeros(RealT, nvar,
                                        nd, # Dofs on each face
                                        4,  # 4 faces
                                        nx + 2, ny + 2),
@@ -1300,9 +1304,9 @@ function Blend(eq::AbstractEquations{2}, op, grid,
                            blend_face_residual_y! = trivial_face_residual,
                            get_element_alpha = get_element_alpha_other_limiter)
             cache = (;
-                     dt = MVector(1.0e20), fn_low)
+                     dt = MVector(convert(RealT, 1.0e20)), fn_low)
             # If limiter is not blend, replace blending with 'do nothing functions'
-            return (; subroutines, cache, parameters, uEltype = Float64) # TODO - Load uEltype from aux.cache
+            return (; subroutines, cache, parameters, uEltype = RealT) # TODO - Load uEltype from aux.cache
         end
     end
 
@@ -1332,10 +1336,11 @@ function Blend(eq::AbstractEquations{2}, op, grid,
                   pure_fv, positivity_blending, debug = debug_blend)
 
     # Big arrays
-    E = zeros(nx, ny)
-    alpha = OffsetArray(zeros(nx + 2, ny + 2), OffsetArrays.Origin(0, 0))
+    RealT = eltype(grid.xc)
+    E = zeros(RealT, nx, ny)
+    alpha = OffsetArray(zeros(RealT, nx + 2, ny + 2), OffsetArrays.Origin(0, 0))
     alpha_temp, alpha_max = (similar(alpha) for _ in 1:2)
-    fn_low = OffsetArray(zeros(nvar,
+    fn_low = OffsetArray(zeros(RealT, nvar,
                                nd, # Dofs on each face
                                4,  # 4 faces
                                nx + 2, ny + 2),
@@ -1343,7 +1348,7 @@ function Blend(eq::AbstractEquations{2}, op, grid,
 
     # Small cache of many MMatrix with one copy per thread
     function abstract_constructor(tuple_, x, origin)
-        [OffsetArray(MArray{tuple_, Float64}(x),
+        [OffsetArray(MArray{tuple_, RealT}(x),
                      OffsetArrays.Origin(origin))]
     end
     # These square brackets are needed when cache_size = 1. Also, when
@@ -1361,15 +1366,15 @@ function Blend(eq::AbstractEquations{2}, op, grid,
                                             (1, 1, 0, 0))
     unph = alloc_for_threads(constructor, 1)
 
-    constructor = MArray{Tuple{nvar, nd, nd}, Float64}
+    constructor = MArray{Tuple{nvar, nd, nd}, RealT}
     nodal_modal = alloc_for_threads(constructor, 3) # stores un, um and a temp
 
-    constructor = MArray{Tuple{nvar}, Float64}
+    constructor = MArray{Tuple{nvar}, RealT}
     slopes = alloc_for_threads(constructor, 2)
 
     Pn2m = nodal2modal(xg)
 
-    resl = OffsetArray(zeros(nvar, nd, nd, nx + 2, ny + 2),
+    resl = OffsetArray(zeros(RealT, nvar, nd, nd, nx + 2, ny + 2),
                        OffsetArrays.Origin(1, 1, 1, 0, 0))
 
     cache = (; alpha, alpha_temp, alpha_max, E, ue,
@@ -1930,53 +1935,65 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
 
         multiply_add_set_node_vars!(unph, # u_{i-1/2+,j}=u_{i-1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
                                     ufl,  # u_{i-1/2,j}
-                                    -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
+                                    -0.5f0 * scaled_dt /
+                                    (xxf[ii] - xxf[ii - 1]),
                                     fr,
-                                    -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
+                                    -0.5f0 * scaled_dt /
+                                    (xxf[ii] - xxf[ii - 1]),
                                     -fl,
                                     eq,
                                     1, # Left face
                                     ii, jj)
         multiply_add_set_node_vars!(unph, # u_{i+1/2-,j}=u_{i+1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
                                     ufr,  # u_{i+1/2,j}
-                                    -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
+                                    -0.5f0 * scaled_dt /
+                                    (xxf[ii] - xxf[ii - 1]),
                                     fr,
-                                    -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
+                                    -0.5f0 * scaled_dt /
+                                    (xxf[ii] - xxf[ii - 1]),
                                     -fl,
                                     eq,
                                     2, # Right face
                                     ii, jj)
         multiply_add_set_node_vars!(unph, # u_{i,j-1/2+}=u_{i,j-1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
                                     ufd,  # u_{i,j-1/2}
-                                    -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                    -0.5f0 * scaled_dt /
+                                    (yyf[jj] - yyf[jj - 1]),
                                     gu,
-                                    -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                    -0.5f0 * scaled_dt /
+                                    (yyf[jj] - yyf[jj - 1]),
                                     -gd,
                                     eq,
                                     3, # Bottom face
                                     ii, jj)
         multiply_add_set_node_vars!(unph, # u_{i,j+1/2-}=u_{i,j+1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
                                     ufu,  # u_{i,j+1/2}
-                                    -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                    -0.5f0 * scaled_dt /
+                                    (yyf[jj] - yyf[jj - 1]),
                                     gu,
-                                    -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                    -0.5f0 * scaled_dt /
+                                    (yyf[jj] - yyf[jj - 1]),
                                     -gd,
                                     eq,
                                     4, # Top face
                                     ii, jj)
 
         multiply_add_to_node_vars!(unph, # u_{i-1/2+,j}=u_{i,j-1/2}-0.5*dt*(gu-gd)/(yfu-yfd)
-                                   -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                   -0.5f0 * scaled_dt /
+                                   (yyf[jj] - yyf[jj - 1]),
                                    gu,
-                                   -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                   -0.5f0 * scaled_dt /
+                                   (yyf[jj] - yyf[jj - 1]),
                                    -gd,
                                    eq,
                                    1, # Left face
                                    ii, jj)
         multiply_add_to_node_vars!(unph, # u_{i+1/2+,j}=u_{i+1/2,j}-0.5*dt*(gu-gd)/(yfu-yfd)
-                                   -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                   -0.5f0 * scaled_dt /
+                                   (yyf[jj] - yyf[jj - 1]),
                                    gu,
-                                   -0.5 * scaled_dt / (yyf[jj] - yyf[jj - 1]),
+                                   -0.5f0 * scaled_dt /
+                                   (yyf[jj] - yyf[jj - 1]),
                                    -gd,
                                    eq,
                                    2, # Right face
@@ -3554,7 +3571,8 @@ function create_aux_cache(eq, op)
     V = Vandermonde_lag(xg, xq) # matrix evaluating at `xq`
     # using values at solution points `xg`
 
-    MArr = MArray{Tuple{nvar, nq, nq}, Float64}
+    RealT = eltype(xg)
+    MArr = MArray{Tuple{nvar, nq, nq}, RealT}
 
     # for each thread, construct `cache_size` number of objects with
     # `constructor` and store them in an SVector
@@ -3564,7 +3582,7 @@ function create_aux_cache(eq, op)
 
     error_cache = (; xq, w2d, V, arr_cache)
 
-    MArr = MArray{Tuple{nvar, nd}, Float64}
+    MArr = MArray{Tuple{nvar, nd}, RealT}
 
     bound_limiter_cache = alloc_for_threads(MArr, 4) # ul, ur, ud, uu
 
@@ -3584,8 +3602,9 @@ function write_poly(::AbstractEquations{2, 1}, grid, op, u1, fcount)
     xu = LinRange(0.0, 1.0, nu)
     Vu = Vandermonde_lag(xg, xu)
     Mx, My = nx * nu, ny * nu
-    grid_x = zeros(Mx)
-    grid_y = zeros(My)
+    out_type = Float64
+    grid_x = zeros(out_type, Mx)
+    grid_y = zeros(out_type, My)
     for i in 1:nx
         i_min = (i - 1) * nu + 1
         i_max = i_min + nu - 1
@@ -3602,8 +3621,8 @@ function write_poly(::AbstractEquations{2, 1}, grid, op, u1, fcount)
 
     vtk_sol = vtk_grid(filename, grid_x, grid_y)
 
-    u_density = zeros(Mx, My)
-    u = zeros(nu)
+    u_density = zeros(out_type, Mx, My)
+    u = zeros(out_type, nu)
     for j in 1:ny
         for i in 1:nx
             # KLUDGE - Don't do this, use all values in the cell

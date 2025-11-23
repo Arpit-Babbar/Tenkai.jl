@@ -18,11 +18,11 @@ using MuladdMacro
 @muladd begin
 #! format: noindent
 
-struct BuckleyLeverret1D <: AbstractEquations{1, 1}
+struct BuckleyLeverret1D{RealT <: Real} <: AbstractEquations{1, 1}
     speed::Function
     fprime::Function
-    a_buck::Float64 # Constant in Buckley-Leverret model
-    u_buck::Float64 # Convex in [0,u_bucklev], concave in [u_bucklev,1]
+    a_buck::RealT # Constant in Buckley-Leverret model
+    u_buck::RealT # Convex in [0,u_bucklev], concave in [u_bucklev,1]
     nvar::Int64
     name::String
     numfluxes::Dict{String, Function}

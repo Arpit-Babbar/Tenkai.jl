@@ -49,9 +49,9 @@ import Tenkai.EqEuler1D: tenkai2trixiequation
 @muladd begin
 #! format: noindent
 
-struct Euler2D{HLLSpeeds <: Function} <: AbstractEquations{2, 4}
-    γ::Float64
-    γ_minus_1::Float64
+struct Euler2D{RealT <: Real, HLLSpeeds <: Function} <: AbstractEquations{2, 4}
+    γ::RealT
+    γ_minus_1::RealT
     hll_speeds::HLLSpeeds
     nvar::Int64
     name::String
@@ -321,8 +321,8 @@ zero_bv(x, t) = 0.0
     end
     ρ_v1 = ρ * v1
     ρ_v2 = ρ * v2
-    return SVector{4, Float64}(ρ, ρ_v1, ρ_v2,
-                               p / (γ - 1.0) + 0.5 * (ρ_v1 * v1 + ρ_v2 * v2))
+    return SVector(ρ, ρ_v1, ρ_v2,
+                   p / (γ - 1.0) + 0.5 * (ρ_v1 * v1 + ρ_v2 * v2))
 end
 
 function isentropic_dumbser_iv(x, y)
@@ -2202,8 +2202,9 @@ function write_poly(eq::Euler2D, grid, op, u1, fcount)
     xu = LinRange(0.0, 1.0, nu)
     Vu = Vandermonde_lag(xg, xu)
     Mx, My = nx * nu, ny * nu
-    grid_x = zeros(Mx)
-    grid_y = zeros(My)
+    plot_type = Float64
+    grid_x = zeros(plot_type, Mx)
+    grid_y = zeros(plot_type, My)
     for i in 1:nx
         i_min = (i - 1) * nu + 1
         i_max = i_min + nu - 1
@@ -2220,8 +2221,8 @@ function write_poly(eq::Euler2D, grid, op, u1, fcount)
 
     vtk_sol = vtk_grid(filename, grid_x, grid_y)
 
-    u_equi = zeros(Mx, My)
-    u = zeros(nu)
+    u_equi = zeros(plot_type, Mx, My)
+    u = zeros(plot_type, nu)
     for j in 1:ny
         for i in 1:nx
             # to get values in the equispaced thing

@@ -38,26 +38,26 @@ using FastGaussQuadrature
 #-------------------------------------------------------------------------------
 # Create a struct of problem description
 #-------------------------------------------------------------------------------
-struct Problem{SourceTerms, BoundaryCondition <: Tuple, F1, F2, F3}
-    domain::Vector{Float64}
+struct Problem{RealT <: Real, SourceTerms, BoundaryCondition <: Tuple, F1, F2, F3}
+    domain::Vector{RealT}
     initial_value::F1
     boundary_value::F2
     boundary_condition::BoundaryCondition
     source_terms::SourceTerms
     periodic_x::Bool
     periodic_y::Bool
-    final_time::Float64
+    final_time::RealT
     exact_solution::F3
 end
 
 # Constructor
-function Problem(domain::Vector{Float64},
+function Problem(domain::Vector{RealT},
                  initial_value,
                  boundary_value,
                  boundary_condition::Tuple,
-                 final_time::Float64,
+                 final_time::RealT,
                  exact_solution;
-                 source_terms = nothing)
+                 source_terms = nothing) where {RealT <: Real}
     if length(domain) == 2
         @assert length(boundary_condition)==2 "Invalid Problem"
         left, right = boundary_condition
@@ -226,34 +226,37 @@ end
 #------------------------------------------------------------------------------
 # Create a struct of parameters
 #------------------------------------------------------------------------------
-struct Parameters{T1 <: Union{Int64, Vector{<:Any}}}
+struct Parameters{T1 <: Union{Int64, Vector{<:Any}}, RealT <: Real}
     grid_size::T1
-    cfl::Float64
-    bounds::Tuple{Vector{Float64}, Vector{Float64}}
+    cfl::RealT
+    bounds::Tuple{Vector{RealT}, Vector{RealT}}
     save_iter_interval::Int64
-    save_time_interval::Float64
+    save_time_interval::RealT
     compute_error_interval::Int64
     animate::Bool
     saveto::String      # Directory where a copy of output will be sent
     time_scheme::String # Time integration used by Runge-Kutta
-    cfl_safety_factor::Float64
+    cfl_safety_factor::RealT
     cfl_style::String
-    eps::Float64
+    eps::RealT
 end
 
 # Constructor
 function Parameters(grid_size, cfl, bounds, save_iter_interval,
                     save_time_interval, compute_error_interval;
-                    animate = false, cfl_safety_factor = 0.98,
+                    animate = false, cfl_safety_factor = convert(typeof(cfl), 0.98),
                     time_scheme = "by degree",
                     saveto = "none",
                     cfl_style = "optimal",
-                    eps = 1e-12)
-    @assert (cfl>=0.0) "cfl must be >= 0.0"
+                    eps = convert(typeof(cfl), 1e-12))
+    # Infer RealT from cfl argument
+    RealT = typeof(cfl)
+
+    @assert (cfl>=zero(RealT)) "cfl must be >= 0.0"
     @assert (save_iter_interval>=0) "save_iter_interval must be >= 0"
-    @assert (save_time_interval>=0.0) "save_time_interval must be >= 0.0"
+    @assert (save_time_interval>=zero(RealT)) "save_time_interval must be >= 0.0"
     @assert (!(save_iter_interval > 0 &&
-               save_time_interval > 0.0)) "Both save_(iter,time)_interval > 0"
+               save_time_interval > zero(RealT))) "Both save_(iter,time)_interval > 0"
     @assert cfl_style in ["lw", "optimal"]
 
     Parameters(grid_size, cfl, bounds, save_iter_interval,
@@ -267,7 +270,7 @@ end
 struct EmptyZeros{RealT <: Real} end
 @inline Base.getindex(::EmptyZeros{RealT}, i...) where {RealT} = zero(RealT)
 EmptyZeros(RealT) = EmptyZeros{RealT}()
-EmptyZeros() = EmptyZeros{Float64}()
+EmptyZeros() = EmptyZeros{Float64}()  # Default for backwards compatibility
 
 #------------------------------------------------------------------------------
 # Methods which need to be defined in Equation modules
@@ -348,16 +351,17 @@ end
 end
 
 function newton_step(func, x)
-    d = func(Dual(x, 1.0))
+    d = func(Dual(x, one(x)))
     # VERY INEFFICIENT TO BE COMPUTING THE STEP MULTIPLE TIMES
-    stepsize = d.value / (d.partials[1] + 1e-16)
-    while x - stepsize < 0.0 || x - stepsize > 1.0
-        stepsize *= 0.5
+    stepsize = d.value / (d.partials[1] + oftype(x, 1e-16))
+    while x - stepsize < zero(x) || x - stepsize > one(x)
+        stepsize *= 0.5f0
     end
     return x - stepsize
 end
 
-function newton_solver_scalar(func, y0, tol = 1e-14, maxiters = 1e3)
+function newton_solver_scalar(func, y0, tol = convert(typeof(y0), 1e-14),
+                              maxiters = 1e3)
     error = func(y0)
     iter = 0
     y = y0
@@ -367,13 +371,14 @@ function newton_solver_scalar(func, y0, tol = 1e-14, maxiters = 1e3)
         iter += 1
     end
 
-    if error > 100 * tol
+    if error > oftype(error, 100) * tol
         @warn "Newton solver did not converge: error = $error, iter = $iter"
     end
     return y
 end
 
-function newton_solver_tenkai(func, y0, tol = 1e-14, maxiters = 1e3)
+function newton_solver_tenkai(func, y0, tol = convert(typeof(y0), 1e-14),
+                              maxiters = 1e3)
     p = nothing # The func doesn't have any parameters
     f = (x, p) -> func(x)
     prob = NonlinearProblem{false}(f, y0, p)
@@ -873,15 +878,18 @@ function limit_variable_slope(eq, variable, slope, u_star_ll, u_star_rr, ue, xl,
     # By Jensen's inequality, we can find theta's directly for the primitives
     var_star_ll, var_star_rr = variable(eq, u_star_ll), variable(eq, u_star_rr)
     var_low = variable(eq, ue)
-    threshold = 0.1 * var_low
-    eps = 1e-10
+    RealT = typeof(var_low)
+    threshold = convert(RealT, 0.1) * var_low
+    eps = convert(RealT, 1e-10)
     if var_star_ll < eps || var_star_rr < eps
-        ratio_ll = abs(threshold - var_low) / (abs(var_star_ll - var_low) + 1e-13)
-        ratio_rr = abs(threshold - var_low) / (abs(var_star_rr - var_low) + 1e-13)
-        theta = min(ratio_ll, ratio_rr, 1.0)
+        ratio_ll = abs(threshold - var_low) /
+                   (abs(var_star_ll - var_low) + convert(RealT, 1e-13))
+        ratio_rr = abs(threshold - var_low) /
+                   (abs(var_star_rr - var_low) + convert(RealT, 1e-13))
+        theta = min(ratio_ll, ratio_rr, one(var_low))
         slope *= theta
-        u_star_ll = ue + 2.0 * xl * slope
-        u_star_rr = ue + 2.0 * xr * slope
+        u_star_ll = ue + 2 * xl * slope
+        u_star_rr = ue + 2 * xr * slope
     end
     return slope, u_star_ll, u_star_rr
 end

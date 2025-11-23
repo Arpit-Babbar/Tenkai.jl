@@ -31,12 +31,13 @@ using ..Equations: AbstractEquations, nvariables, eachvariable
 
 #------------------------------------------------------------------------------
 function setup_arrays_rkfr(grid, scheme, eq::AbstractEquations{2})
+    RealT = eltype(grid.xc)
     function gArray(nvar, nx, ny)
-        OffsetArray(zeros(nvar, nx + 2, ny + 2),
+        OffsetArray(zeros(RealT, nvar, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 0, 0))
     end
     function gArray(nvar, n1, n2, nx, ny)
-        OffsetArray(zeros(nvar, n1, n2, nx + 2, ny + 2),
+        OffsetArray(zeros(RealT, nvar, n1, n2, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 1, 1, 0, 0))
     end
     # Allocate memory

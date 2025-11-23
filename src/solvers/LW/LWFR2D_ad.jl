@@ -151,11 +151,11 @@ end
 function setup_arrays(grid, scheme::Scheme{<:LWEnzymeTower},
                       eq::AbstractEquations{2})
     function gArray(nvar, nx, ny)
-        OffsetArray(zeros(nvar, nx + 2, ny + 2),
+        OffsetArray(zeros(RealT, nvar, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 0, 0))
     end
     function gArray(nvar, n1, n2, nx, ny)
-        OffsetArray(zeros(nvar, n1, n2, nx + 2, ny + 2),
+        OffsetArray(zeros(RealT, nvar, n1, n2, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 1, 1, 0, 0))
     end
     # Allocate memory
@@ -164,6 +164,7 @@ function setup_arrays(grid, scheme::Scheme{<:LWEnzymeTower},
     nvar = nvariables(eq)
     nd = degree + 1
     nx, ny = grid.size
+    RealT = eltype(grid.xc)
     u1 = gArray(nvar, nd, nd, nx, ny)
     ua = gArray(nvar, nx, ny)
     res = gArray(nvar, nd, nd, nx, ny)
@@ -202,22 +203,22 @@ function setup_arrays(grid, scheme::Scheme{<:LWEnzymeTower},
         SVector{nt}([alloc(constructor, cache_size) for _ in Base.OneTo(nt)])
     end
 
-    MArr = MArray{Tuple{nvariables(eq), nd, nd}, Float64}
+    MArr = MArray{Tuple{nvariables(eq), nd, nd}, RealT}
     cell_arrays = alloc_for_threads(MArr, cell_array_size)
 
     nt = Threads.nthreads()
 
-    MEval = MArray{Tuple{nvariables(eq), nd}, Float64}
+    MEval = MArray{Tuple{nvariables(eq), nd}, RealT}
     eval_data_big = alloc_for_threads(MEval, big_eval_data_size)
 
-    MEval_small = MArray{Tuple{nvariables(eq), 1}, Float64}
+    MEval_small = MArray{Tuple{nvariables(eq), 1}, RealT}
     eval_data_small = alloc_for_threads(MEval_small, small_eval_data_size)
 
     eval_data = (; eval_data_big, eval_data_small)
 
     # Ghost values cache
 
-    Marr = MArray{Tuple{nvariables(eq), 1}, Float64}
+    Marr = MArray{Tuple{nvariables(eq), 1}, RealT}
 
     ghost_cache = alloc_for_threads(Marr, 2)
 

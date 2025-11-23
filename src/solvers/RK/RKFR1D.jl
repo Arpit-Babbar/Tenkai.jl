@@ -29,12 +29,13 @@ using ..Tenkai: update_ghost_values_periodic!
 
 #------------------------------------------------------------------------------
 function setup_arrays_rkfr(grid, scheme, eq::AbstractEquations{1})
+    RealT = eltype(grid.xc)
     function gArray(nvar, nx)
-        OffsetArray(zeros(Float64, nvar, nx + 2),
+        OffsetArray(zeros(RealT, nvar, nx + 2),
                     OffsetArrays.Origin(1, 0))
     end
     function gArray(nvar, n1, nx)
-        OffsetArray(zeros(Float64, nvar, n1, nx + 2),
+        OffsetArray(zeros(RealT, nvar, n1, nx + 2),
                     OffsetArrays.Origin(1, 1, 0))
     end
     # Allocate memory
@@ -148,11 +149,12 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
     nx = grid.size
     nd = length(xg)
     @unpack bflux_ind = scheme.bflux
-    refresh!(u) = fill!(u, 0.0)
+    RealT = eltype(grid.xc)
+    refresh!(u) = fill!(u, zero(RealT))
 
     refresh!.((ub, Fb, res))
     nvar = nvariables(eq)
-    f = zeros(nvar, nd)
+    f = zeros(RealT, nvar, nd)
     @timeit aux.timer "Cell loop" begin
     #! format: noindent
     @inbounds for cell in 1:nx
@@ -162,7 +164,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
         xl, xr = grid.xf[cell], grid.xf[cell + 1]
         for ix in Base.OneTo(nd)
             # Solution points
-            x = xc - 0.5 * dx + xg[ix] * dx
+            x = xc - 0.5f0 * dx + xg[ix] * dx
             u_node = get_node_vars(u1, eq, ix, cell)
             # Compute flux at all solution points
             flux1 = flux(x, u_node, eq)
