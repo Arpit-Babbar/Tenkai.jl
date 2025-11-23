@@ -968,7 +968,8 @@ function Tenkai.initialize_plot(eq::Euler1D, op, grid, problem, scheme, timer, u
     # Initialize subplots for density, velocity and pressure
     p_ua, p_u1 = [plot() for _ in 1:nvar], [plot() for _ in 1:nvar]
     labels = ["Density", "Velocity", "Pressure"]
-    y = zeros(RealT, nx) # put dummy to fix plotly bug with OffsetArrays
+    plot_type = Float64
+    y = zeros(plot_type, nx) # put dummy to fix plotly bug with OffsetArrays
     for n in 1:nvar
         @views plot!(p_ua[n], xc, y, label = "Approximate",
                      linestyle = :dot, seriestype = :scatter,
@@ -985,8 +986,8 @@ function Tenkai.initialize_plot(eq::Euler1D, op, grid, problem, scheme, timer, u
     # Set up p_u1 to contain polynomial approximation as a different curve
     # for each cell
     x = LinRange(xf[1], xf[2], nu)
-    up1 = zeros(RealT, nvar, nd)
-    u = zeros(RealT, nu)
+    up1 = zeros(plot_type, nvar, nd)
+    u = zeros(plot_type, nu)
     for ii in 1:nd
         @views con2prim!(eq, u1[:, ii, 1], up1[:, ii]) # store prim form in up1
     end
@@ -1037,7 +1038,8 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::Euler1D, grid
     nvar = eq.nvar
     @unpack save_time_interval, save_iter_interval, animate = param
     avg_file = open("$avg_filename.txt", "w")
-    up_ = zeros(RealT, nvar)
+    plot_type = Float64
+    up_ = zeros(plot_type, nvar)
     ylims = [[Inf, -Inf] for _ in 1:nvar] # set ylims for plots of all variables
     for i in 1:nx
         @views con2prim!(eq, ua[:, i], up_) # store primitve form in up_
@@ -1058,10 +1060,10 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::Euler1D, grid
     title!(p_ua[1], "Cell averages plot, $nx cells, t = $t")
     sol_filename = get_filename("output/sol", ndigits, fcount)
     sol_file = open(sol_filename * ".txt", "w")
-    up1 = zeros(RealT, nvar, nd)
+    up1 = zeros(plot_type, nvar, nd)
 
-    u = zeros(RealT, nvar, nu)
-    x = zeros(RealT, nu)
+    u = zeros(plot_type, nvar, nu)
+    x = zeros(plot_type, nu)
     for i in 1:nx
         for ii in 1:nd
             @views con2prim!(eq, u1[:, ii, i], up1[:, ii]) # store prim form in up1

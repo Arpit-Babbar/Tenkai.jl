@@ -2202,8 +2202,9 @@ function write_poly(eq::Euler2D, grid, op, u1, fcount)
     xu = LinRange(0.0, 1.0, nu)
     Vu = Vandermonde_lag(xg, xu)
     Mx, My = nx * nu, ny * nu
-    grid_x = zeros(RealT, Mx)
-    grid_y = zeros(RealT, My)
+    plot_type = Float64
+    grid_x = zeros(plot_type, Mx)
+    grid_y = zeros(plot_type, My)
     for i in 1:nx
         i_min = (i - 1) * nu + 1
         i_max = i_min + nu - 1
@@ -2220,8 +2221,8 @@ function write_poly(eq::Euler2D, grid, op, u1, fcount)
 
     vtk_sol = vtk_grid(filename, grid_x, grid_y)
 
-    u_equi = zeros(RealT, Mx, My)
-    u = zeros(RealT, nu)
+    u_equi = zeros(plot_type, Mx, My)
+    u = zeros(plot_type, nu)
     for j in 1:ny
         for i in 1:nx
             # to get values in the equispaced thing

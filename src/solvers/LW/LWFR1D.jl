@@ -99,6 +99,7 @@ function update_ghost_values_lwfr!(problem, scheme, eq, grid, aux, op, cache,
     left, right = boundary_condition
     refresh!(u) = fill!(u, 0.0)
 
+    RealT = eltype(grid.xc)
     ub, fb = zeros(RealT, nvar), zeros(RealT, nvar)
 
     # For Dirichlet bc, use upwind flux at faces by assigning both physical

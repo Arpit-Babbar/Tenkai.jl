@@ -477,6 +477,7 @@ end
 
 function setup_limiter_tvb(eq::AbstractEquations{1}; tvbM = 0.0, beta = 1.0)
     cache_size = 13
+    RealT = typeof(tvbM)
     cache = SVector{cache_size}([MArray{Tuple{nvariables(eq), 1}, RealT}(undef)
                                  for _ in Base.OneTo(cache_size)])
     limiter = (; name = "tvb", tvbM = tvbM, beta, cache)
@@ -2203,6 +2204,8 @@ function Blend(eq::AbstractEquations{1}, op, grid,
     @unpack degree, xg = op
     @unpack limiter = scheme
 
+    RealT = eltype(grid.xc)
+
     if limiter.name != "blend"
         parameters = (; positivity_blending = NoPositivityBlending())
         if limiter.name == "tvb"
@@ -2302,14 +2305,13 @@ function Blend(eq::AbstractEquations{1}, op, grid,
         println("Indicator not implemented for degree")
         @assert false
     end
-
-    E0 = E1 * 1e-2 # E < E0 implies smoothness
-    tolE = 1.0e-6  # If denominator < tolE, do purely high order
+    E0 = E1 * convert(RealT, 1e-2) # E < E0 implies smoothness
+    tolE = convert(RealT, 1.0e-6)  # If denominator < tolE, do purely high order
     E, alpha = zeros(RealT, nx),
                OffsetArray(zeros(RealT, nx + 2), OffsetArrays.Origin(0))
     alpha0 = copy(alpha)
-    a0 = 1.0 / 3.0
-    a1 = 1.0 - 2.0 * a0              # smoothing coefficients
+    a0 = convert(RealT, 1.0 / 3.0)
+    a1 = 1 - 2 * a0              # smoothing coefficients
     idata = zeros(RealT, nx + 1)                          # t, alpha[1:nx]
     lamx = OffsetArray(zeros(RealT, nx + 2),
                        OffsetArrays.Origin(0))   # alpha[i] * dt/dx[i]
@@ -2340,7 +2342,7 @@ function Blend(eq::AbstractEquations{1}, op, grid,
     @unpack blend_cell_residual!, blend_face_residual! = blend_type
     @unpack conservative2recon!, recon2conservative! = reconstruction_variables
 
-    beta_muscl = 1e20 # unused dummy
+    beta_muscl = convert(RealT, 1e20) # unused dummy
     Blend1D(alpha, alpha0, space_time_alpha, time_levels_anim, grid.xc, lamx,
             ue, xxf, xe, ufl, ufr, fl, fr, fn, unph, resl, fn_low, amax,
             parameters, E1, E0,
