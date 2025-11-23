@@ -244,21 +244,28 @@ end
 # Constructor
 function Parameters(grid_size, cfl, bounds, save_iter_interval,
                     save_time_interval, compute_error_interval;
-                    animate = false, cfl_safety_factor = 0.98,
+                    animate = false, cfl_safety_factor = nothing,
                     time_scheme = "by degree",
                     saveto = "none",
                     cfl_style = "optimal",
-                    eps = 1e-12)
-    @assert (cfl>=0.0) "cfl must be >= 0.0"
+                    eps = nothing)
+    # Infer RealT from cfl argument
+    RealT = typeof(cfl)
+    
+    # Set defaults with correct type
+    cfl_safety_factor_val = cfl_safety_factor === nothing ? convert(RealT, 0.98) : cfl_safety_factor
+    eps_val = eps === nothing ? convert(RealT, 1e-12) : eps
+    
+    @assert (cfl >= zero(RealT)) "cfl must be >= 0.0"
     @assert (save_iter_interval>=0) "save_iter_interval must be >= 0"
-    @assert (save_time_interval>=0.0) "save_time_interval must be >= 0.0"
+    @assert (save_time_interval >= zero(RealT)) "save_time_interval must be >= 0.0"
     @assert (!(save_iter_interval > 0 &&
-               save_time_interval > 0.0)) "Both save_(iter,time)_interval > 0"
+               save_time_interval > zero(RealT))) "Both save_(iter,time)_interval > 0"
     @assert cfl_style in ["lw", "optimal"]
 
     Parameters(grid_size, cfl, bounds, save_iter_interval,
                save_time_interval, compute_error_interval, animate,
-               saveto, time_scheme, cfl_safety_factor, cfl_style, eps)
+               saveto, time_scheme, cfl_safety_factor_val, cfl_style, eps_val)
 end
 
 #------------------------------------------------------------------------------
@@ -348,37 +355,39 @@ end
 end
 
 function newton_step(func, x)
-    d = func(Dual(x, 1.0))
+    d = func(Dual(x, one(x)))
     # VERY INEFFICIENT TO BE COMPUTING THE STEP MULTIPLE TIMES
-    stepsize = d.value / (d.partials[1] + 1e-16)
-    while x - stepsize < 0.0 || x - stepsize > 1.0
-        stepsize *= 0.5
+    stepsize = d.value / (d.partials[1] + oftype(x, 1e-16))
+    while x - stepsize < zero(x) || x - stepsize > one(x)
+        stepsize *= oftype(stepsize, 0.5)
     end
     return x - stepsize
 end
 
-function newton_solver_scalar(func, y0, tol = 1e-14, maxiters = 1e3)
+function newton_solver_scalar(func, y0, tol = nothing, maxiters = 1e3)
+    tol_val = tol === nothing ? oftype(y0, 1e-14) : tol
     error = func(y0)
     iter = 0
     y = y0
-    while abs(error) > tol && iter < maxiters
+    while abs(error) > tol_val && iter < maxiters
         y = newton_step(func, y)
         error = func(y)
         iter += 1
     end
 
-    if error > 100 * tol
+    if error > oftype(error, 100) * tol_val
         @warn "Newton solver did not converge: error = $error, iter = $iter"
     end
     return y
 end
 
-function newton_solver_tenkai(func, y0, tol = 1e-14, maxiters = 1e3)
+function newton_solver_tenkai(func, y0, tol = nothing, maxiters = 1e3)
+    tol_val = tol === nothing ? oftype(y0, 1e-14) : tol
     p = nothing # The func doesn't have any parameters
     f = (x, p) -> func(x)
     prob = NonlinearProblem{false}(f, y0, p)
-    sol = SimpleNonlinearSolve.solve(prob, SimpleNewtonRaphson(), abstol = tol,
-                                     reltol = tol, verbose = true,
+    sol = SimpleNonlinearSolve.solve(prob, SimpleNewtonRaphson(), abstol = tol_val,
+                                     reltol = tol_val, verbose = true,
                                      maxiters = maxiters)
     return sol.u
 end
@@ -873,15 +882,15 @@ function limit_variable_slope(eq, variable, slope, u_star_ll, u_star_rr, ue, xl,
     # By Jensen's inequality, we can find theta's directly for the primitives
     var_star_ll, var_star_rr = variable(eq, u_star_ll), variable(eq, u_star_rr)
     var_low = variable(eq, ue)
-    threshold = 0.1 * var_low
-    eps = 1e-10
+    threshold = oftype(var_low, 0.1) * var_low
+    eps = oftype(var_low, 1e-10)
     if var_star_ll < eps || var_star_rr < eps
-        ratio_ll = abs(threshold - var_low) / (abs(var_star_ll - var_low) + 1e-13)
-        ratio_rr = abs(threshold - var_low) / (abs(var_star_rr - var_low) + 1e-13)
-        theta = min(ratio_ll, ratio_rr, 1.0)
+        ratio_ll = abs(threshold - var_low) / (abs(var_star_ll - var_low) + oftype(var_low, 1e-13))
+        ratio_rr = abs(threshold - var_low) / (abs(var_star_rr - var_low) + oftype(var_low, 1e-13))
+        theta = min(ratio_ll, ratio_rr, one(var_low))
         slope *= theta
-        u_star_ll = ue + 2.0 * xl * slope
-        u_star_rr = ue + 2.0 * xr * slope
+        u_star_ll = ue + oftype(xl, 2) * xl * slope
+        u_star_rr = ue + oftype(xr, 2) * xr * slope
     end
     return slope, u_star_ll, u_star_rr
 end

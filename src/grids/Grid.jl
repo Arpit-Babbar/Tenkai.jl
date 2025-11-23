@@ -31,6 +31,7 @@ function make_cartesian_grid(problem, size::Int64)
     xmin, xmax = domain
     nx = size
     dx1 = (xmax - xmin) / nx
+    RealT = typeof(dx1)
     xc = collect(LinRange(xmin + oftype(dx1, 0.5) * dx1, xmax - oftype(dx1, 0.5) * dx1, nx))
     @printf("   Grid size = %d \n", nx)
     @printf("   xmin,xmax = %e, %e\n", xmin, xmax)
@@ -48,6 +49,7 @@ function make_cartesian_grid(problem, size::Vector{Int64})
     nx, ny = size
     dx1 = (xmax - xmin) / nx
     dy1 = (ymax - ymin) / ny
+    RealT = typeof(dx1)
     xc = collect(LinRange(xmin + oftype(dx1, 0.5) * dx1, xmax - oftype(dx1, 0.5) * dx1, nx))
     yc = collect(LinRange(ymin + oftype(dy1, 0.5) * dy1, ymax - oftype(dy1, 0.5) * dy1, ny))
     @printf("   Grid size = %d x %d\n", nx, ny)
