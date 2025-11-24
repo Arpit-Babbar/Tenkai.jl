@@ -37,12 +37,12 @@ Tenkai.solver2enum(solver::LWADSolver) = Tenkai.ssfr # solver type enum
 #------------------------------------------------------------------------------
 # Methods to be defined in LWFR1D, LWFR2D
 #------------------------------------------------------------------------------
-compute_cell_residual_1!() = nothing
-compute_cell_residual_2!() = nothing
-compute_cell_residual_3!() = nothing
-compute_cell_residual_4!() = nothing
-compute_cell_residual_5!() = nothing
-update_ghost_values_lwfr!() = nothing
+function compute_cell_residual_1! end
+function compute_cell_residual_2! end
+function compute_cell_residual_3! end
+function compute_cell_residual_4! end
+function compute_cell_residual_5! end
+function update_ghost_values_lwfr! end
 (import Tenkai: eval_bflux1!, eval_bflux2!, eval_bflux3!, eval_bflux4!,
                 extrap_bflux!, setup_arrays_lwfr)
 # eval_bflux1!() = nothing
