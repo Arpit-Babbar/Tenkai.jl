@@ -18,7 +18,7 @@ using MuladdMacro
 
 import Tenkai.EqTenMoment2D
 
-import Tenkai.EqTenMoment2D: varnames
+import Tenkai.EqTenMoment2D: varnames, det_constraint, trace_constraint
 
 import Tenkai: flux, prim2con, prim2con!, con2prim, con2prim!,
                eigmatrix,
@@ -77,6 +77,25 @@ end
 @inline function waterheight(::ShearShallowWater2D, u::AbstractArray)
     ρ = u[1]
     return ρ
+end
+
+function det_constraint(eq::ShearShallowWater2D, u)
+    return EqTenMoment2D.det_constraint(eq.ten_moment_problem, u)
+end
+
+function trace_constraint(eq::ShearShallowWater2D, u)
+    return EqTenMoment2D.trace_constraint(eq.ten_moment_problem, u)
+end
+
+@inbounds @inline function rho_p_indicator!(un, eq::ShearShallowWater2D)
+    nd_p2 = size(un, 2) # nd + 2
+    for iy in 1:nd_p2, ix in 1:nd_p2 # loop over dofs and faces
+        u_node = get_node_vars(un, eq, ix, iy)
+        det_p = EqTenMoment2D.det_constraint(eq.ten_moment_problem, u_node)
+        un[1, ix, iy] *= det_p # ρ * p
+    end
+    n_ind_var = 1
+    return n_ind_var
 end
 
 # function converting primitive variables to PDE variables
