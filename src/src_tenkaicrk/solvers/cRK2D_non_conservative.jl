@@ -717,9 +717,8 @@ end
 #-------------------------------------------------------------------------------
 # Cell residual functions
 #-------------------------------------------------------------------------------
-function flux_der!(volume_integral, r1, u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, u_in,
-                   op,
-                   local_grid, eq::AbstractEquations)
+function flux_der!(volume_integral, r1, u_tuples_out, F_G_U_S, A_rk_tuple,
+                   b_rk_coeff, u_in, op, local_grid, eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     F, G, U, S = F_G_U_S
     xc, yc, dx, dy, lamx, lamy, dt = local_grid
@@ -753,9 +752,8 @@ function flux_der!(volume_integral, r1, u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_
 end
 
 function flux_der!(volume_integral::MyVolumeIntegralFluxDifferencing,
-                   r1,
-                   u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, u_in, op,
-                   local_grid, eq::AbstractEquations)
+                   r1, u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, u_in, op,
+                   local_grid, eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     b = b_rk_coeff # b is the coefficient for the Runge-Kutta method
     # @assert false
@@ -816,8 +814,7 @@ function flux_der!(volume_integral::MyVolumeIntegralFluxDifferencing,
 end
 
 function noncons_flux_der!(volume_integral, u_tuples_out, res, A_rk_tuple, b_rk_coeff, u_in,
-                           op,
-                           local_grid, eq::AbstractEquations)
+                           op, local_grid, eq::AbstractNonConservativeEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     xc, yc, dx, dy, lamx, lamy, t, dt = local_grid
     nd = length(xg)
@@ -857,8 +854,7 @@ end
 
 function noncons_flux_der!(volume_integral::MyVolumeIntegralFluxDifferencing,
                            u_tuples_out, res, A_rk_tuple, b_rk_coeff, u_in,
-                           op,
-                           local_grid, eq::AbstractEquations)
+                           op, local_grid, eq::AbstractNonConservativeEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     xc, yc, dx, dy, lamx, lamy, t, dt = local_grid
     @unpack flux_non_conservative = volume_integral
@@ -900,7 +896,7 @@ function noncons_flux_der!(volume_integral::MyVolumeIntegralFluxDifferencing,
 end
 
 function source_term_explicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_rk_coeff,
-                               u_in, op, local_grid, source_terms, eq::AbstractEquations)
+                               u_in, op, local_grid, source_terms, eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     xc, yc, dx, dy, lamx, lamy, t, dt = local_grid
     nd = length(xg)
@@ -925,7 +921,7 @@ end
 
 function source_term_implicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_rk_coeff,
                                u_in, op, local_grid, problem, scheme, implicit_solver,
-                               source_terms, aux, eq::AbstractEquations)
+                               source_terms, aux, eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     xc, yc, dx, dy, lamx, lamy, t, dt = local_grid
     nd = length(xg)
@@ -949,9 +945,8 @@ function source_term_implicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_
     end
 end
 
-function F_G_S_to_res_Ub!(volume_integral,
-                          r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
-                          eq::AbstractEquations)
+function F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
+                          eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     F, G, U, S = F_G_U_S
     xc, yc, dx, dy, lamx, lamy, t, dt = local_grid
@@ -989,9 +984,9 @@ function F_G_S_to_res_Ub!(volume_integral,
     end
 end
 
-function F_G_S_to_res_Ub!(volume_integral::MyVolumeIntegralFluxDifferencing,
+function F_U_S_to_res_Ub!(volume_integral::MyVolumeIntegralFluxDifferencing,
                           r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
-                          eq::AbstractEquations)
+                          eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, bV, Vl, Vr = op
     F, G, U, S = F_G_U_S
     xc, yc, dx, dy, lamx, lamy, t, dt = local_grid
@@ -1031,8 +1026,7 @@ function F_G_S_to_res_Ub!(volume_integral::MyVolumeIntegralFluxDifferencing,
     end
 end
 
-function Bb_to_res!(eq::AbstractNonConservativeEquations{2}, local_grid, op,
-                    Ub, res)
+function Bb_to_res!(eq::AbstractNonConservativeEquations{2}, local_grid, op, Ub, res)
     @unpack bl, br, xg, wg, degree = op
     nd = degree + 1
 

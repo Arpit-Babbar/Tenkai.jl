@@ -94,6 +94,140 @@ function compute_non_cons_terms(ul, ur, Ul, Ur, x, t,
     return Bul, Bur
 end
 
+function flux_der!(volume_integral, r1, u_tuples_out, F_U_S, A_rk_tuple,
+                   b_rk_coeff, u_in, op, local_grid, eq::AbstractEquations{1})
+    @unpack xg, wg, Dm, D1, Vl, Vr = op
+    F, U, S = F_U_S
+    xc, dx, lamx, t, dt = local_grid
+    nd = length(xg)
+    # Solution points
+    for i in 1:nd
+        x = xc - 0.5 * dx + xg[i] * dx
+        u_node = get_node_vars(u_in, eq, i)
+        flux1 = flux(x, u_node, eq)
+
+        # TOTHINK - Should the `integral_contribution` approach be tried here?
+        for i_u in eachindex(u_tuples_out)
+            u = u_tuples_out[i_u]
+            a = -A_rk_tuple[i_u]
+            for ii in Base.OneTo(nd)
+                # ut              += -lam * D * f for each variable
+                # i.e.,  ut[ii] += -lam * Dm[ii,i] f[i] (sum over i)
+                multiply_add_to_node_vars!(u, a * lamx * Dm[ii, i], flux1, eq, ii)
+            end
+        end
+        multiply_add_to_node_vars!(F, b_rk_coeff, flux1, eq, i)
+        multiply_add_to_node_vars!(U, b_rk_coeff, u_node, eq, i)
+    end
+end
+
+function noncons_flux_der!(volume_integral, u_tuples_out, res, A_rk_tuple, b_rk_coeff, u_in,
+                           op, local_grid, eq::AbstractNonConservativeEquations{1})
+    @unpack xg, wg, Dm, D1, Vl, Vr = op
+    xc, dx, lamx, t, dt = local_grid
+    nd = length(xg)
+    # Solution points
+    # Compute the contribution of non-conservative equation (u_x, u_y)
+    for i in Base.OneTo(nd)
+        x_ = xc - 0.5 * dx + xg[i] * dx
+        u_node = get_node_vars(u_in, eq, i)
+
+        integral_contribution = zero(u_node)
+        for ii in Base.OneTo(nd) # Computes derivative in reference coordinates
+            # TODO - Replace with multiply_non_conservative_node_vars!
+            # and then you won't need the `eq_nc` struct.
+            u_node_ii = get_node_vars(u_in, eq, ii)
+            u_non_cons_ii = calc_non_cons_gradient(u_node_ii, x_, t, eq)
+            noncons_flux1 = calc_non_cons_Bu(u_node, u_non_cons_ii, x_, t, eq)
+            integral_contribution = (integral_contribution +
+                                     lamx * Dm[i, ii] * noncons_flux1)
+        end
+
+        for i_u in eachindex(u_tuples_out)
+            u = u_tuples_out[i_u]
+            multiply_add_to_node_vars!(u, -A_rk_tuple[i_u], integral_contribution, eq, i)
+        end
+        multiply_add_to_node_vars!(res, b_rk_coeff, integral_contribution, eq, i)
+    end
+end
+
+function source_term_explicit!(u_tuples_out, F_U_S, A_rk_tuple, b_rk_coeff, c_rk_coeff,
+                               u_in, op, local_grid, source_terms, eq::AbstractEquations{1})
+    @unpack xg, wg, Dm, D1, Vl, Vr = op
+    xc, dx, lamx, t, dt = local_grid
+    nd = length(xg)
+    _, _, S = F_U_S
+    # Solution points
+    # Compute the contribution of non-conservative equation (u_x, u_y)
+    for i in 1:nd
+        x_ = xc - 0.5 * dx + xg[i] * dx
+        X = x_
+        u_node = get_node_vars(u_in, eq, i)
+
+        # Source terms
+        s_node = calc_source(u_node, X, t + c_rk_coeff * dt, source_terms, eq)
+        for i_u in eachindex(u_tuples_out)
+            multiply_add_to_node_vars!(u_tuples_out[i_u], A_rk_tuple[i_u] * dt, s_node, eq,
+                                       i)
+        end
+        multiply_add_to_node_vars!(S, b_rk_coeff, s_node, eq, i)
+    end
+end
+
+function source_term_implicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_rk_coeff,
+                               u_in, op, local_grid, problem, scheme, implicit_solver,
+                               source_terms, aux, eq::AbstractEquations{1})
+    @unpack xg, wg, Dm, D1, Vl, Vr = op
+    xc, dx, lamx, t, dt = local_grid
+    nd = length(xg)
+    _, _, _, S = F_G_U_S
+    for i in 1:nd
+        x_ = xc - 0.5 * dx + xg[i] * dx
+        X = SVector(x_)
+        # Source terms
+        lhs = get_node_vars(u_tuples_out[1], eq, i) # lhs in the implicit source solver
+        # TODO - Improve get_cache_node_vars to make it work here
+        # aux_node = get_cache_node_vars(aux, u_in, problem, scheme, eq, i, j)
+        u_node = get_node_vars(u_in, eq, i)
+        u_node_implicit, s_node = implicit_source_solve(lhs, eq, X, t + c_rk_coeff * dt,
+                                                        A_rk_tuple[1] * dt,
+                                                        source_terms,
+                                                        u_node, implicit_solver)
+        for i_u in eachindex(u_tuples_out)
+            multiply_add_to_node_vars!(u_tuples_out[i_u], A_rk_tuple[i_u] * dt, s_node, eq,
+                                       i)
+        end
+        multiply_add_to_node_vars!(S, b_rk_coeff, s_node, eq, i)
+    end
+end
+
+function F_U_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_U_S, op, local_grid, scheme,
+                          eq::AbstractEquations{1})
+    @unpack xg, wg, Dm, D1, Vl, Vr = op
+    F, U, S = F_U_S
+    xc, dx, lamx, t, dt = local_grid
+    nd = length(xg)
+    # Solution points
+    for i in Base.OneTo(nd)
+        F_node = get_node_vars(F, eq, i)
+        for ii in Base.OneTo(nd)
+            # res              += -lam * D * F for each variable
+            # i.e.,  res[ii,j] += -lam * Dm[ii,i] F[i,j] (sum over i)
+            multiply_add_to_node_vars!(r1, lamx * D1[ii, i], F_node, eq, ii)
+        end
+
+        U_node = scheme.dissipation(u1_, U, eq, i)
+
+        # Ub = UT * V
+        # Ub += ∑_i U[i] * V[i] = ∑_i U[i] * V[i]
+        multiply_add_to_node_vars!(Ub_, Vl[i], U_node, eq, 1)
+        multiply_add_to_node_vars!(Ub_, Vr[i], U_node, eq, 2)
+
+        S_node = get_node_vars(S, eq, i)
+        multiply_add_to_node_vars!(r1, -dt, S_node, eq, i)
+    end
+end
+
 #-------------------------------------------------------------------------------
 # Add numerical flux to residual
 #-------------------------------------------------------------------------------
@@ -202,6 +336,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations{1}, gri
     @unpack blend = aux
     @unpack bl, br = op
     get_dissipation_node_vars = scheme.dissipation
+    @unpack solver = scheme
+    @unpack volume_integral = solver
 
     # A struct containing information about the non-conservative part of the equation
     eq_nc = non_conservative_equation(eq)
@@ -213,112 +349,55 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations{1}, gri
     u_non_cons_x = @view u_non_cons_x_[1:1, 1:nd]
     u2_non_cons_x = @view u2_non_cons_x_[1:1, 1:nd]
 
+    tA_rk = ((0.0, 0.0),
+             (0.5, MyZero()))
+    tb_rk = (0.0, 1.0)
+    tc_rk = (0.0, 0.5)
+
     refresh!.((res, Ub, Fb, ub_N, Bb)) # Reset previously used variables to zero
 
     @inbounds for cell in Base.OneTo(nx) # Loop over cells
         dx = grid.dx[cell]
         xc = grid.xc[cell]
         lamx = dt / dx
+        local_grid = (xc, dx, lamx, t, dt)
         u2 .= @view u1[:, :, cell]
         refresh!.((u_non_cons_x, u2_non_cons_x))
-
-        # Solution points
-        for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
-            u_node = get_node_vars(u1, eq, i, cell)
-            # Compute flux at all solution points
-            flux1 = flux(x_, u_node, eq)
-
-            for ii in Base.OneTo(nd) # ut = -lamx * DmT * f
-                multiply_add_to_node_vars!(u2, -0.5 * lamx * Dm[ii, i], flux1, eq, ii)
-            end
-        end
-
-        # Compute the contribution of non-conservative equation
-        for ix in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[ix] * dx
-            u_node = get_node_vars(u1, eq, ix, cell)
-            # Compute flux at all solution points
-            u_non_cons = calc_non_cons_gradient(u_node, x_, t, eq) # u_non_cons = SVector(u_node[1])
-            for iix in Base.OneTo(nd) # Computes derivative in reference coordinates
-                multiply_add_to_node_vars!(u_non_cons_x, Dm[iix, ix], u_non_cons,
-                                           eq_nc, iix)
-            end
-        end
-
-        # Add Bu_x and source terms contribution to u2
-        for i in 1:nd
-            x_ = xc - 0.5 * dx + xg[i] * dx
-            # cache_node = get_cache_node(cache, i, cell)
-            u_node = get_node_vars(u1, eq, i, cell)
-            u_nc_x_node = get_node_vars(u_non_cons_x, eq_nc, i)
-            Bu_x = calc_non_cons_Bu(u_node, u_nc_x_node, x_, t, eq)
-            multiply_add_to_node_vars!(u2, -0.5 * lamx, Bu_x, eq, i)
-            u_node = get_node_vars(u1, eq, i, cell)
-            s_node = calc_source(u_node, x_, t, source_terms, eq)
-            # s_node = calc_source(u_node, cache_node, x_, t, source_terms, eq)
-            multiply_add_to_node_vars!(u2, 0.5 * dt, s_node, eq, i)
-        end
-
-        # Compute the contribution of non-conservative equation
-        for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
-            u2_node = get_node_vars(u2, eq, i)
-            # Compute flux at all solution points
-            u2_non_cons = calc_non_cons_gradient(u2_node, x_, t, eq)
-            for ii in Base.OneTo(nd) # Computes derivative in reference coordinates
-                multiply_add_to_node_vars!(u2_non_cons_x, Dm[ii, i], u2_non_cons,
-                                           eq_nc, ii)
-            end
-        end
-
-        for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
-            u2_node = get_node_vars(u2, eq, i)
-
-            flux1 = flux(x_, u2_node, eq)
-            B_node = calc_non_cons_B(u2_node, x_, t, eq)
-
-            multiply_add_to_node_vars!(Bb, Vl[i], B_node, eq, eq_nc, 1, cell)
-            multiply_add_to_node_vars!(Bb, Vr[i], B_node, eq, eq_nc, 2, cell)
-
-            u2_non_cons_x_node = get_node_vars(u2_non_cons_x, eq_nc, i)
-            Bu2_x = calc_non_cons_Bu(u2_node, u2_non_cons_x_node, x_, t, eq)
-            multiply_add_to_node_vars!(res, lamx, Bu2_x, eq, i, cell)
-
-            set_node_vars!(F, flux1, eq, i)
-            set_node_vars!(U, u2_node, eq, i)
-            F_node = get_node_vars(F, eq, i)
-            for ix in Base.OneTo(nd)
-                multiply_add_to_node_vars!(res, lamx * D1[ix, i], F_node, eq, ix, cell)
-            end
-
-            s2_node = calc_source(u2_node, x_, t + 0.5 * dt, source_terms, eq)
-
-            S_node = s2_node # S array is not needed in this degree N = 2 case
-
-            multiply_add_to_node_vars!(res, -dt, S_node, eq, i, cell)
-        end
-        u = @view u1[:, :, cell]
-        r = @view res[:, :, cell]
-
-        # Interpolate to faces
-        for i in Base.OneTo(nd)
-            U_node = get_dissipation_node_vars(u, U, eq, i)
-            u2_node = get_node_vars(u2, eq, i)
-            multiply_add_to_node_vars!(Ub, Vl[i], U_node, eq, 1, cell)
-            multiply_add_to_node_vars!(Ub, Vr[i], U_node, eq, 2, cell)
-
-            multiply_add_to_node_vars!(ub_N, Vl[i], u2_node, eq, 1, cell)
-            multiply_add_to_node_vars!(ub_N, Vr[i], u2_node, eq, 2, cell)
-        end
-
-        local_grid = (xc, dx, lamx, t, dt)
+        u1_ = @view u1[:, :, cell]
+        r1 = @view res[:, :, cell]
         Ub_ = @view Ub[:, :, cell]
-        Bb_to_res!(eq, local_grid, op, Ub_, r)
+
+        F_U_S = (F, U, S)
+        refresh!.(F_U_S)
+
+        flux_der!(volume_integral, r1, (u2,), F_U_S, (tA_rk[2][1],), tb_rk[1], u1_,
+                  op, local_grid, eq)
+
+        noncons_flux_der!(volume_integral, (u2,), r1, (tA_rk[2][1],), tb_rk[1], u1_, op,
+                          local_grid, eq)
+
+        source_term_explicit!((u2,), F_U_S, (tA_rk[2][1],), tb_rk[1], tc_rk[1], u1_,
+                              op,
+                              local_grid,
+                              source_terms, eq)
+
+        noncons_flux_der!(volume_integral, (), r1, (tA_rk[2][2],), tb_rk[2], u2, op,
+                          local_grid, eq)
+
+        flux_der!(volume_integral, r1, (), F_U_S, (tA_rk[2][2],), tb_rk[2], u2, op,
+                  local_grid, eq)
+
+        source_term_explicit!((), F_U_S, (tA_rk[2][2],), tb_rk[2], tc_rk[2], u2, op,
+                              local_grid,
+                              source_terms, eq)
+
+        F_U_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_U_S, op, local_grid, scheme,
+                         eq)
+
+        Bb_to_res!(eq, local_grid, op, Ub_, r1)
 
         blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
-                                   grid.xf[cell], op, u1, u, cache.ua, f, r)
+                                   grid.xf[cell], op, u1, u1_, cache.ua, f, r1)
 
         if bflux_ind == extrapolate
             for i in Base.OneTo(nd)
