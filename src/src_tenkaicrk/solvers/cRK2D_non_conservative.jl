@@ -72,6 +72,8 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
     Bb = OffsetArray(zeros(nvar, nc_var, nd, 4, nx + 2, ny + 2),
                      OffsetArrays.Origin(1, 1, 1, 1, 0, 0))
     Fb = gArray(nvar, nd, 4, nx, ny)
+    # TODO - Can Fnum be equal to Fb?
+    Fnum = gArray(nvar, nd, 4, nx, ny) # Numerical fluxes at faces of each element
     Ub = gArray(nvar, nd, 4, nx, ny)
     u1_b = copy(Ub)
     ub_N = gArray(nvar, nd, 4, nx, ny) # The final stage of cRK before communication
@@ -126,7 +128,8 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
     ghost_cache = alloc_for_threads(Marr, 2)
 
     # KLUDGE - Rename this to LWFR cache
-    cache = (; u1, ua, ub_N, res, Fb, Ub, Bb, u1_b, eval_data, cell_arrays, ghost_cache)
+    cache = (; u1, ua, ub_N, res, Fb, Fnum, Ub, Bb, u1_b, eval_data, cell_arrays,
+             ghost_cache)
     return cache
 end
 
@@ -197,11 +200,11 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractNonConservativeEquation
     u = @view u1[:, :, :, el_x, el_y]
     r = @view res[:, :, :, el_x, el_y]
 
-    if alpha < 1e-12
-        store_low_flux!(u, el_x, el_y, xf, yf, dx, dy, op, blend, eq,
-                        scaling_factor)
-        return nothing
-    end
+    # if alpha < 1e-12
+    #     store_low_flux!(u, el_x, el_y, xf, yf, dx, dy, op, blend, eq,
+    #                     scaling_factor)
+    #     return nothing
+    # end
 
     # limit the higher order part
     lmul!(1.0 - alpha, r)
@@ -603,7 +606,7 @@ function compute_face_residual!(eq::AbstractNonConservativeEquations{2}, grid, o
     @unpack numerical_flux, solver = scheme
     @unpack blend = aux
     @unpack blend_face_residual_x!, blend_face_residual_y!, get_element_alpha = blend.subroutines
-    @unpack u1_b, Bb = cache
+    @unpack u1_b, Bb, Fnum = cache
 
     # Vertical faces, x flux
     @threaded for element in CartesianIndices((1:(nx + 1), 1:ny)) # Loop over cells
@@ -640,8 +643,8 @@ function compute_face_residual!(eq::AbstractNonConservativeEquations{2}, grid, o
                                                                    res,
                                                                    scaling_factor)
 
-            set_node_vars!(Fb, Fn_l_limited, eq, jy, 2, el_x - 1, el_y)
-            set_node_vars!(Fb, Fn_r_limited, eq, jy, 1, el_x, el_y)
+            set_node_vars!(Fnum, Fn_l_limited, eq, jy, 2, el_x - 1, el_y)
+            set_node_vars!(Fnum, Fn_r_limited, eq, jy, 1, el_x, el_y)
         end
     end
 
@@ -677,8 +680,8 @@ function compute_face_residual!(eq::AbstractNonConservativeEquations{2}, grid, o
                                                                    res,
                                                                    scaling_factor)
 
-            set_node_vars!(Fb, Fn_l_limited, eq, ix, 4, el_x, el_y - 1)
-            set_node_vars!(Fb, Fn_r_limited, eq, ix, 3, el_x, el_y)
+            set_node_vars!(Fnum, Fn_l_limited, eq, ix, 4, el_x, el_y - 1)
+            set_node_vars!(Fnum, Fn_r_limited, eq, ix, 3, el_x, el_y)
         end
     end
 
@@ -690,10 +693,10 @@ function compute_face_residual!(eq::AbstractNonConservativeEquations{2}, grid, o
 
             # For higher order residual
             for jy in Base.OneTo(nd)
-                Fl = get_node_vars(Fb, eq, jy, 1, el_x, el_y)
-                Fr = get_node_vars(Fb, eq, jy, 2, el_x, el_y)
-                Fd = get_node_vars(Fb, eq, ix, 3, el_x, el_y)
-                Fu = get_node_vars(Fb, eq, ix, 4, el_x, el_y)
+                Fl = get_node_vars(Fnum, eq, jy, 1, el_x, el_y)
+                Fr = get_node_vars(Fnum, eq, jy, 2, el_x, el_y)
+                Fd = get_node_vars(Fnum, eq, ix, 3, el_x, el_y)
+                Fu = get_node_vars(Fnum, eq, ix, 4, el_x, el_y)
                 for n in eachvariable(eq)
                     res[n, ix, jy, el_x, el_y] += one_m_alp * dt / dy[el_y] *
                                                   br[jy] * Fu[n]
@@ -708,7 +711,7 @@ function compute_face_residual!(eq::AbstractNonConservativeEquations{2}, grid, o
         end
     end
 
-    add_low_order_face_residual!(get_element_alpha, eq, grid, op, aux, dt, Fb, res)
+    add_low_order_face_residual!(get_element_alpha, eq, grid, op, aux, dt, Fnum, res)
 
     return nothing
     end # timer
@@ -1292,8 +1295,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
 
         # Stage 1
         flux_der!(volume_integral, r1, (u2,), F_G_U_S, (tA_rk[2][1],), tb_rk[1], u1_,
-                  op,
-                  local_grid, eq)
+                  op, local_grid, eq)
         noncons_flux_der!(volume_integral, (u2,), r1, (tA_rk[2][1],), tb_rk[1], u1_, op,
                           local_grid, eq)
         source_term_explicit!((u2,), F_G_U_S, (tA_rk[2][1],), tb_rk[1], tc_rk[1], u1_,

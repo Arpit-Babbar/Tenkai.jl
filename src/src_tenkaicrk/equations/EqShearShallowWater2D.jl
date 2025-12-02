@@ -18,6 +18,8 @@ using MuladdMacro
 
 import Tenkai.EqTenMoment2D
 
+import Tenkai.TenkaicRK: test_var
+
 import Tenkai.EqTenMoment2D: varnames, det_constraint, trace_constraint
 
 import Tenkai: flux, prim2con, prim2con!, con2prim, con2prim!,
@@ -27,7 +29,7 @@ import Tenkai: flux, prim2con, prim2con!, con2prim, con2prim!,
                apply_bound_limiter!, initialize_plot,
                write_soln!, compute_time_step, post_process_soln,
                correct_variable_bound_limiter!,
-               update_ghost_values_rkfr!
+               update_ghost_values_rkfr!, correct_variable!
 
 (using Tenkai: PlotData, data_dir, get_filename, neumann, minmod,
                get_node_vars,
@@ -218,6 +220,11 @@ function compute_time_step(eq::ShearShallowWater2D, problem, grid, aux, op, cfl,
     end # timer
 end
 
+function test_var(val_min, eq::Union{ShearShallowWater2D},
+                  variable::typeof(det_constraint), el_x, el_y)
+    return nothing # Shear shallow water equations can have negative determinant in low order solution
+end
+
 @inbounds @inline function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::ShearShallowWater2D,
                                    dir)
     λ = max(max_abs_eigen_value(eq, ual, dir), max_abs_eigen_value(eq, uar, dir)) # local wave speed
@@ -254,7 +261,14 @@ end
 
 function Tenkai.apply_bound_limiter!(eq::ShearShallowWater2D, grid, scheme, param, op,
                                      ua, u1, aux)
-    apply_bound_limiter!(eq.ten_moment_problem, grid, scheme, param, op, ua, u1, aux)
+    if scheme.bound_limit == "no"
+        return nothing
+    end
+    correct_variable!(eq, waterheight, op, aux, grid, u1, ua)
+    correct_variable!(eq, trace_constraint, op, aux, grid, u1, ua)
+
+    # No need to check if determant is positive for shear shallow water equations
+    correct_variable!(eq, det_constraint, op, aux, grid, u1, ua, false)
 end
 
 function Tenkai.apply_tvb_limiterβ!(eq::ShearShallowWater2D, problem, scheme, grid,

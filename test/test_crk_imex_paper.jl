@@ -205,6 +205,15 @@ end
         data_name = "ssw_roll_wave_$(solver).txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
     end
+
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_ssw_roll_wave_2.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  solver = cRK44(),
+                  animate = false, final_time = 1.0, nx = 5,
+                  degree = 3, cfl_safety_factor = 0.98)
+    data_name = "ssw_roll_wave2.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
 
 @testset "SSW convergence 1D" begin

@@ -623,6 +623,10 @@ function find_theta_positivity_blending(eq::AbstractEquations{2},
     return theta
 end
 
+function test_var(val_min, eq::AbstractEquations, variable, el_x, el_y)
+    @assert val_min>0.0 "Low order minimum $variable is negative: $val_min in cell ($el_x, $el_y)"
+end
+
 @inbounds function apply_positivity_blending_to_variable!(u1, u1_low,
                                                           eq::AbstractEquations{2},
                                                           grid, op, aux, variable)
@@ -639,7 +643,7 @@ end
         u1_low_ = @view u1_low[:, :, :, el_x, el_y]
 
         val_min = find_val_min(eq, u1_low_, op, variable)
-        @assert val_min>0.0 "Low order minimum $variable is negative: $val_min in cell ($el_x, $el_y)"
+        test_var(val_min, eq, variable, el_x, el_y)
 
         theta = 1.0
 

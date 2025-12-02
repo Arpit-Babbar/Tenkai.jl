@@ -249,13 +249,15 @@ function compute_face_residual!(eq::AbstractNonConservativeEquations{1},
         Bul, Bur = compute_non_cons_terms(uN_l, uN_r, Ul, Ur, x, t,
                                           scheme.solver, eq)
 
-        Fn, blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt, grid,
-                                                   op, problem,
-                                                   scheme, param, Fn, aux, nothing,
-                                                   res, scaling_factor)
-
         Fl = Fn + Bul
         Fr = Fn + Bur
+
+        (Fl, Fr), blend_fac = blend.blend_face_residual!(i, x, u1, ua, eq, t, dt,
+                                                         grid,
+                                                         op, problem,
+                                                         scheme, param, Fl, Fr, aux,
+                                                         nothing,
+                                                         res, scaling_factor)
         for ix in 1:nd
             for n in 1:nvariables(eq)
                 res[n, ix, i - 1] += dt / dx[i - 1] * blend_fac[1] * Fl[n] * br[ix]

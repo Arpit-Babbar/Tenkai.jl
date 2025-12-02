@@ -17,6 +17,11 @@ using Tenkai
 import Tenkai.EqTenMoment1D
 using Tenkai.Basis
 
+import Tenkai.TenkaicRK: test_var
+
+import Tenkai.EqTenMoment1D: rho_p_indicator!, density_constraint, trace_constraint,
+                             det_constraint
+
 import Tenkai: admissibility_tolerance
 
 (import Tenkai: flux, prim2con, prim2con!, con2prim, con2prim!,
@@ -82,6 +87,14 @@ end
     return ρ
 end
 
+@inline function trace_constraint(eq::ShearShallowWater1D, u::AbstractArray)
+    return trace_constraint(eq.ten_moment_problem, u)
+end
+
+@inline function det_constraint(eq::ShearShallowWater1D, u::AbstractArray)
+    return det_constraint(eq.ten_moment_problem, u)
+end
+
 # function converting primitive variables to PDE variables
 function prim2con(eq::ShearShallowWater1D, prim) # primitive, gas constant
     return prim2con(eq.ten_moment_problem, prim)
@@ -139,6 +152,12 @@ function compute_time_step(eq::ShearShallowWater1D, problem, grid, aux, op, cfl,
     return dt
 end
 
+# TODO - Move to shear shallow water equations file
+function test_var(val_min, eq::Union{ShearShallowWater1D},
+                  variable::typeof(det_constraint), el_x, el_y)
+    return nothing # Shear shallow water equations can have negative determinant in low order solution
+end
+
 function max_abs_eigen_value(eq::ShearShallowWater1D, u)
     @unpack gravity = eq
     h = u[1]
@@ -157,6 +176,10 @@ function max_abs_eigen_value(eq::ShearShallowWater1D, ul, ur)
     λ = max(abs(v1l), abs(v1r)) +
         max(sqrt(3.0 * P11l + gravity * hl), sqrt(3.0 * P11r + gravity * hr))
     return λ
+end
+
+@inbounds @inline function rho_p_indicator!(un, eq::ShearShallowWater1D)
+    rho_p_indicator!(un, eq.ten_moment_problem)
 end
 
 @inbounds @inline function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::ShearShallowWater1D,

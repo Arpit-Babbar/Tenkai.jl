@@ -95,8 +95,8 @@ bound_limit = "no"
 bflux = evaluate
 final_time = 36.0
 
-nx = 130
-ny = 50
+nx = 520
+ny = 200
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
@@ -115,15 +115,19 @@ problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution,
                   source_terms = source_terms_ssw_roll_wave)
 # limiter = setup_limiter_none()
-limiter = setup_limiter_blend(blend_type = mh_blend(eq),
-                              # indicating_variables = Eq.rho_p_indicator!,
-                              indicating_variables = Eq.conservative_indicator!,
+limiter = setup_limiter_blend(blend_type = fo_blend(eq),
+                              indicating_variables = Eq.rho_p_indicator!,
+                              #   indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
-                              indicator_model = "gassner"
+                              indicator_model = "gassner",
+                              positivity_blending = PositivityBlending((Eq.waterheight,
+                                                                        Eq.trace_constraint
+                                                                        # Eq.det_constraint
+                                                                        ))
                               # pure_fv = true
                               )
-limiter = setup_limiter_tvb(eq; tvbM = tvbM, beta = 1.0)
-limiter = setup_limiter_none()
+# limiter = setup_limiter_tvb(eq; tvbM = tvbM, beta = 1.0)
+# limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
@@ -148,4 +152,4 @@ gr(size = (600, 600))
 surface(xc, yc, vec(ua))
 
 plot(xc, ua[:, 10])
-Plots.savefig("roll_wave_2d_$(nx)_$(ny).png")
+Plots.savefig("roll_wave_2d_$(nx)_$(ny)_N$degree.png")
