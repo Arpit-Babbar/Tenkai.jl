@@ -387,7 +387,7 @@ function correct_variable!(eq, variable::typeof(det_constraint), op, aux,
         el_x, el_y = element[1], element[2]
         ua_ = get_node_vars(ua, eq, el_x, el_y)
         var_min_avg[] = min(var_min_avg[], variable(eq, ua_))
-        if var_min_avg[] < admissibility_tolerance(eq) || check_lower_bound
+        if var_min_avg[] < admissibility_tolerance(eq) && check_lower_bound
             @show variable
             println("Positivity limiter failed in element ", el_x, " ", el_y,
                     "with centre ", xc[el_x], ", ", yc[el_y])
