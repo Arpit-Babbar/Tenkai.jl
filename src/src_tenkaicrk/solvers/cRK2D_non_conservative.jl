@@ -984,7 +984,7 @@ function F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid
     end
 end
 
-function F_U_S_to_res_Ub!(volume_integral::MyVolumeIntegralFluxDifferencing,
+function F_G_S_to_res_Ub!(volume_integral::MyVolumeIntegralFluxDifferencing,
                           r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                           eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, bV, Vl, Vr = op
