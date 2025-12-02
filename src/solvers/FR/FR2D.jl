@@ -797,6 +797,7 @@ end
 function setup_limiter_tvb(eq::AbstractEquations{2}; tvbM = 0.0, beta = 1.0)
     cache_size = 28
     # Make the particular initializers into functions
+    RealT = typeof(tvbM)
     MArr = MArray{Tuple{nvariables(eq), 1}, RealT}
     cache = alloc_for_threads(MArr, cache_size)
     limiter = (; name = "tvb", tvbM = tvbM, cache, beta = beta)
