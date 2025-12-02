@@ -779,7 +779,8 @@ function Tenkai.initialize_plot(eq::TenMoment1D, op, grid, problem, scheme, time
                    grid = false, showaxis = false, bottom_margin = 0Plots.px)
     p_ua, p_u1 = [plot() for _ in 1:nvar], [plot() for _ in 1:nvar]
     labels = varnames(eq)
-    y = zeros(RealT, nx) # put dummy to fix plotly bug with OffsetArrays
+    plot_type = Float64
+    y = zeros(plot_type, nx) # put dummy to fix plotly bug with OffsetArrays
     for n in 1:nvar
         @views plot!(p_ua[n], xc, y, label = "Approximate",
                      linestyle = :dot, seriestype = :scatter,
@@ -796,8 +797,8 @@ function Tenkai.initialize_plot(eq::TenMoment1D, op, grid, problem, scheme, time
     # Set up p_u1 to contain polynomial approximation as a different curve
     # for each cell
     x = LinRange(xf[1], xf[2], nu)
-    up1 = zeros(RealT, nvar, nd)
-    u = zeros(RealT, nu)
+    up1 = zeros(plot_type, nvar, nd)
+    u = zeros(plot_type, nu)
     for ii in 1:nd
         u_node = get_node_vars(u1, eq, ii, 1)
         up1[:, ii] .= con2prim(eq, u_node)
@@ -851,7 +852,8 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::TenMoment1D, 
     nvar = nvariables(eq)
     @unpack save_time_interval, save_iter_interval, animate = param
     avg_file = open("$avg_filename.txt", "w")
-    up_ = zeros(RealT, nvar)
+    plot_type = Float64
+    up_ = zeros(plot_type, nvar)
     ylims = [[Inf, -Inf] for _ in 1:nvar] # set ylims for plots of all variables
     for i in 1:nx
         ua_node = get_node_vars(ua, eq, i)
@@ -873,10 +875,10 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::TenMoment1D, 
     title!(p_ua[1], "Cell averages plot, $nx cells, t = $t")
     sol_filename = get_filename("output/sol", ndigits, fcount)
     sol_file = open(sol_filename * ".txt", "w")
-    up1 = zeros(RealT, nvar, nd)
+    up1 = zeros(plot_type, nvar, nd)
 
-    u = zeros(RealT, nvar, nu)
-    x = zeros(RealT, nu)
+    u = zeros(plot_type, nvar, nu)
+    x = zeros(plot_type, nu)
     for i in 1:nx
         for ii in 1:nd
             u_node = get_node_vars(u1, eq, ii, i)
