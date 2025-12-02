@@ -324,7 +324,7 @@ macro threaded(expr)
                        if Threads.nthreads() == 1
                            $(expr)
                        else
-                           Threads.@threads $(expr)
+                           Threads.@threads :static $(expr)
                        end
                    end
                end)
@@ -372,7 +372,7 @@ function newton_solver_scalar(func, y0, tol = convert(typeof(y0), 1e-14),
     end
 
     if error > oftype(error, 100) * tol
-        @warn "Newton solver did not converge: error = $error, iter = $iter"
+        @debug "Newton solver did not converge: error = $error, iter = $iter"
     end
     return y
 end
