@@ -2,7 +2,7 @@ import Tenkai: compute_face_residual!, compute_cell_residual_cRK!, get_blended_f
                blend_cell_residual_fo!, blend_face_residual_fo!, blend_flux_only,
                blend_flux_face_residual!, trivial_face_residual
 
-using Tenkai: cRKSolver
+using Tenkai: cRKSolver, True, False
 
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
                       eq::AbstractNonConservativeEquations{1})
