@@ -7,7 +7,7 @@ struct VolumeIntegralWeak{CheapNonConsExtrapolation}
     cheap_noncons_extrapolation::CheapNonConsExtrapolation
 end
 
-function VolumeIntegralWeak(; cheap_noncons_extrapolation = False())
+function VolumeIntegralWeak(; cheap_noncons_extrapolation = True())
     return VolumeIntegralWeak{typeof(cheap_noncons_extrapolation)}(cheap_noncons_extrapolation)
 end
 
