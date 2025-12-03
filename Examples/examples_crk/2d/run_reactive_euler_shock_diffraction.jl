@@ -48,7 +48,7 @@ end
 initial_value = (x, y) -> initial_value_shock_diffraction(equation, x, y)
 exact_solution = (x, y, t) -> initial_value(x, y)
 
-source_terms = (u, x, t, q) -> Eq.source_term_arrhenius(x, u, eq)
+source_term_arrhenius_2d = (u, x, t, q) -> Eq.source_term_arrhenius(x, u, eq)
 
 boundary_value = exact_solution
 
@@ -79,7 +79,7 @@ grid_size = [nx_tuple, ny_tuple]
 domain = [xmin, xmax, ymin, ymax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution,
-                  source_terms = source_terms)
+                  source_terms = source_term_arrhenius_2d)
 limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               indicating_variables = Eq.rho_p_indicator!,
                               reconstruction_variables = conservative_reconstruction,

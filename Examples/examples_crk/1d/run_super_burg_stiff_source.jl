@@ -66,8 +66,6 @@ function source_terms_stiff_burg_non_linear_single_crk(u, x, t, eq)
     source_terms_stiff_burg_non_linear(u, x, t, eq)
 end
 
-source_terms = source_terms_stiff_burg_non_linear
-
 function TenkaicRK.get_cache_node_vars(aux, u1,
                                        problem::Problem{<:Real,
                                                         <:typeof(source_terms_stiff_burg_non_linear)},
@@ -105,7 +103,7 @@ grid_size = nx
 domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value,
                   boundary_condition, final_time, exact_solution,
-                  source_terms = source_terms)
+                  source_terms = source_terms_stiff_burg_non_linear)
 equation = Eq.get_equation()
 limiter = setup_limiter_blend(blend_type = fo_blend_imex(equation),
                               #   indicating_variables = Eq.rho_p_indicator!,

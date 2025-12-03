@@ -32,7 +32,7 @@ end
 
 A, TA = 164180.0, 25.0
 
-source_terms = Eq.SourceTermReactive(A, TA)
+source_terms_reactive_rp1_tough = Eq.SourceTermReactive(A, TA)
 
 initial_value = reactive_rp1
 
@@ -69,7 +69,7 @@ q0 = 25.0
 equation = Eq.get_equation(gamma, q0)
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution,
-                  source_terms = source_terms)
+                  source_terms = source_terms_reactive_rp1_tough)
 MH = mh_blend(equation)
 FO = fo_blend_imex(equation)
 limiter_blend = setup_limiter_blend(blend_type = FO,

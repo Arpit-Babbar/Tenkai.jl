@@ -28,9 +28,9 @@ exact_wave(x, t) = initial_wave(x - t)
 
 Wx(x, t) = -100000.0 * (x - 2.0) * exp(-20 * (x - 2.0)^2)
 
-source_terms = Eq.TenMoment1DSourceTerms(Wx)
-
-source_terms = (u, x, t, equations) -> Eq.ten_moment_source_x(u, x, t, Wx, equations)
+source_terms_tenmom_two_rare_stiff = (u, x, t, equations) -> Eq.ten_moment_source_x(u, x, t,
+                                                                                    Wx,
+                                                                                    equations)
 
 initial_value, exact_solution, boundary_value = initial_wave, exact_wave, dummy_bv
 
@@ -60,7 +60,8 @@ cfl_safety_factor = 0.9 # Source term positivity condition has |∇W| making it 
 grid_size = nx
 domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
-                  final_time, exact_solution, source_terms = source_terms)
+                  final_time, exact_solution,
+                  source_terms = source_terms_tenmom_two_rare_stiff)
 # FO Blending scheme gives good results with degree 4, amax = 0.5
 limiter = setup_limiter_blend(blend_type = fo_blend(eq),
                               indicating_variables = Eq.rho_p_indicator!,

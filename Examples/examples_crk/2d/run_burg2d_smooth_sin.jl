@@ -22,7 +22,6 @@ function burg_smooth_source(u, x_, t, eq)
 
     return SVector(ut + u_ex * (ux + uy))
 end
-source_terms = burg_smooth_source
 boundary_condition = (periodic, periodic, periodic, periodic)
 final_time = 0.1
 

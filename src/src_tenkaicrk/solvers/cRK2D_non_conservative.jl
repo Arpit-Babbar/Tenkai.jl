@@ -22,16 +22,20 @@ function flux_central_non_conservative(u_ll, u_rr, orientation, eq)
     return calc_non_cons_Bu(u_ll, u_rr, x, y, t, orientation, eq)
 end
 
-struct MyVolumeIntegralFluxDifferencing{FluxConservative, FluxNonConservative}
+struct MyVolumeIntegralFluxDifferencing{FluxConservative, FluxNonConservative,
+                                        CheapNonConsExtrapolation}
     degree::Int
     flux_conservative::FluxConservative
     flux_non_conservative::FluxNonConservative
+    cheap_noncons_extrapolation::CheapNonConsExtrapolation
 end
 
 function MyVolumeIntegralFluxDifferencing(degree, flux_conservative,
-                                          flux_non_conservative)
+                                          flux_non_conservative;
+                                          cheap_noncons_extrapolation = True())
     return MyVolumeIntegralFluxDifferencing(degree, flux_conservative,
-                                            flux_non_conservative)
+                                            flux_non_conservative,
+                                            cheap_noncons_extrapolation)
 end
 
 *(a::MyZero, ::Any) = a
