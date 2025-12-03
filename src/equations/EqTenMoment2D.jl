@@ -370,7 +370,8 @@ function Tenkai.apply_bound_limiter!(eq::TenMoment2D, grid, scheme, param, op, u
     return nothing
 end
 
-function correct_variable!(eq, variable::typeof(det_constraint), op, aux,
+function correct_variable!(eq::AbstractEquations{2}, variable::typeof(det_constraint),
+                           op, aux,
                            grid,
                            u1, ua, eps_ = 1e-12, check_lower_bound = true)
     @unpack Vl, Vr = op
@@ -387,7 +388,7 @@ function correct_variable!(eq, variable::typeof(det_constraint), op, aux,
         el_x, el_y = element[1], element[2]
         ua_ = get_node_vars(ua, eq, el_x, el_y)
         var_min_avg[] = min(var_min_avg[], variable(eq, ua_))
-        if var_min_avg[] < admissibility_tolerance(eq) || check_lower_bound
+        if var_min_avg[] < admissibility_tolerance(eq) && check_lower_bound
             @show variable
             println("Positivity limiter failed in element ", el_x, " ", el_y,
                     "with centre ", xc[el_x], ", ", yc[el_y])
