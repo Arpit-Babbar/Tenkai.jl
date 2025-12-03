@@ -3,7 +3,13 @@ abstract type AbstractDissipation end # Don't think it'll be used beyond D-CSX
 
 solver2enum(solver::cRKSolver) = ssfr # solver type enum
 
-struct VolumeIntegralWeak end
+struct VolumeIntegralWeak{CheapNonConsExtrapolation}
+    cheap_noncons_extrapolation::CheapNonConsExtrapolation
+end
+
+function VolumeIntegralWeak(; cheap_noncons_extrapolation = False())
+    return VolumeIntegralWeak{typeof(cheap_noncons_extrapolation)}(cheap_noncons_extrapolation)
+end
 
 struct cRK64{VolumeIntegral} <: cRKSolver
     volume_integral::VolumeIntegral
