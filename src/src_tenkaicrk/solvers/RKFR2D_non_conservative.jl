@@ -146,7 +146,7 @@ function compute_cell_residual_rkfr!(eq::AbstractNonConservativeEquations{2}, gr
 
         local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt)
 
-        Bb_to_res!(eq, local_grid, op, ub_, r1)
+        Bb_to_res_cheap!(eq, local_grid, op, ub_, r1)
 
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid,
                              dx,

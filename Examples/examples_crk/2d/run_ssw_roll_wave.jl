@@ -87,7 +87,7 @@ exact_solution_roll(x, y, t) = initial_condition_roll_wave(x, y)
 exact_solution = exact_solution_roll
 
 degree = 3
-solver = cRK44()
+solver = cRK33()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov

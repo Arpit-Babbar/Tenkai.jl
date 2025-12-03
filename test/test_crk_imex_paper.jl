@@ -11,6 +11,16 @@ overwrite_errors = false
 
 # Reactive Euler 1D
 
+solver2string(s::String) = s
+solver2string(s::cRK22) = "cRK22"
+solver2string(s::cRK33) = "cRK33"
+solver2string(s::cRK44) = "cRK44"
+solver2string(s::cIMEX111) = "cIMEX111"
+solver2string(s::cHT112) = "cHT112"
+solver2string(s::cSSP2IMEX433) = "cSSP2IMEX433"
+solver2string(s::cSSP2IMEX222) = "cSSP2IMEX222"
+solver2string(s::cSSP2IMEX332) = "cSSP2IMEX332"
+
 @testset "Reactive Euler 1D" begin
     EqReactive = Tenkai.TenkaicRK.EqEulerReactive1D
     # Pure FV blending test
@@ -202,7 +212,7 @@ end
                       solver = solver,
                       animate = false, final_time = 0.1, nx = 5,
                       degree = 1, cfl_safety_factor = 0.98)
-        data_name = "ssw_roll_wave_$(solver).txt"
+        data_name = "ssw_roll_wave_$(solver2string(solver)).txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
     end
 
@@ -224,7 +234,7 @@ end
                       solver = solver,
                       animate = false, final_time = 0.1, nx = 5,
                       degree = 1, cfl_safety_factor = 0.98)
-        data_name = "ssw_accuracy_$(solver).txt"
+        data_name = "ssw_accuracy_$(solver2string(solver)).txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
     end
 end
@@ -248,7 +258,7 @@ end
                       compute_error_interval = 0,
                       animate = false, final_time = 0.1, nx = 10,
                       solver = solver)
-        data_name = "tenmom_two_rare_source_stiff_$(solver).txt"
+        data_name = "tenmom_two_rare_source_stiff_$(solver2string(solver)).txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
     end
 
@@ -367,7 +377,7 @@ end
                       save_time_interval = 0.0, save_iter_interval = 0,
                       compute_error_interval = 0,
                       animate = false, final_time = 0.3, nx = 5, ny = 5)
-        data_name = "ssw_accuracy_2d_$(solver).txt"
+        data_name = "ssw_accuracy_2d_$(solver2string(solver)).txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
     end
 end
@@ -453,7 +463,7 @@ end
                       solver = solver, save_time_interval = 0.0, save_iter_interval = 0,
                       compute_error_interval = 0,
                       animate = false, final_time = 0.001, nx = 5, ny = 5)
-        data_name = "ssw_accuracy_dirichlet_2d_$(solver).txt"
+        data_name = "ssw_accuracy_dirichlet_2d_$(solver2string(solver)).txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
     end
 end

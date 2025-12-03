@@ -1029,7 +1029,14 @@ function F_G_S_to_res_Ub!(volume_integral::MyVolumeIntegralFluxDifferencing,
     end
 end
 
-function Bb_to_res!(eq::AbstractNonConservativeEquations{2}, local_grid, op, Ub, res)
+function Bb_to_res!(eq::AbstractNonConservativeEquations{2},
+                    cheap_noncons_extrapolation::True,
+                    tb_rk, local_grid, op, Ub, res)
+    Bb_to_res_cheap!(eq, local_grid, op, Ub, res)
+    return nothing
+end
+
+function Bb_to_res_cheap!(eq::AbstractNonConservativeEquations{2}, local_grid, op, Ub, res)
     @unpack bl, br, xg, wg, degree = op
     nd = degree + 1
 
@@ -1082,6 +1089,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     nx, ny = grid.size
     @unpack solver = scheme
     @unpack volume_integral = solver
+    @unpack cheap_noncons_extrapolation = volume_integral
     @unpack compute_bflux! = scheme.bflux
     @unpack blend = aux
     @unpack bl, br = op
@@ -1141,7 +1149,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
@@ -1164,6 +1172,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     nx, ny = grid.size
     @unpack solver = scheme
     @unpack volume_integral = solver
+    @unpack cheap_noncons_extrapolation = volume_integral
     @unpack compute_bflux! = scheme.bflux
     @unpack blend = aux
     @unpack bl, br = op
@@ -1231,7 +1240,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
@@ -1254,6 +1263,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     nx, ny = grid.size
     @unpack solver = scheme
     @unpack volume_integral = solver
+    @unpack cheap_noncons_extrapolation = volume_integral
     @unpack compute_bflux! = scheme.bflux
     @unpack blend = aux
     @unpack bl, br = op
@@ -1329,7 +1339,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
@@ -1353,6 +1363,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     @unpack compute_bflux! = scheme.bflux
     @unpack solver = scheme
     @unpack volume_integral = solver
+    @unpack cheap_noncons_extrapolation = volume_integral
     @unpack implicit_solver = solver
     @unpack blend = aux
     @unpack bl, br = op
@@ -1410,7 +1421,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
@@ -1436,6 +1447,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     @unpack compute_bflux! = scheme.bflux
     @unpack solver = scheme
     @unpack volume_integral = solver
+    @unpack cheap_noncons_extrapolation = volume_integral
     @unpack implicit_solver = solver
     @unpack blend = aux
     @unpack bl, br = op
@@ -1501,7 +1513,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
@@ -1527,6 +1539,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     @unpack compute_bflux! = scheme.bflux
     @unpack solver = scheme
     @unpack volume_integral = solver
+    @unpack cheap_noncons_extrapolation = volume_integral
     @unpack implicit_solver = solver
     @unpack blend = aux
     @unpack bl, br = op
@@ -1596,7 +1609,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
@@ -1622,6 +1635,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     @unpack compute_bflux! = scheme.bflux
     @unpack solver = scheme
     @unpack volume_integral = solver
+    @unpack cheap_noncons_extrapolation = volume_integral
     @unpack implicit_solver = solver
     @unpack blend = aux
     @unpack bl, br = op
@@ -1721,7 +1735,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
@@ -1747,6 +1761,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     @unpack compute_bflux! = scheme.bflux
     @unpack solver = scheme
     @unpack volume_integral = solver
+    @unpack cheap_noncons_extrapolation = volume_integral
     @unpack implicit_solver = solver
     @unpack blend = aux
     @unpack bl, br = op
@@ -1851,7 +1866,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
@@ -1877,6 +1892,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     @unpack compute_bflux! = scheme.bflux
     @unpack solver = scheme
     @unpack volume_integral = solver
+    @unpack cheap_noncons_extrapolation = volume_integral
     @unpack implicit_solver = solver
     @unpack blend = aux
     @unpack bl, br = op
@@ -1996,7 +2012,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
