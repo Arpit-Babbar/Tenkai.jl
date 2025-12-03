@@ -322,7 +322,13 @@ function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44},
     update_ghost_values_Bb!(problem, scheme, eq, grid, aux, op, cache, t, dt)
 end
 
-function Bb_to_res!(eq::AbstractNonConservativeEquations{1}, local_grid, op, Ub, res)
+function Bb_to_res!(eq::AbstractNonConservativeEquations{1},
+                    cheap_noncons_extrapolation::True,
+                    tb_rk, local_grid, op, Ub, res)
+    Bb_to_res_cheap!(eq, local_grid, op, Ub, res)
+end
+
+function Bb_to_res_cheap!(eq::AbstractNonConservativeEquations{1}, local_grid, op, Ub, res)
     @unpack bl, br, xg, wg, degree = op
     nd = degree + 1
 
@@ -619,6 +625,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations{1}, gri
     get_dissipation_node_vars = scheme.dissipation
     @unpack solver = scheme
     @unpack volume_integral = solver
+    @unpack cheap_noncons_extrapolation = volume_integral
 
     # A struct containing information about the non-conservative part of the equation
     eq_nc = non_conservative_equation(eq)
@@ -675,7 +682,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations{1}, gri
         F_U_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
 
         blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
                                    grid.xf[cell], op, u1, u1_, cache.ua, f, r1)
@@ -718,6 +725,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations{1}, gri
     get_dissipation_node_vars = scheme.dissipation
     @unpack solver = scheme
     @unpack volume_integral = solver
+    @unpack cheap_noncons_extrapolation = volume_integral
 
     # A struct containing information about the non-conservative part of the equation
     eq_nc = non_conservative_equation(eq)
@@ -788,7 +796,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations{1}, gri
 
         F_U_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_U_S, op, local_grid, scheme, eq)
 
-        Bb_to_res!(eq, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
 
         blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
                                    grid.xf[cell], op, u1, u1_, cache.ua, f, r1)
