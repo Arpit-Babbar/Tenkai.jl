@@ -86,8 +86,8 @@ boundary_value = dummy_bv
 exact_solution_roll(x, y, t) = initial_condition_roll_wave(x, y)
 exact_solution = exact_solution_roll
 
-degree = 1
-solver = cRK22()
+degree = 3
+solver = cRK44()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
@@ -95,8 +95,8 @@ bound_limit = "no"
 bflux = evaluate
 final_time = 36.0
 
-nx = 520
-ny = 200
+nx = 130
+ny = 50
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0

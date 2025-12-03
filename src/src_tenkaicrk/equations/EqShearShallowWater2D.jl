@@ -221,8 +221,9 @@ function compute_time_step(eq::ShearShallowWater2D, problem, grid, aux, op, cfl,
 end
 
 function test_var(val_min, eq::Union{ShearShallowWater2D},
-                  variable::typeof(det_constraint), el_x, el_y)
-    return nothing # Shear shallow water equations can have negative determinant in low order solution
+                  variable,
+                  el_x, el_y)
+    return nothing # Admissibility cannot be guaranteed for shear shallow water equations
 end
 
 @inbounds @inline function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::ShearShallowWater2D,
