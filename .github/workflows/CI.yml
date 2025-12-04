@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - master # Fix after paper launch
+      - master
   pull_request:
     branches:
       - master
