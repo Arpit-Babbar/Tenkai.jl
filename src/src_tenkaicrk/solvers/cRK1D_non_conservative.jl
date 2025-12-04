@@ -2,7 +2,7 @@ import Tenkai: compute_face_residual!, compute_cell_residual_cRK!, get_blended_f
                blend_cell_residual_fo!, blend_face_residual_fo!, blend_flux_only,
                blend_flux_face_residual!, trivial_face_residual
 
-using Tenkai: cRKSolver, True, False
+using Tenkai: cRKSolver, True, False, sum_node_vars_1d
 
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
                       eq::AbstractNonConservativeEquations{1})
@@ -323,8 +323,39 @@ function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44},
 end
 
 function Bb_to_res!(eq::AbstractNonConservativeEquations{1},
+                    cheap_noncons_extrapolation::False,
+                    tb_rk, local_grid, op, Ub, res, u1_, ustages)
+    Bb_to_res_cheap!(eq, local_grid, op, Ub, res)
+end
+
+function Bb_to_res_stage!(eq::AbstractNonConservativeEquations{1}, local_grid, op, Ub, res,
+                          coeff, ustage)
+    @unpack bl, br, xg, wg, degree = op
+    nd = degree + 1
+
+    xc, dx, lamx, t, dt = local_grid
+
+    ul = sum_node_vars_1d(Vl, u1, eq, 1:nd, element) # ul = ∑ Vl*u
+    ur = sum_node_vars_1d(Vr, u1, eq, 1:nd, element) # ur = ∑ Vr*u
+
+    xl, xr = (xc - 0.5 * dx, xc + 0.5 * dx)
+
+    Ul_nc = calc_non_cons_gradient(ul, xl, t, eq)
+    Ur_nc = calc_non_cons_gradient(ur, xr, t, eq)
+
+    Bul = calc_non_cons_Bu(ul, Ul_nc, xl, t, eq)
+    Bur = calc_non_cons_Bu(ur, Ur_nc, xr, t, eq)
+
+    for ix in Base.OneTo(nd), n in eachvariable(eq)
+        res[n, ix] -= lamx * br[ix] * Bur[n]
+        res[n, ix] -= lamx * bl[ix] * Bul[n]
+    end
+    return nothing
+end
+
+function Bb_to_res!(eq::AbstractNonConservativeEquations{1},
                     cheap_noncons_extrapolation::True,
-                    tb_rk, local_grid, op, Ub, res)
+                    tb_rk, local_grid, op, Ub, res, u1_, ustages)
     Bb_to_res_cheap!(eq, local_grid, op, Ub, res)
 end
 
@@ -682,7 +713,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations{1}, gri
         F_U_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1, u1_,
+                   (u2,))
 
         blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
                                    grid.xf[cell], op, u1, u1_, cache.ua, f, r1)
@@ -796,7 +828,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations{1}, gri
 
         F_U_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_U_S, op, local_grid, scheme, eq)
 
-        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1, u1_,
+                   (u2, u3, u4))
 
         blend.blend_cell_residual!(cell, eq, problem, scheme, aux, lamx, t, dt, dx,
                                    grid.xf[cell], op, u1, u1_, cache.ua, f, r1)

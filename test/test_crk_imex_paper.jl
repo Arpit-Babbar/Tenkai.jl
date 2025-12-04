@@ -237,6 +237,17 @@ end
         data_name = "ssw_accuracy_$(solver2string(solver)).txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
     end
+
+    # Test with non-cheap extrapolation
+    volume_integral = Tenkai.VolumeIntegralWeak(cheap_noncons_extrapolation = Tenkai.False())
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_ssw_accuracy.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  solver = cRK44(volume_integral = volume_integral),
+                  animate = false, final_time = 0.1, nx = 20,
+                  degree = 3, cfl_safety_factor = 0.98)
+    data_name = "ssw_accuracy_cRK44_noncheap.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
 
 @testset "Ten Moment stiff rarefaction" begin
@@ -628,6 +639,17 @@ end
                   solver = cRK22(),
                   animate = false, final_time = 0.1, nx = 5, ny = 5)
     data_name = "multiion_convergence.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    # Non-cheap extrapolation
+    volume_integral = Tenkai.VolumeIntegralWeak(cheap_noncons_extrapolation = Tenkai.False())
+    trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_convergence.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  degree = 3,
+                  solver = cRK44(volume_integral),
+                  animate = false, final_time = 0.1, nx = 20, ny = 20)
+    data_name = "multiion_convergence_cRK44_noncheap.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
 

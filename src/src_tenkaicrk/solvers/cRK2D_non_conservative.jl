@@ -43,6 +43,8 @@ end
 -(a::MyZero) = a
 +(::MyZero, b) = b
 +(b, ::MyZero) = b
+-(::MyZero, b) = -b
+-(b, ::MyZero) = b
 adjoint(a::MyZero) = a
 
 @inline function multiply_add_to_node_vars!(u::AbstractArray,
@@ -1033,9 +1035,76 @@ function F_G_S_to_res_Ub!(volume_integral::MyVolumeIntegralFluxDifferencing,
     end
 end
 
+@noinline function Bb_to_res!(eq::AbstractNonConservativeEquations{2},
+                              cheap_noncons_extrapolation::False,
+                              tb_rk::NTuple{N, Any}, local_grid, op, Ub, res, u1_, ustages,
+                              eval_data) where {N}
+    Bb_to_res_stage!(eq, local_grid, op, Ub, res, tb_rk[1], u1_, eval_data)
+    for stage in 2:N
+        ustage = ustages[stage - 1]
+        coeff = tb_rk[stage]
+        Bb_to_res_stage!(eq, local_grid, op, Ub, res, coeff, ustage, eval_data)
+    end
+end
+
+@inline function Bb_to_res_stage!(eq::AbstractNonConservativeEquations{2}, local_grid, op,
+                                  Ub, res, coeff, ustage, eval_data)
+    @unpack Vl, Vr, bl, br, xg, wg = op
+
+    xc, yc, dx, dy, lamx, lamy, t, dt = local_grid
+
+    ul, ur, ud, uu = eval_data.eval_data_big[Threads.threadid()]
+    refresh!.((ul, ur, ud, uu))
+    nd = length(xg) # Known at compile time
+    for j in 1:nd, i in 1:nd
+        u_node = get_node_vars(ustage, eq, i, j)
+
+        multiply_add_to_node_vars!(ul, Vl[i], u_node, eq, j)
+        multiply_add_to_node_vars!(ur, Vr[i], u_node, eq, j)
+        multiply_add_to_node_vars!(ud, Vl[j], u_node, eq, i)
+        multiply_add_to_node_vars!(uu, Vr[j], u_node, eq, i)
+    end
+
+    for ix in Base.OneTo(nd)
+        x = xc - 0.5 * dx + xg[ix] * dx
+        xl, xr = (xc - 0.5 * dx, xc + 0.5 * dx)
+        yl, yr = (yc - 0.5 * dy, yc + 0.5 * dy)
+
+        ud_node = get_node_vars(ud, eq, ix)
+        uu_node = get_node_vars(uu, eq, ix)
+
+        ud_nc = calc_non_cons_gradient(ud_node, x, yl, t, eq)
+        uu_nc = calc_non_cons_gradient(uu_node, x, yr, t, eq)
+        Bud = calc_non_cons_Bu(ud_node, ud_nc, x, yl, t, 2, eq)
+        Buu = calc_non_cons_Bu(uu_node, uu_nc, x, yr, t, 2, eq)
+        for jy in Base.OneTo(nd)
+            y = yc - 0.5 * dy + xg[jy] * dy
+
+            # TODO - Repeated computation with jy
+            ul_node = get_node_vars(ul, eq, jy)
+            ur_node = get_node_vars(ur, eq, jy)
+
+            ul_nc = calc_non_cons_gradient(ul_node, xl, y, t, eq)
+            ur_nc = calc_non_cons_gradient(ur_node, xr, y, t, eq)
+
+            Bul = calc_non_cons_Bu(ul_node, ul_nc, xl, y, t, 1, eq)
+            Bur = calc_non_cons_Bu(ur_node, ur_nc, xr, y, t, 1, eq)
+
+            for n in eachvariable(eq)
+                res[n, ix, jy] -= lamy * coeff * br[jy] * Buu[n]
+                res[n, ix, jy] -= lamy * coeff * bl[jy] * Bud[n]
+                res[n, ix, jy] -= lamx * coeff * br[ix] * Bur[n]
+                res[n, ix, jy] -= lamx * coeff * bl[ix] * Bul[n]
+            end
+        end
+    end
+
+    return nothing
+end
+
 function Bb_to_res!(eq::AbstractNonConservativeEquations{2},
                     cheap_noncons_extrapolation::True,
-                    tb_rk, local_grid, op, Ub, res)
+                    tb_rk, local_grid, op, Ub, res, u1_, ustages, eval_data)
     Bb_to_res_cheap!(eq, local_grid, op, Ub, res)
     return nothing
 end
@@ -1153,7 +1222,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1,
+                   u1_, (u2,), eval_data)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
@@ -1244,7 +1314,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1,
+                   u1_, (u2, u3), eval_data)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
@@ -1343,7 +1414,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1,
+                   u1_, (u2, u3, u4), eval_data)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
@@ -1425,7 +1497,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1,
+                   u1_, (u2,), eval_data)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
@@ -1517,7 +1590,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1,
+                   u1_, (u2,), eval_data)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
@@ -1613,7 +1687,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1,
+                   u1_, (u2, u3), eval_data)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
@@ -1739,7 +1814,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1,
+                   u1_, (u2, u3, u4, u5), eval_data)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
@@ -1870,7 +1946,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1,
+                   u1_, (u2, u3, u4, u5), eval_data)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
@@ -2016,7 +2093,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
 
-        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1)
+        Bb_to_res!(eq, cheap_noncons_extrapolation, tb_rk, local_grid, op, Ub_, r1,
+                   u1_, (u2, u3, u4), eval_data)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
