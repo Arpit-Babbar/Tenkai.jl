@@ -151,4 +151,8 @@ export scheme_degree_plus_one, scheme_n_solution_points
 
 export LWEnzymeTower, MDRKEnzymeTower
 
+export PositivityBlending, NoPositivityBlending
+
+include("src_tenkaicrk/TenkaicRK.jl")
+
 end # module

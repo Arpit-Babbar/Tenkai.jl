@@ -3,11 +3,10 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - master # Fix after paper launch
   pull_request:
     branches:
       - master
-      - paper_main
   workflow_dispatch:
 
 # Cancel redundant CI tests automatically
