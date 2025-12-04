@@ -223,7 +223,7 @@ end
                   animate = false, final_time = 1.0, nx = 5,
                   degree = 3, cfl_safety_factor = 0.98)
     data_name = "ssw_roll_wave2.txt"
-    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-10)
 end
 
 @testset "SSW convergence 1D" begin

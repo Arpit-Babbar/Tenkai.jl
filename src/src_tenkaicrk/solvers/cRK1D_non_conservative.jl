@@ -324,19 +324,24 @@ end
 
 function Bb_to_res!(eq::AbstractNonConservativeEquations{1},
                     cheap_noncons_extrapolation::False,
-                    tb_rk, local_grid, op, Ub, res, u1_, ustages)
-    Bb_to_res_cheap!(eq, local_grid, op, Ub, res)
+                    tb_rk::NTuple{N, Any}, local_grid, op, Ub, res, u1_, ustages) where {N}
+    Bb_to_res_stage!(eq, local_grid, op, Ub, res, tb_rk[1], u1_)
+    for stage in 2:N
+        ustage = ustages[stage - 1]
+        coeff = tb_rk[stage]
+        Bb_to_res_stage!(eq, local_grid, op, Ub, res, coeff, ustage)
+    end
 end
 
 function Bb_to_res_stage!(eq::AbstractNonConservativeEquations{1}, local_grid, op, Ub, res,
                           coeff, ustage)
-    @unpack bl, br, xg, wg, degree = op
+    @unpack bl, br, Vl, Vr, xg, wg, degree = op
     nd = degree + 1
 
     xc, dx, lamx, t, dt = local_grid
 
-    ul = sum_node_vars_1d(Vl, u1, eq, 1:nd, element) # ul = ∑ Vl*u
-    ur = sum_node_vars_1d(Vr, u1, eq, 1:nd, element) # ur = ∑ Vr*u
+    ul = sum_node_vars_1d(Vl, ustage, eq, 1:nd, 1) # ul = ∑ Vl*u
+    ur = sum_node_vars_1d(Vr, ustage, eq, 1:nd, 1) # ur = ∑ Vr*u
 
     xl, xr = (xc - 0.5 * dx, xc + 0.5 * dx)
 
@@ -347,8 +352,8 @@ function Bb_to_res_stage!(eq::AbstractNonConservativeEquations{1}, local_grid, o
     Bur = calc_non_cons_Bu(ur, Ur_nc, xr, t, eq)
 
     for ix in Base.OneTo(nd), n in eachvariable(eq)
-        res[n, ix] -= lamx * br[ix] * Bur[n]
-        res[n, ix] -= lamx * bl[ix] * Bul[n]
+        res[n, ix] -= lamx * coeff * br[ix] * Bur[n]
+        res[n, ix] -= lamx * coeff * bl[ix] * Bul[n]
     end
     return nothing
 end
