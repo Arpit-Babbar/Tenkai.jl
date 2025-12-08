@@ -208,10 +208,12 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
         ub_ = @view ub[:, :, :, el_x, el_y]
         Fb_ = @view Fb[:, :, :, el_x, el_y]
 
+        trixi_equations = get_trixi_equations(semi, eq)
+
         calc_volume_integral_local!(scheme.solver.volume_integral, res, u1,
                                     (el_x, el_y), semi.mesh,
-                                    Trixi.have_nonconservative_terms(eq.trixi_equations),
-                                    eq.trixi_equations, semi.solver, semi.cache, op,
+                                    Trixi.have_nonconservative_terms(trixi_equations),
+                                    trixi_equations, semi.solver, semi.cache, op,
                                     lamx)
 
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
@@ -358,9 +360,11 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
     @unpack cache = semi
     surface_flux_values = fb
 
+    trixi_equations = get_trixi_equations(semi, eq)
+
     calc_interface_flux!(surface_flux_values, semi.mesh,
-                         Trixi.have_nonconservative_terms(eq.trixi_equations),
-                         eq.trixi_equations, semi.solver.surface_integral, Ub,
+                         Trixi.have_nonconservative_terms(trixi_equations),
+                         trixi_equations, semi.solver.surface_integral, Ub,
                          semi.solver,
                          grid, cache)
 
@@ -412,9 +416,11 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem,
     # limit the higher order part
     lmul!(1.0 - alpha, r)
 
+    trixi_equations = get_trixi_equations(semi, eq)
+
     fv_kernel!(res, u1, semi.mesh,
-               Trixi.have_nonconservative_terms(eq.trixi_equations),
-               eq.trixi_equations,
+               Trixi.have_nonconservative_terms(trixi_equations),
+               trixi_equations,
                volume_integral.volume_flux_fv, semi.solver,
                semi.cache, (el_x, el_y), op,
                lamx * alpha)

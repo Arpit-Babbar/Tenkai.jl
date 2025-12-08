@@ -159,11 +159,13 @@ function compute_cell_residual_rkfr!(eq::AbstractNonConservativeEquations{2}, gr
         ub_ = @view ub[:, :, :, el_x, el_y]
         Fb_ = @view Fb[:, :, :, el_x, el_y]
 
+        trixi_equations = get_trixi_equations(semi, eq)
+
         calc_volume_integral_local!(scheme.solver.volume_integral, res, u1,
                                     (el_x, el_y), semi.mesh,
-                                    Trixi.have_nonconservative_terms(eq.trixi_equations),
+                                    Trixi.have_nonconservative_terms(trixi_equations),
                                     #    Trixi.False(),
-                                    eq.trixi_equations, semi.solver, semi.cache, op,
+                                    trixi_equations, semi.solver, semi.cache, op,
                                     lamx)
 
         for j in Base.OneTo(nd), i in Base.OneTo(nd) # solution points loop
@@ -459,9 +461,11 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractNonConservativeEquation
     # limit the higher order part
     lmul!(1.0 - alpha, r)
 
+    trixi_equations = get_trixi_equations(semi, eq)
+
     fv_kernel!(res, u1, semi.mesh,
-               Trixi.have_nonconservative_terms(eq.trixi_equations),
-               eq.trixi_equations,
+               Trixi.have_nonconservative_terms(trixi_equations),
+               trixi_equations,
                volume_integral.volume_flux_fv, semi.solver,
                semi.cache, cache, op, (el_x, el_y),
                lamx * alpha)
@@ -489,9 +493,11 @@ function compute_face_residual!(eq::AbstractNonConservativeEquations{2}, grid, o
     @unpack cache = semi
     surface_flux_values = fb
 
+    trixi_equations = get_trixi_equations(semi, eq)
+
     calc_interface_flux!(scheme.solver, surface_flux_values, semi.mesh,
-                         Trixi.have_nonconservative_terms(eq.trixi_equations),
-                         eq.trixi_equations, semi.solver.surface_integral, ub,
+                         Trixi.have_nonconservative_terms(trixi_equations),
+                         trixi_equations, semi.solver.surface_integral, ub,
                          semi.solver,
                          grid, cache)
 

@@ -19,7 +19,7 @@ using Tenkai.Basis
 
 using Trixi: True, False
 
-import Tenkai: admissibility_tolerance
+import Tenkai: admissibility_tolerance, get_trixi_equations
 
 (import Tenkai: flux, prim2con, con2prim,
                 eigmatrix,
@@ -66,6 +66,7 @@ struct MHD2D{TrixiEquations, RealT <: Real, StaticBool} <:
 end
 
 tenkai2trixiequation(eq::MHD2D) = eq.trixi_equations
+get_trixi_equations(semi, eq::MHD2D) = tenkai2trixiequation(eq)
 
 non_conservative_equation(eq::MHD2D) = eq.non_conservative_part
 
