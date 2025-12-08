@@ -210,8 +210,8 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
 
         calc_volume_integral_local!(scheme.solver.volume_integral, res, u1,
                                     (el_x, el_y), semi.mesh,
-                                    Trixi.have_nonconservative_terms(semi.equations),
-                                    semi.equations, semi.solver, semi.cache, op,
+                                    Trixi.have_nonconservative_terms(eq.trixi_equations),
+                                    eq.trixi_equations, semi.solver, semi.cache, op,
                                     lamx)
 
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx,
@@ -359,8 +359,9 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
     surface_flux_values = fb
 
     calc_interface_flux!(surface_flux_values, semi.mesh,
-                         Trixi.have_nonconservative_terms(semi.equations),
-                         semi.equations, semi.solver.surface_integral, Ub, semi.solver,
+                         Trixi.have_nonconservative_terms(eq.trixi_equations),
+                         eq.trixi_equations, semi.solver.surface_integral, Ub,
+                         semi.solver,
                          grid, cache)
 
     # This loop is slow with Threads.@threads so we use Polyster.jl threads
@@ -412,8 +413,8 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem,
     lmul!(1.0 - alpha, r)
 
     fv_kernel!(res, u1, semi.mesh,
-               Trixi.have_nonconservative_terms(semi.equations),
-               semi.equations,
+               Trixi.have_nonconservative_terms(eq.trixi_equations),
+               eq.trixi_equations,
                volume_integral.volume_flux_fv, semi.solver,
                semi.cache, (el_x, el_y), op,
                lamx * alpha)

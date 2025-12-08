@@ -161,9 +161,9 @@ function compute_cell_residual_rkfr!(eq::AbstractNonConservativeEquations{2}, gr
 
         calc_volume_integral_local!(scheme.solver.volume_integral, res, u1,
                                     (el_x, el_y), semi.mesh,
-                                    Trixi.have_nonconservative_terms(semi.equations),
+                                    Trixi.have_nonconservative_terms(eq.trixi_equations),
                                     #    Trixi.False(),
-                                    semi.equations, semi.solver, semi.cache, op,
+                                    eq.trixi_equations, semi.solver, semi.cache, op,
                                     lamx)
 
         for j in Base.OneTo(nd), i in Base.OneTo(nd) # solution points loop
@@ -460,8 +460,8 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractNonConservativeEquation
     lmul!(1.0 - alpha, r)
 
     fv_kernel!(res, u1, semi.mesh,
-               Trixi.have_nonconservative_terms(semi.equations),
-               semi.equations,
+               Trixi.have_nonconservative_terms(eq.trixi_equations),
+               eq.trixi_equations,
                volume_integral.volume_flux_fv, semi.solver,
                semi.cache, cache, op, (el_x, el_y),
                lamx * alpha)
@@ -490,8 +490,9 @@ function compute_face_residual!(eq::AbstractNonConservativeEquations{2}, grid, o
     surface_flux_values = fb
 
     calc_interface_flux!(scheme.solver, surface_flux_values, semi.mesh,
-                         Trixi.have_nonconservative_terms(semi.equations),
-                         semi.equations, semi.solver.surface_integral, ub, semi.solver,
+                         Trixi.have_nonconservative_terms(eq.trixi_equations),
+                         eq.trixi_equations, semi.solver.surface_integral, ub,
+                         semi.solver,
                          grid, cache)
 
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
