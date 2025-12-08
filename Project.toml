@@ -39,7 +39,19 @@ UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [compat]
-julia = "1.7.3"
+Accessors = "0.1.36"
+ForwardDiff = "0.10.36, 1"
+EllipsisNotation = "1.0"
+HDF5 = "0.16.10, 0.17"
+LinearAlgebra = "1"
+LoopVectorization = "0.12.118"
+MuladdMacro = "0.2.2"
+Printf = "1"
+StaticArrays = "1"
+TimerOutputs = "0.5.25"
+Trixi = "0.13, 0.14"
+WriteVTK = "1.21"
+julia = "1.10"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
