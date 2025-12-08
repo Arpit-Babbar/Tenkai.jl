@@ -1,7 +1,7 @@
 using Tenkai
 using Tenkai: TreeMesh, DGSEM, True, False, eachnode, DG, eachinterface_x,
-              eachinterface_y, tenkai2trixiequation,
-              StructuredMesh, UnstructuredMesh2D, P4estMesh, T8codeMesh, nnodes
+              eachinterface_y, tenkai2trixiequation, get_trixi_equations
+StructuredMesh, UnstructuredMesh2D, P4estMesh, T8codeMesh, nnodes
 import Tenkai: flux_differencing_kernel!, tenkai2trixiode, weak_form_kernel!,
                calc_volume_integral_local!
 
