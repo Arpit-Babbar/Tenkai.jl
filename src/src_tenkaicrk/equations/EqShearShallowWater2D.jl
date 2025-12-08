@@ -216,7 +216,7 @@ function compute_time_step(eq::ShearShallowWater2D, problem, grid, aux, op, cfl,
 
     dt = cfl / den
 
-    return dt
+    return dt, eq
     end # timer
 end
 

@@ -264,7 +264,7 @@ function compute_time_step(eq::TenMoment1D, problem, grid, aux, op, cfl, u1, ua)
     dt_source = cfl *
                 compute_source_time_step(eq, source_terms, grid, aux, op, cfl, u1, ua)
     dt = cfl / den
-    return min(dt, dt_source)
+    return min(dt, dt_source), eq
 end
 
 compute_source_time_step(eq, source_terms, grid, aux, op, cfl, u1, ua) = 1e20

@@ -142,7 +142,7 @@ function compute_time_step(eq::EulerReactive1D, problem, grid, aux, op, cfl, u1,
     end
     dt = cfl / den
     eq.dt[1] = dt
-    return dt
+    return dt, eq
 end
 
 @inbounds @inline function rusanov_dissipated(x, ual, uar, Fl, Fr, Ul, Ur,

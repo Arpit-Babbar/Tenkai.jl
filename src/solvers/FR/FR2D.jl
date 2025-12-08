@@ -356,7 +356,7 @@ function compute_time_step(eq::AbstractEquations{2, 1}, problem, grid, aux, op, 
         den = max(den, abs(sx) / dx[i] + abs(sy) / dy[j] + 1.0e-12)
     end
     dt = cfl / den
-    return dt
+    return dt, eq
     end # timer
 end
 

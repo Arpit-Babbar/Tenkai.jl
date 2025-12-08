@@ -108,7 +108,7 @@ function solve_mdrk(eq, problem, scheme, param, grid, op, aux, cache)
 
     println("Starting time stepping")
     while t < final_time
-        dt = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
+        dt, eq = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
         dt = adjust_time_step(problem, param, t, dt, aux)
 
         # First stage

@@ -12,6 +12,7 @@ using Tenkai.LoopVectorization
 using Tenkai.JSON3
 using Tenkai.SimpleUnPack
 using Tenkai.WriteVTK
+using Accessors
 
 using Tenkai
 using Tenkai.Basis
@@ -26,7 +27,7 @@ import Tenkai: flux, prim2con, con2prim,
                apply_tvb_limiter!, apply_bound_limiter!, initialize_plot,
                write_soln!, compute_time_step, post_process_soln,
                update_ghost_values_cRK!, update_ghost_values_u1!,
-               compute_cell_average!
+               compute_cell_average!, get_trixi_equations
 
 using Tenkai: PlotData, data_dir, get_filename, neumann, minmod,
               get_node_vars, sum_node_vars_1d,
@@ -61,6 +62,8 @@ struct MultiIonMHD2D{TrixiEquations, NVAR, RealT <: Real} <:
     name::String
     non_conservative_part::MultiIonMHDNonConservative2D{NVAR}
 end
+
+get_trixi_equations(semi, eq::MultiIonMHD2D) = eq.trixi_equations
 
 non_conservative_equation(eq::MultiIonMHD2D) = eq.non_conservative_part
 
@@ -337,9 +340,13 @@ function compute_time_step(eq::MultiIonMHD2D, problem, grid, aux, op, cfl, u1, u
     dt = cfl / den
     dt_const_speed = cfl / den_const_speed
 
-    eq.trixi_equations.c_h = glm_scale * dt_const_speed / dt
+    c_h = glm_scale * dt_const_speed / dt
+    @unpack trixi_equations = eq
+    @reset trixi_equations.c_h = c_h
+    @reset eq.trixi_equations = trixi_equations
+    # eq.trixi_equations.c_h = glm_scale * dt_const_speed / dt
 
-    return dt
+    return dt, eq
     end # timer
 end
 

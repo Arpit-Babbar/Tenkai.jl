@@ -120,7 +120,7 @@ function solve_ssfr(eq, problem, scheme::Scheme{<:cRKSolver}, param, grid, op, a
     local dt
     println("Starting time stepping")
     while t < final_time
-        dt = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
+        dt, eq = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
         dt = adjust_time_step(problem, param, t, dt, aux)
 
         evolve_solution!(eq, grid, op, problem, scheme, param, aux, iter, t, dt, fcount,

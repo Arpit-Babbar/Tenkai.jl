@@ -10,6 +10,8 @@ end
 
 TrixiRKSolver() = TrixiRKSolver(VolumeIntegralWeakForm())
 
+get_trixi_equations(semi, eq) = semi.equations
+
 solver2enum(solver::TrixiRKSolver) = rktrixi # solver type enum
 
 include(joinpath(@__DIR__, "RKTrixi1D.jl"))

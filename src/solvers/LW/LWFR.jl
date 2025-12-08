@@ -229,7 +229,7 @@ function solve_ssfr(eq, problem, scheme, param, grid, op, aux, cache)
     local dt
     println("Starting time stepping")
     while t < final_time
-        dt = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
+        dt, eq = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
         dt = adjust_time_step(problem, param, t, dt, aux)
 
         pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme,

@@ -104,7 +104,7 @@ function compute_time_step(eq::VarAdv1D, problem, grid, aux, op, cfl, u1, ua)
         den = max(den, smax / dx[i])
     end
     dt = cfl / den
-    return dt
+    return dt, eq
 end
 
 function max_abs_eigen_value(eq::VarAdv1D, u)
