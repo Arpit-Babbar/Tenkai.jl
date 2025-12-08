@@ -1,0 +1,15 @@
+# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/" # Location of package manifests
+    schedule:
+      interval: "monthly"
+    groups:
+      # Group all GitHub Actions PRs into a single PR:
+      all-github-actions:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "julia-actions/julia-downgrade-compat"
+        versions: [ ">=2.0.0" ]
