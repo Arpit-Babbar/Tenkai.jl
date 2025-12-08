@@ -130,10 +130,12 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
 
         alpha = get_element_alpha(blend, cell)
 
+        trixi_equations = get_trixi_equations(semi, eq)
+
         calc_volume_integral_local!(scheme.solver.volume_integral, res, u1,
                                     cell, semi.mesh,
-                                    Trixi.have_nonconservative_terms(semi.equations),
-                                    semi.equations, semi.solver, semi.cache, op,
+                                    Trixi.have_nonconservative_terms(trixi_equations),
+                                    trixi_equations, semi.solver, semi.cache, op,
                                     lamx * (1.0 - alpha))
 
         for ix in Base.OneTo(nd)
@@ -225,9 +227,11 @@ function compute_face_residual!(eq::AbstractEquations{1}, grid, op, cache,
     @unpack cache = semi
     surface_flux_values = Fb
 
+    trixi_equations = get_trixi_equations(semi, eq)
+
     calc_interface_flux!(surface_flux_values, semi.mesh,
-                         Trixi.have_nonconservative_terms(semi.equations),
-                         semi.equations, semi.solver.surface_integral, ub,
+                         Trixi.have_nonconservative_terms(trixi_equations),
+                         trixi_equations, semi.solver.surface_integral, ub,
                          semi.solver, cache)
 
     for i in 1:nx
@@ -311,10 +315,12 @@ end
 
     alpha = get_element_alpha(blend, cell)
 
+    trixi_equations = get_trixi_equations(semi, eq)
+
     # TODO - Use your own fv_kernel!
     fv_kernel!(r, u1, semi.mesh,
-               Trixi.have_nonconservative_terms(semi.equations),
-               semi.equations,
+               Trixi.have_nonconservative_terms(trixi_equations),
+               trixi_equations,
                volume_integral.volume_flux_fv, semi.solver,
                semi.cache, cell, op,
                lamx * alpha)

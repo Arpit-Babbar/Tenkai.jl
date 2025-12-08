@@ -307,7 +307,7 @@ function compute_time_step(eq::TenMoment2D, problem, grid, aux, op, cfl, u1, ua)
 
     dt = cfl / den
 
-    return dt
+    return dt, eq
     end # timer
 end
 

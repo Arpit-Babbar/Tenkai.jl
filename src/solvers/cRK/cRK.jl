@@ -3,7 +3,13 @@ abstract type AbstractDissipation end # Don't think it'll be used beyond D-CSX
 
 solver2enum(solver::cRKSolver) = ssfr # solver type enum
 
-struct VolumeIntegralWeak end
+struct VolumeIntegralWeak{CheapNonConsExtrapolation}
+    cheap_noncons_extrapolation::CheapNonConsExtrapolation
+end
+
+function VolumeIntegralWeak(; cheap_noncons_extrapolation = True())
+    return VolumeIntegralWeak{typeof(cheap_noncons_extrapolation)}(cheap_noncons_extrapolation)
+end
 
 struct cRK64{VolumeIntegral} <: cRKSolver
     volume_integral::VolumeIntegral
@@ -114,7 +120,7 @@ function solve_ssfr(eq, problem, scheme::Scheme{<:cRKSolver}, param, grid, op, a
     local dt
     println("Starting time stepping")
     while t < final_time
-        dt = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
+        dt, eq = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
         dt = adjust_time_step(problem, param, t, dt, aux)
 
         evolve_solution!(eq, grid, op, problem, scheme, param, aux, iter, t, dt, fcount,

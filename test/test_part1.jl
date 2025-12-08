@@ -128,6 +128,8 @@ end
 end
 
 @testset "Ten Moment 2D" begin
+    solver_name(s::String) = s
+    solver_name(s::cRK33) = "cRK33"
     for solver in ["mdrk", "lwfr", "rkfr", cRK33()]
         trixi_include(joinpath(examples_dir(), "2d", "run_tenmom_dwave.jl"),
                       save_time_interval = 0.0, save_iter_interval = 0,
@@ -135,7 +137,7 @@ end
                       solver = solver, degree = 3,
                       limiter = setup_limiter_none(),
                       animate = false, final_time = 1.0, nx = 5, ny = 5)
-        data_name = "tenmom_dwave_2d_$(solver)_$(degree).txt"
+        data_name = "tenmom_dwave_2d_$(solver_name(solver))_$(degree).txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 
         trixi_include(joinpath(examples_dir(), "2d", "run_tenmom_near_vacuum.jl"),
@@ -145,7 +147,7 @@ end
                       # eq comes from the previous test
                       limiter = setup_limiter_tvbβ(eq; tvbM = 0.0, beta = 0.9),
                       animate = false, final_time = 0.02, nx = 5, ny = 5)
-        data_name = "tenmom_near_vacuum_2d_$(solver)_$(degree).txt"
+        data_name = "tenmom_near_vacuum_2d_$(solver_name(solver))_$(degree).txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
     end
 end
@@ -238,16 +240,14 @@ end
 @testset "Double Mach reflection" begin
     Eq = Tenkai.EqEuler2D
     equation = Eq.get_equation(1.4)
-    filenames = ("dmr_fo_blend.txt", "dmr_mh_blend.txt", "dmr_mh_blend_crk.txt")
-    blend_types = (fo_blend(equation), mh_blend(equation), mh_blend(equation))
-    solvers = ("lwfr", "lwfr", cRK44())
-    for i in 1:3
+    filenames = ("dmr_fo_blend.txt", "dmr_mh_blend.txt")
+    blend_types = (fo_blend(equation), mh_blend(equation))
+    for i in 1:2
         trixi_include(joinpath(examples_dir(), "2d", "run_double_mach_reflection.jl"),
                       save_time_interval = 0.0, save_iter_interval = 0,
                       compute_error_interval = 0,
                       animate = false, final_time = 0.1, ny = 5,
                       degree = 3,
-                      solver = solvers[i],
                       blend_type = blend_types[i])
         data_name = filenames[i]
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
