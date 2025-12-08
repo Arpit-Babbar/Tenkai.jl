@@ -339,7 +339,7 @@ function compute_time_step(eq::MultiIonMHD2D, problem, grid, aux, op, cfl, u1, u
 
     eq.trixi_equations.c_h = glm_scale * dt_const_speed / dt
 
-    return dt
+    return dt, eq
     end # timer
 end
 

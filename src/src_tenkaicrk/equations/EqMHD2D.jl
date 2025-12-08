@@ -12,6 +12,7 @@ using Tenkai.LoopVectorization
 using Tenkai.JSON3
 using Tenkai.SimpleUnPack
 using Tenkai.WriteVTK
+using Accessors: @reset
 
 using Tenkai
 using Tenkai.Basis
@@ -364,10 +365,13 @@ function compute_time_step(eq::MHD2D, problem, grid, aux, op, cfl, u1, ua)
     # @show dt, dt_const_speed
 
     c_h = glm_scale * (dt_const_speed / dt)
-    eq.trixi_equations.c_h = c_h
+    @unpack trixi_equations = eq
+    @reset trixi_equations.c_h = c_h
+    # eq.trixi_equations.c_h = c_h
+    @reset eq.trixi_equations = trixi_equations
     @show c_h
 
-    return dt
+    return dt, eq
     end # timer
 end
 

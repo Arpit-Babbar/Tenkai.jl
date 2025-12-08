@@ -35,7 +35,7 @@ function compute_time_step(eq::Euler2D, problem, grid::StepGrid, aux, op, cfl, u
         end
 
         dt = cfl / den
-        return dt
+        return dt, eq
     end # timer
 end
 

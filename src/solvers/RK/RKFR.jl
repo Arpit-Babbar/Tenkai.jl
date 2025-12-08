@@ -69,7 +69,7 @@ function dtFE(u, p, t)
 
     @unpack compute_error_interval = param
 
-    dt = compute_time_step(eq, problem, grid, aux, op, cfl, u, ua)
+    dt, eq = compute_time_step(eq, problem, grid, aux, op, cfl, u, ua)
     dt = adjust_time_step(problem, param, t, dt, aux)
     set_blend_dt!(eq, aux, dt) # Set dt used by MUSCL-Hancock
     @printf("iter,dt,t   = %5d %12.4e %12.4e \n", iter, dt, t)
@@ -398,7 +398,7 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
         copyto!(u0, u1)
         tspan = (0.0, final_time)
         odeprob = ODEProblem(compute_residual_rkfr!, u0, tspan, p)
-        dt = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
+        dt, eq = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
         callback_dt = StepsizeLimiter(dtFE, safety_factor = 1.0, max_step = true)
         callback = (callback_dt)
         # Try adding another function layer?
@@ -427,7 +427,7 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
     error_norm = compute_error(problem, grid, eq, aux, op, u1, t)
     println("Starting time stepping")
     while t < final_time
-        dt = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
+        dt, eq = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
         dt = adjust_time_step(problem, param, t, dt, aux)
         copyto!(u0, u1) # u0 = u1
         update_solution_rkfr!(eq, problem, param, grid, op, scheme, aux, t, dt, cache,
