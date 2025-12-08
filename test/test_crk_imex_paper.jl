@@ -512,7 +512,8 @@ end
                   solution_points = "gll", correction_function = "g2",
                   nx = 16, ny = 16,
                   degree = 1,
-                  solver = TrixiRKSolver())
+                  solver = TrixiRKSolver(),
+                  time_scheme = "SSPRK22")
     data_name = "mhd_alfven_wave_trixirk.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 
@@ -525,7 +526,8 @@ end
                   solution_points = "gll", correction_function = "g2",
                   nx = 16, ny = 16,
                   degree = 1,
-                  solver = TrixiRKSolver(volume_integral))
+                  solver = TrixiRKSolver(volume_integral),
+                  time_scheme = "SSPRK22")
     data_name = "mhd_alfven_wave_trixirk_flux_diff.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
@@ -562,7 +564,8 @@ end
                   nx = 16, ny = 16,
                   limiter = :limiter_blend,
                   degree = 3,
-                  solver = TrixiRKSolver(volume_integral))
+                  solver = TrixiRKSolver(volume_integral),
+                  cfl_safety_factor = 0.8)
     data_name = "mhd_tang_trixirk.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end

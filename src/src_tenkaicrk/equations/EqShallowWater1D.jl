@@ -99,7 +99,7 @@ function compute_time_step(eq::ShallowWater1D, problem, grid, aux, op, cfl, u1, 
         den = max(den, smax / dx[i])
     end
     dt = cfl / den
-    return dt
+    return dt, eq
 end
 
 @inbounds @inline function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::ShallowWater1D, dir)

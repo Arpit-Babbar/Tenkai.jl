@@ -1,6 +1,6 @@
 using Tenkai
 using Tenkai: TreeMesh, DGSEM, True, False, eachnode, DG, eachinterface_x,
-              eachinterface_y, tenkai2trixiequation,
+              eachinterface_y, tenkai2trixiequation, get_trixi_equations,
               StructuredMesh, UnstructuredMesh2D, P4estMesh, T8codeMesh, nnodes
 import Tenkai: flux_differencing_kernel!, tenkai2trixiode, weak_form_kernel!,
                calc_volume_integral_local!
@@ -159,11 +159,13 @@ function compute_cell_residual_rkfr!(eq::AbstractNonConservativeEquations{2}, gr
         ub_ = @view ub[:, :, :, el_x, el_y]
         Fb_ = @view Fb[:, :, :, el_x, el_y]
 
+        trixi_equations = get_trixi_equations(semi, eq)
+
         calc_volume_integral_local!(scheme.solver.volume_integral, res, u1,
                                     (el_x, el_y), semi.mesh,
-                                    Trixi.have_nonconservative_terms(semi.equations),
+                                    Trixi.have_nonconservative_terms(trixi_equations),
                                     #    Trixi.False(),
-                                    semi.equations, semi.solver, semi.cache, op,
+                                    trixi_equations, semi.solver, semi.cache, op,
                                     lamx)
 
         for j in Base.OneTo(nd), i in Base.OneTo(nd) # solution points loop
@@ -459,9 +461,11 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractNonConservativeEquation
     # limit the higher order part
     lmul!(1.0 - alpha, r)
 
+    trixi_equations = get_trixi_equations(semi, eq)
+
     fv_kernel!(res, u1, semi.mesh,
-               Trixi.have_nonconservative_terms(semi.equations),
-               semi.equations,
+               Trixi.have_nonconservative_terms(trixi_equations),
+               trixi_equations,
                volume_integral.volume_flux_fv, semi.solver,
                semi.cache, cache, op, (el_x, el_y),
                lamx * alpha)
@@ -489,9 +493,12 @@ function compute_face_residual!(eq::AbstractNonConservativeEquations{2}, grid, o
     @unpack cache = semi
     surface_flux_values = fb
 
+    trixi_equations = get_trixi_equations(semi, eq)
+
     calc_interface_flux!(scheme.solver, surface_flux_values, semi.mesh,
-                         Trixi.have_nonconservative_terms(semi.equations),
-                         semi.equations, semi.solver.surface_integral, ub, semi.solver,
+                         Trixi.have_nonconservative_terms(trixi_equations),
+                         trixi_equations, semi.solver.surface_integral, ub,
+                         semi.solver,
                          grid, cache)
 
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells

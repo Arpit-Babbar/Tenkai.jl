@@ -32,7 +32,7 @@ function compute_time_step(eq::EulerReactive2D, problem, grid::StepGrid, aux, op
         end
 
         dt = cfl / den
-        return dt
+        return dt, eq
     end # timer
 end
 

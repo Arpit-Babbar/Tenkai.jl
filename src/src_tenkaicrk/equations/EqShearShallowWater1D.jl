@@ -149,7 +149,7 @@ function compute_time_step(eq::ShearShallowWater1D, problem, grid, aux, op, cfl,
         den = max(den, smax / dx[i])
     end
     dt = cfl / den
-    return dt
+    return dt, eq
 end
 
 # TODO - Move to shear shallow water equations file

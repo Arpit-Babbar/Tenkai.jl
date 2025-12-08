@@ -91,7 +91,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval;
                    animate = animate,
                    cfl_safety_factor = cfl_safety_factor,
-                   time_scheme = "SSPRK54")
+                   time_scheme = "RK4")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 

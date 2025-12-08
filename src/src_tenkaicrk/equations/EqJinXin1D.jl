@@ -292,7 +292,7 @@ function compute_time_step(eq::JinXin1D, problem, grid, aux, op, cfl, u1,
         den = max(den, abs.(sx) / dx[i] + 1.0e-12)
     end
     dt = cfl / den
-    return dt
+    return dt, eq
     end # Timer
 end
 
