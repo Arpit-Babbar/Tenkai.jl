@@ -71,7 +71,7 @@ Trixi = "0.13, 0.14"
 TrixiBase = "0.1.6"
 UnPack = "1.0.02"
 WriteVTK = "1.21"
-julia = "1.10"
+julia = "1.10, 1.11"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
