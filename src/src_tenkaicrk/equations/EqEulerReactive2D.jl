@@ -22,7 +22,7 @@ using Tenkai.Basis
 
 using EllipsisNotation
 
-import Tenkai: admissibility_tolerance, rho_p_indicator!
+import Tenkai: admissibility_tolerance
 
 (import Tenkai: flux, prim2con, prim2con!, con2prim, con2prim!,
                 eigmatrix,
