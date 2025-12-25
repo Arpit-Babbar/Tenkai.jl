@@ -154,5 +154,6 @@ export LWEnzymeTower, MDRKEnzymeTower
 export PositivityBlending, NoPositivityBlending
 
 include("src_tenkaicrk/TenkaicRK.jl")
+using .TenkaicRK
 
 end # module
