@@ -6,8 +6,6 @@ import Tenkai: compute_time_step, correct_variable!, apply_tvb_limiter!,
 
 using EllipsisNotation
 
-
-
 using .EqEulerReactive2D: EulerReactive2D, con2prim!, pressure, con2prim,
                           max_abs_eigen_value
 
