@@ -78,4 +78,3 @@ sol = Tenkai.solve(eq, problem, scheme, param);
 println(sol["errors"])
 
 return sol;
-
