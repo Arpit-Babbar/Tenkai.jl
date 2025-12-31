@@ -62,15 +62,15 @@ sol["plot_data"].p_ua
 
 p_u1 = sol["plot_data"].p_u1
 
-p = plot(p_u1.subplots[2], xlabel = "x", ylabel = "Density",
-         title = "Density Profile at t = $final_time, linear scale")
+p = plot(p_u1.subplots[5], xlabel = "x", ylabel = "P11",
+         title = "P11 Profile at t = $final_time, linear scale")
 display(p)
 
 using Tenkai.DelimitedFiles
 using Tenkai.Plots
 
 sol_data = readdlm("output/sol001.txt")
-p_log = plot(sol_data[:, 1], sol_data[:, 2], yscale = :log10, xlabel = "x",
-             ylabel = "Density",
-             title = "Density Profile (Log Scale)")
+p_log = plot(sol_data[:, 1], sol_data[:, 5], yscale = :log10, xlabel = "x",
+             ylabel = "P11",
+             title = "P11 Profile (Log Scale)")
 display(p_log)
