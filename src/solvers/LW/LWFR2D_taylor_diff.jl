@@ -253,7 +253,7 @@ end
     end
 end
 
-function setup_arrays(grid, scheme::Scheme{<:LWTDEfficient}, eq::AbstractEquations{2})
+function setup_arrays(grid, scheme::Scheme{<:LWTDEltWise}, eq::AbstractEquations{2})
     function gArray(nvar, nx, ny)
         OffsetArray(zeros(nvar, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 0, 0))
@@ -374,7 +374,7 @@ end
 # end
 
 function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, problem,
-                                  scheme::Scheme{<:LWTDEfficient},
+                                  scheme::Scheme{<:LWTDEltWise},
                                   aux, t, dt, u1, res, Fb, Ub, cache)
     @unpack source_terms = problem
     @unpack xg, Dm, D1, Vl, Vr = op
@@ -452,7 +452,7 @@ function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, problem,
 end
 
 function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
-                                  scheme::Scheme{<:LWTDEfficient},
+                                  scheme::Scheme{<:LWTDEltWise},
                                   aux, t, dt, u1, res, Fb, Ub, cache)
     @unpack source_terms = problem
     @unpack xg, Dm, D1, Vl, Vr = op
@@ -551,7 +551,7 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
 end
 
 function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
-                                  scheme::Scheme{<:LWTDEfficient},
+                                  scheme::Scheme{<:LWTDEltWise},
                                   aux, t, dt, u1, res, Fb, Ub, cache)
     @unpack source_terms = problem
     @unpack xg, Dm, D1, Vl, Vr = op
@@ -664,7 +664,7 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
 end
 
 function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
-                                  scheme::Scheme{<:LWTDEfficient, <:Any, <:Function},
+                                  scheme::Scheme{<:LWTDEltWise, <:Any, <:Function},
                                   aux, t, dt, u1, res, Fb, Ub, cache)
     @unpack source_terms = problem
     @unpack xg, Dm, D1, Vl, Vr = op

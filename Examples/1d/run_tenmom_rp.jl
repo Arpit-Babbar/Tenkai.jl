@@ -22,13 +22,13 @@ bound_limit = "yes"
 bflux = evaluate
 final_time = 0.05 # Choose 0.125 for sod, two_shock; 0.15 for two_rare_iv; 0.05 for two_rare_vacuum_iv
 
-nx = ceil(Int64, 400)
+nx = ceil(Int64, 1000)
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 10.0
 save_iter_interval = 0
 save_time_interval = 0.0 * final_time
-animate = true # Factor on save_iter_interval or save_time_interval
+animate = false # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
 
 #------------------------------------------------------------------------------
@@ -38,19 +38,30 @@ domain = [xmin, xmax]
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
                   final_time, exact_solution)
 # limiter = setup_limiter_none()
-limiter = setup_limiter_blend(blend_type = fo_blend(eq),
-                              # indicating_variables = Eq.rho_p_indicator!,
+limiter = setup_limiter_blend(blend_type = mh_blend(eq),
+                              #   indicating_variables = Eq.rho_p_indicator!,
                               indicating_variables = Eq.conservative_indicator!,
                               reconstruction_variables = conservative_reconstruction,
                               indicator_model = "gassner"
                               # pure_fv = true
                               )
-# limiter = setup_limiter_tvb(eq; tvbM = tvbM, beta = 1.4)
+# limiter = setup_limiter_tvb(eq; tvbM = tvbM, beta = 1.0)
+# limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
+if numerical_flux == Eq.rusanov
+    saveto = "output_rusanov"
+elseif numerical_flux == Eq.hllc3
+    saveto = "output_hllc3"
+elseif numerical_flux == Eq.hll
+    saveto = "output_hll"
+else
+    saveto = "output_unknown"
+end
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
                    compute_error_interval, animate = animate,
-                   cfl_safety_factor = 0.98)
+                   cfl_safety_factor = 0.9,
+                   saveto = saveto)
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(eq, problem, scheme, param);
 
@@ -62,15 +73,42 @@ sol["plot_data"].p_ua
 
 p_u1 = sol["plot_data"].p_u1
 
-p = plot(p_u1.subplots[5], xlabel = "x", ylabel = "P11",
-         title = "P11 Profile at t = $final_time, linear scale")
-display(p)
-
 using Tenkai.DelimitedFiles
 using Tenkai.Plots
 
-sol_data = readdlm("output/sol001.txt")
-p_log = plot(sol_data[:, 1], sol_data[:, 5], yscale = :log10, xlabel = "x",
-             ylabel = "P11",
-             title = "P11 Profile (Log Scale)")
-display(p_log)
+# p = plot(p_u1.subplots[5], xlabel = "x", ylabel = "P11",
+#          title = "P11 Profile at t = $final_time, linear scale")
+# display(p)
+
+# exact = Eq.exact_solution_data(initial_value)
+
+# exact = readdlm("exact.txt", skipstart=1)
+
+# sol_data = readdlm("output_rusanov_2000/sol001.txt")
+# p_log = plot(sol_data[:, 1], sol_data[:, 7],
+#              yscale = :log10,
+#              xlabel = "x",
+#              label = "2000",
+#              ylabel = "rho",
+#              title = "Log scale")
+
+# sol_data = readdlm("output_rusanov_4000/sol001.txt")
+# plot!(p_log, sol_data[:, 1], sol_data[:, 7],
+#       yscale = :log10,
+#       xlabel = "x",
+#       label = "4000", ylabel = "rho", title = "Log scale")
+
+# plot!(p_log, exact[:, 1], exact[:, 7],
+#       yscale = :log10,
+#       label = "Exact")
+
+# sol_data_hllc3 = readdlm("output_hllc3/sol001.txt"
+# plot!(p_log, sol_data_hllc3[:, 1], sol_data_hllc3[:, 2],
+#       yscale = :log10,
+#       label = "HLLC3")
+
+# sol_data_hll = readdlm("output_hll/sol001.txt")
+# plot!(p_log, sol_data_hll[:, 1], sol_data_hll[:, 2],
+#       yscale = :log10,
+#       label = "HLL")
+# display(p_log)
