@@ -654,11 +654,7 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
     @unpack compute_bflux! = scheme.bflux
     @unpack eval_data, cell_arrays, f_taylor_arrays, u_taylor_arrays = cache
 
-    # f_g_s_arrays, df_g_s_arrays, ddf_g_s_arrays, dddf_g_s_arrays, ddddf_g_s_arrays = f_taylor_arrays
-    # u_du_arrays, u_du_ddu_arrays, u_du_ddu_dddu_arrays, u_du_ddu_dddu_ddddu_arrays = u_taylor_arrays
-
-    reset_arr!(res)
-    reset_Fb_Ub!(Fb, Ub)
+    reset_arr!.((res, Fb, Ub))
     @inbounds @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
         dx, dy = grid.dx[el_x], grid.dy[el_y]
