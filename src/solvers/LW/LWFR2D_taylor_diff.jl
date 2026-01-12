@@ -8,6 +8,18 @@ using TaylorDiff
 
 # MAKE PROPER STRUCTS FOR IN AND OUT ARRAYS WHERE THEIR TYPES ARE WELL-KNOWN.
 
+function derivative_bundle!(func!::SomeFunction, u::AbstractArray, constants,
+                            in_arrays, out_arrays) where {SomeFunction}
+    # Use bundle values to set up cache values
+    in_array = in_arrays[1]
+    out_array = out_arrays[1]
+
+    set_arr_A_B!(in_array.value, u)
+
+    func!(out_array, in_array, constants...)
+    return out_array
+end
+
 # TODO: Add as DerivativeBundleCache{N}. For now, it will be a NamedTuple
 function derivative_bundle!(func!::SomeFunction, bundle::NTuple{M}, constants,
                             in_arrays, out_arrays) where {SomeFunction, M}
@@ -21,7 +33,7 @@ function derivative_bundle!(func!::SomeFunction, bundle::NTuple{M}, constants,
     end
 
     func!(out_array, in_array, constants...)
-    return out_array
+    return out_array.partials[end]
 end
 
 @inline function Tenkai.set_node_vars!(u, u_node::TaylorScalar{<:Any}, eq, indices...)
@@ -675,8 +687,7 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
 
         set_arr_A_B!(u, u1_)
 
-        f_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, (u,),
-                                   constants_for_ad,
+        f_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, u, constants_for_ad,
                                    in_arrays, out_arrays)
 
         compute_div!(ut, f_g_s, op, local_grid, eq, nd_val, nvar_val)
@@ -684,18 +695,18 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
         df_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, (u, ut),
                                     constants_for_ad, in_arrays, out_arrays)
 
-        compute_div!(utt, df_g_s.partials[1], op, local_grid, eq, nd_val, nvar_val,
+        compute_div!(utt, df_g_s, op, local_grid, eq, nd_val, nvar_val,
                      0.5) # 1! / 2!
 
         ddf_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, (u, ut, utt),
                                      constants_for_ad, in_arrays, out_arrays)
 
-        compute_div!(uttt, ddf_g_s.partials[2], op, local_grid, eq, nd_val, nvar_val,
+        compute_div!(uttt, ddf_g_s, op, local_grid, eq, nd_val, nvar_val,
                      1.0 / 3.0) # 2! / 3!
         dddf_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, (u, ut, utt, uttt),
                                       constants_for_ad, in_arrays, out_arrays)
 
-        compute_div!(utttt, dddf_g_s.partials[3], op, local_grid, eq, nd_val, nvar_val,
+        compute_div!(utttt, dddf_g_s, op, local_grid, eq, nd_val, nvar_val,
                      1.0 / 4.0) # 3! / 4!
         ddddf_g_s = derivative_bundle!(compute_fluxes_and_sources_array!,
                                        (u, ut, utt, uttt, utttt),
