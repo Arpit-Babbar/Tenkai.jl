@@ -13,7 +13,6 @@ using TaylorDiff
     return out_array
 end
 
-# TODO: Add as DerivativeBundleCache{N}. For now, it will be a NamedTuple
 @inline @inbounds function derivative_bundle!(func!::SomeFunction, bundle::NTuple{M},
                                               constants,
                                               in_arrays, out_arrays) where {SomeFunction, M}
