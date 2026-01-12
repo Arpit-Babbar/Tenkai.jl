@@ -360,7 +360,8 @@ function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, problem,
         u = u_du_array.value
         set_U_u!(U, u, u1_)
 
-        compute_fluxes_and_sources_array!(f_g_s, u, local_grid, op, source_terms, eq, scheme)
+        compute_fluxes_and_sources_array!(f_g_s, u, local_grid, op, source_terms, eq,
+                                          scheme)
 
         # TODO - Is this the best we can do for performance? I think it is best if we pass f_g_s.
         set_F_G_S!(F, G, S, f_g_s, nd_val, nvar_val)
@@ -693,7 +694,8 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
         compute_ut!(uttt, ddf_g_s.partials[2], op, local_grid, eq, nd_val, nvar_val,
                     1.0 / 3.0) # 2! / 3!
         set_arr_A_B!(u_du_ddu_dddu_ddddu_array.partials[3], uttt)
-        compute_fluxes_and_sources_array!(dddf_g_s, u_du_ddu_dddu_array, local_grid, op, source_terms,
+        compute_fluxes_and_sources_array!(dddf_g_s, u_du_ddu_dddu_array, local_grid, op,
+                                          source_terms,
                                           eq, scheme)
         add_to_F_G_S!(F, G, S, dddf_g_s.partials[3],
                       1.0 / 4.0,
