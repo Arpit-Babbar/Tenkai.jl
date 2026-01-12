@@ -1,13 +1,5 @@
 using TaylorDiff
 
-# struct DerivativeBundleCache{Constants,TaylorArrays, N}
-#     # Cache fields for derivatives up to order N
-#   constants::Constants
-#.  taylor_arrays::TaylorArrays
-# end
-
-# MAKE PROPER STRUCTS FOR IN AND OUT ARRAYS WHERE THEIR TYPES ARE WELL-KNOWN.
-
 @inline @inbounds function derivative_bundle!(func!::SomeFunction, u::AbstractArray,
                                               constants,
                                               in_arrays, out_arrays) where {SomeFunction}
