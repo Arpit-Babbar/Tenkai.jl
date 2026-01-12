@@ -8,8 +8,9 @@ using TaylorDiff
 
 # MAKE PROPER STRUCTS FOR IN AND OUT ARRAYS WHERE THEIR TYPES ARE WELL-KNOWN.
 
-@inline @inbounds function derivative_bundle!(func!::SomeFunction, u::AbstractArray, constants,
-                            in_arrays, out_arrays) where {SomeFunction}
+@inline @inbounds function derivative_bundle!(func!::SomeFunction, u::AbstractArray,
+                                              constants,
+                                              in_arrays, out_arrays) where {SomeFunction}
     # Use bundle values to set up cache values
     in_array = in_arrays[1]
     out_array = out_arrays[1]
@@ -21,8 +22,9 @@ using TaylorDiff
 end
 
 # TODO: Add as DerivativeBundleCache{N}. For now, it will be a NamedTuple
-@inline @inbounds function derivative_bundle!(func!::SomeFunction, bundle::NTuple{M}, constants,
-                            in_arrays, out_arrays) where {SomeFunction, M}
+@inline @inbounds function derivative_bundle!(func!::SomeFunction, bundle::NTuple{M},
+                                              constants,
+                                              in_arrays, out_arrays) where {SomeFunction, M}
     # Use bundle values to set up cache values
     in_array = in_arrays[M]
     out_array = out_arrays[M]
@@ -152,8 +154,8 @@ end
 end
 
 @inline @inbounds function compute_div!(ut, f_g_s, op, local_grid, eq,
-                                          nd_val::Val{nd}, nvar_val::Val{nvar},
-                                          scaling_factor = 1.0) where {nd, nvar}
+                                        nd_val::Val{nd}, nvar_val::Val{nvar},
+                                        scaling_factor = 1.0) where {nd, nvar}
     @unpack Dm = op
     _, _, _, _, lamx, lamy, t, dt = local_grid
     # @turbo for j in Base.OneTo(nd), i in Base.OneTo(nd), n in Base.OneTo(nvar)
