@@ -13,8 +13,8 @@ initial_value = Eq.isentropic_iv
 exact_solution = Eq.isentropic_exact
 
 degree = 4
-# solver = LWEnzymeTower()
-solver = LWTDEltWise()
+solver = LWEnzymeTower()
+# solver = LWTDEltWise()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
