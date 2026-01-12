@@ -8,7 +8,7 @@ using TaylorDiff
 
 # MAKE PROPER STRUCTS FOR IN AND OUT ARRAYS WHERE THEIR TYPES ARE WELL-KNOWN.
 
-function derivative_bundle!(func!::SomeFunction, u::AbstractArray, constants,
+@inline function derivative_bundle!(func!::SomeFunction, u::AbstractArray, constants,
                             in_arrays, out_arrays) where {SomeFunction}
     # Use bundle values to set up cache values
     in_array = in_arrays[1]
@@ -21,7 +21,7 @@ function derivative_bundle!(func!::SomeFunction, u::AbstractArray, constants,
 end
 
 # TODO: Add as DerivativeBundleCache{N}. For now, it will be a NamedTuple
-function derivative_bundle!(func!::SomeFunction, bundle::NTuple{M}, constants,
+@inline function derivative_bundle!(func!::SomeFunction, bundle::NTuple{M}, constants,
                             in_arrays, out_arrays) where {SomeFunction, M}
     # Use bundle values to set up cache values
     in_array = in_arrays[M]
@@ -679,8 +679,6 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
 
         F, G, U, S, u, ut, utt, uttt, utttt = cell_arrays[id]
 
-        _, u_du_array, u_du_ddu_array, u_du_ddu_dddu_array, u_du_ddu_dddu_ddddu_array = in_arrays
-
         u1_ = @view u1[:, :, :, el_x, el_y]
         r1 = @view res[:, :, :, el_x, el_y]
         Ub_ = @view Ub[:, :, :, el_x, el_y]
@@ -723,7 +721,7 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
         fb = cache.fb_arrays[id]
         ub = cache.ub_arrays[id]
         Fb_loc = @view Fb[:, :, :, el_x, el_y]
-        bflux_data = (Fb_loc, fb, ub, u_du_ddu_dddu_ddddu_array, local_grid, op, nd_val,
+        bflux_data = (Fb_loc, fb, ub, in_arrays[end], local_grid, op, nd_val,
                       nvar_val)
         compute_bflux_4!(eq, grid, bflux_data, eval_data, xg, Vl, Vr,
                          F, G, Fb_loc, aux, compute_bflux!)

@@ -12,17 +12,18 @@ boundary_condition = (periodic, periodic, periodic, periodic)
 initial_value = Eq.isentropic_iv
 exact_solution = Eq.isentropic_exact
 
-degree = 3
-solver = "mdrk"
+degree = 4
+solver = LWEnzymeTower()
+# solver = LWTDEltWise()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
-final_time = 1.0 # 20 * sqrt(2.0) / 0.5
+final_time = 0.1 # 20 * sqrt(2.0) / 0.5
 
-nx = 120
-ny = 120
+nx = 100
+ny = 100
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
@@ -45,10 +46,9 @@ limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               debug_blend = false,
                               pure_fv = true,
                               tvbM = Inf)
-# limiter = setup_limiter_none()
+limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
-                numerical_flux, bound_limit, limiter, bflux,
-                2)
+                numerical_flux, bound_limit, limiter, bflux, 2)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
                    animate = animate,
