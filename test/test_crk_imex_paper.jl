@@ -11,16 +11,6 @@ overwrite_errors = false
 
 # Reactive Euler 1D
 
-solver2string(s::String) = s
-solver2string(s::cRK22) = "cRK22"
-solver2string(s::cRK33) = "cRK33"
-solver2string(s::cRK44) = "cRK44"
-solver2string(s::cIMEX111) = "cIMEX111"
-solver2string(s::cHT112) = "cHT112"
-solver2string(s::cSSP2IMEX433) = "cSSP2IMEX433"
-solver2string(s::cSSP2IMEX222) = "cSSP2IMEX222"
-solver2string(s::cSSP2IMEX332) = "cSSP2IMEX332"
-
 @testset "Reactive Euler 1D" begin
     EqReactive = Tenkai.TenkaicRK.EqEulerReactive1D
     # Pure FV blending test

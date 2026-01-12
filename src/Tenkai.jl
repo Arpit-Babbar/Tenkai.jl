@@ -100,6 +100,7 @@ include("$lwfr_dir/LWFR1D.jl")
 include("$lwfr_dir/LWFR1D_ad.jl")
 include("$lwfr_dir/LWFR2D.jl")
 include("$lwfr_dir/LWFR2D_ad.jl")
+include("$lwfr_dir/LWFR2D_taylor_diff.jl")
 
 # ( # LWFR API exported
 # export setup_arrays_lwfr,
@@ -149,7 +150,7 @@ export TrixiRKSolver
 
 export scheme_degree_plus_one, scheme_n_solution_points
 
-export LWEnzymeTower, MDRKEnzymeTower
+export LWTDEltWise, LWEnzymeTower, MDRKEnzymeTower
 
 export PositivityBlending, NoPositivityBlending
 
