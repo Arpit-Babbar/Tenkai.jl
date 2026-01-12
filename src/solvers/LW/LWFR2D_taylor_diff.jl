@@ -1,13 +1,32 @@
 using TaylorDiff
 
-# TODO: Add as DerivativeBundleCache{N}. For now, it will be a NamedTuple
-function derivative_bundle!(func_out1, func1!, bundle::NTuple{N}, cache) where {N}
+@inline @inbounds function derivative_bundle!(func!::SomeFunction, u::AbstractArray,
+                                              constants,
+                                              in_arrays, out_arrays) where {SomeFunction}
     # Use bundle values to set up cache values
+    in_array = in_arrays[1]
+    out_array = out_arrays[1]
+
+    set_arr_A_B!(in_array, u)
+
+    func!(out_array, in_array, constants...)
+    return out_array
 end
 
-function derivative_bundle!(func_out1, func_out2, func1!, func2!, bundle::NTuple{N},
-                            cache) where {N}
+@inline @inbounds function derivative_bundle!(func!::SomeFunction, bundle::NTuple{M},
+                                              constants,
+                                              in_arrays, out_arrays) where {SomeFunction, M}
     # Use bundle values to set up cache values
+    in_array = in_arrays[M]
+    out_array = out_arrays[M]
+
+    set_arr_A_B!(in_array.value, bundle[1])
+    for i in 2:M
+        set_arr_A_B!(in_array.partials[i - 1], bundle[i])
+    end
+
+    func!(out_array, in_array, constants...)
+    return out_array.partials[end]
 end
 
 @inline function Tenkai.set_node_vars!(u, u_node::TaylorScalar{<:Any}, eq, indices...)
@@ -41,7 +60,7 @@ function reset_Fb_Ub!(Fb::AbstractArray, Ub::AbstractArray)
     end
 end
 
-function set_arr_A_B!(A::StaticArray, B::StaticArray)
+function set_arr_A_B!(A::StaticArray, B::AbstractArray)
     @turbo for i in eachindex(A)
         A[i] = B[i]
     end
@@ -80,9 +99,9 @@ end
     end
 end
 
-@inline @inbounds function compute_fluxes_and_sources_array!(f_g_s, u, t, dt, local_grid,
+@inline @inbounds function compute_fluxes_and_sources_array!(f_g_s, u, local_grid,
                                                              op, source_terms, eq, scheme)
-    dx, dy, xc, yc, _, _ = local_grid
+    dx, dy, xc, yc, _, _, t, dt = local_grid
     @inbounds for (i, j) in eachpoint(scheme)
         @unpack xg = op
         x = xc - 0.5 * dx + dx * xg[i]
@@ -125,11 +144,11 @@ end
     end
 end
 
-@inline @inbounds function compute_ut!(ut, f_g_s, op, local_grid, dt, eq,
-                                       nd_val::Val{nd}, nvar_val::Val{nvar},
-                                       scaling_factor = 1.0) where {nd, nvar}
+@inline @inbounds function compute_div!(ut, f_g_s, op, local_grid, eq,
+                                        nd_val::Val{nd}, nvar_val::Val{nvar},
+                                        scaling_factor = 1.0) where {nd, nvar}
     @unpack Dm = op
-    _, _, _, _, lamx, lamy = local_grid
+    _, _, _, _, lamx, lamy, t, dt = local_grid
     # @turbo for j in Base.OneTo(nd), i in Base.OneTo(nd), n in Base.OneTo(nvar)
     # Surprisingly, this is faster than LoopVectorization which doesn't make
     # sense to me. However, in that case, it should be merged with flux computation loop.
@@ -172,6 +191,32 @@ end
     end
 end
 
+@inline @inbounds function set_F_G_S_U!(F, G, S, U, out_arrays, in_arrays,
+                                        ::Val{nd}, ::Val{nvar}) where {nd, nvar}
+    # Add more if you want higher orders of derivative
+    factors = (0.5, 1.0 / 3.0, 1.0 / 4.0, 1.0 / 5.0, 1.0 / 6.0, 1.0 / 7.0)
+    du_arr = in_arrays[end]
+    df_g_s_arr = out_arrays[end]
+    u = du_arr.value
+    f_g_s = df_g_s_arr.value
+    @turbo for j in Base.OneTo(nd), i in Base.OneTo(nd), n in Base.OneTo(nvar)
+        U[n, i, j] = u[n, i, j]
+        F[n, i, j] = f_g_s[n, 1, i, j]
+        G[n, i, j] = f_g_s[n, 2, i, j]
+        S[n, i, j] = f_g_s[n, 3, i, j]
+    end
+    for k in 1:length(df_g_s_arr.partials)
+        du = du_arr.partials[k]
+        df_g_s = df_g_s_arr.partials[k]
+        @turbo for j in Base.OneTo(nd), i in Base.OneTo(nd), n in Base.OneTo(nvar)
+            U[n, i, j] = U[n, i, j] + factors[k] * du[n, i, j]
+            F[n, i, j] = F[n, i, j] + factors[k] * df_g_s[n, 1, i, j]
+            G[n, i, j] = G[n, i, j] + factors[k] * df_g_s[n, 2, i, j]
+            S[n, i, j] = S[n, i, j] + factors[k] * df_g_s[n, 3, i, j]
+        end
+    end
+end
+
 @inline @inbounds function add_to_U!(U, ut::StaticArray, fac::Real)
     @turbo for i in eachindex(ut)
         U[i] = U[i] + fac * ut[i]
@@ -191,15 +236,17 @@ end
     end
 end
 
-function construct_taylor_arrays(ArrayType, degree::Val{N}) where {N}
+function construct_taylor_arrays(ArrayType, degree)
     nt = Threads.nthreads()
     # The first one is without derivatives
     constructor() = zero(ArrayType)
-    cache = (SVector{nt}((constructor() for _ in Base.OneTo(nt))),)
-    for i in 1:N
-        cache = (cache...,
-                 SVector{nt}((TaylorArray{i}(constructor())
-                              for _ in Base.OneTo(nt))))
+    # cache = (SVector{nt}((constructor() for _ in Base.OneTo(nt))),)
+    cache = (constructor(),)
+    for i in 1:degree
+        # cache = (cache...,
+        #          SVector{nt}((TaylorArray{i}(constructor())
+        #                       for _ in Base.OneTo(nt))))
+        cache = (cache..., TaylorArray{i}(constructor()))
     end
     return cache
 end
@@ -263,10 +310,12 @@ function setup_arrays(grid, scheme::Scheme{<:LWTDEltWise}, eq::AbstractEquations
     nt = Threads.nthreads()
 
     f_taylor_constructor = MArray{Tuple{nvariables(eq), 3, nd, nd}, Float64}
-    f_taylor_arrays = construct_taylor_arrays(f_taylor_constructor, Val(degree))
+    f_taylor_arrays = SVector{nt}([construct_taylor_arrays(f_taylor_constructor, degree)
+                                   for _ in 1:nt])
 
     u_taylor_constructor = MArray{Tuple{nvar, nd, nd}, Float64}
-    u_taylor_arrays = construct_taylor_arrays(u_taylor_constructor, Val(degree))
+    u_taylor_arrays = SVector{nt}([construct_taylor_arrays(u_taylor_constructor,
+                                                           degree) for _ in 1:nt])
 
     fb_eval() = zero(MArray{Tuple{nvariables(eq), 4, nd}, Float64})
     ub_eval() = zero(MArray{Tuple{nvariables(eq), 4, nd}, Float64})
@@ -320,9 +369,6 @@ function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, problem,
     @unpack compute_bflux! = scheme.bflux
     @unpack eval_data, cell_arrays, f_taylor_arrays, u_taylor_arrays = cache
 
-    f_g_s_arrays, df_g_s_arrays = f_taylor_arrays
-    _, u_du_arrays = u_taylor_arrays
-
     reset_arr!(res)
     reset_Fb_Ub!(Fb, Ub)
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
@@ -330,55 +376,42 @@ function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, problem,
         dx, dy = grid.dx[el_x], grid.dy[el_y]
         xc, yc = grid.xc[el_x], grid.yc[el_y]
         lamx, lamy = dt / dx, dt / dy
-        local_grid = (dx, dy, xc, yc, lamx, lamy)
+        local_grid = (dx, dy, xc, yc, lamx, lamy, t, dt)
+        in_arrays = u_taylor_arrays[Threads.threadid()]
+        out_arrays = f_taylor_arrays[Threads.threadid()]
+        constants_for_ad = (local_grid, op, source_terms, eq, scheme)
 
         id = Threads.threadid()
-        F, G, U, S = cell_arrays[id]
 
-        f_g_s = f_g_s_arrays[id]
-        df_g_s = df_g_s_arrays[id]
-        u_du_array = u_du_arrays[id]
+        F, G, U, S, u, ut = cell_arrays[id]
 
         u1_ = @view u1[:, :, :, el_x, el_y]
         r1 = @view res[:, :, :, el_x, el_y]
         Ub_ = @view Ub[:, :, :, el_x, el_y]
 
-        u = u_du_array.value
-        set_U_u!(U, u, u1_)
+        set_arr_A_B!(u, u1_)
 
-        compute_fluxes_and_sources_array!(f_g_s, u, t, dt, local_grid, op, source_terms, eq,
-                                          scheme)
+        f_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, u, constants_for_ad,
+                                   in_arrays, out_arrays)
 
-        # TODO - Is this the best we can do for performance? I think it is best if we pass f_g_s.
-        set_F_G_S!(F, G, S, f_g_s, nd_val, nvar_val)
+        compute_div!(ut, f_g_s, op, local_grid, eq, nd_val, nvar_val)
 
-        # This will be done with loop vectorization
-        ut = u_du_array.partials[1]
-        compute_ut!(ut, f_g_s, op, local_grid, dt, eq, nd_val, nvar_val)
+        df_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, (u, ut),
+                                    constants_for_ad, in_arrays, out_arrays)
 
-        add_to_U!(U, ut, 0.5)
-
-        compute_fluxes_and_sources_array!(df_g_s, u_du_array, t, dt, local_grid, op,
-                                          source_terms, eq, scheme)
-
-        add_to_F_G_S!(F, G, S, df_g_s.partials[1], 0.5, nd_val, nvar_val)
+        set_F_G_S_U!(F, G, S, U, out_arrays, in_arrays, nd_val, nvar_val)
 
         FGS2res!(r1, F, G, S, D1, dt, lamx, lamy, nd_val, nvar_val)
 
         extrapolate_to_faces!(Ub_, U, op, nd_val, nvar_val)
 
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
-                             grid.xf[el_x], grid.yf[el_y], op, u1, u1_, nothing, res)
-        # Interpolate to faces
-        # @views cell_data = (u, ut, el_x, el_y)
-        # @views eval_bflux_ad_1!(eq, grid, cell_data, eval_data, xg, op, nd_val,
-        #                         F, G, Fb[:, :, :, el_x, el_y], aux)
-        # @views extrap_bflux!(eq, grid, cell_data, eval_data, xg, Vl, Vr,
-        #                       F, G, Fb[:, :, :, el_x, el_y], aux)
+                             grid.xf[el_x], grid.yf[el_y], op, u1, u, nothing, res)
+
         fb = cache.fb_arrays[id]
         ub = cache.ub_arrays[id]
         Fb_loc = @view Fb[:, :, :, el_x, el_y]
-        bflux_data = (Fb_loc, fb, ub, u_du_array, local_grid, op, nd_val, nvar_val)
+        bflux_data = (Fb_loc, fb, ub, in_arrays[end], local_grid, op, nd_val, nvar_val)
         compute_bflux_1!(eq, grid, bflux_data, eval_data, xg, Vl, Vr,
                          F, G, Fb_loc, aux, compute_bflux!)
     end
@@ -400,9 +433,6 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
     @unpack compute_bflux! = scheme.bflux
     @unpack eval_data, cell_arrays, f_taylor_arrays, u_taylor_arrays = cache
 
-    f_g_s_arrays, df_g_s_arrays, ddf_g_s_arrays = f_taylor_arrays
-    _, u_du_arrays, u_du_ddu_arrays = u_taylor_arrays
-
     reset_arr!(res)
     reset_Fb_Ub!(Fb, Ub)
     @inbounds @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
@@ -410,54 +440,36 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
         dx, dy = grid.dx[el_x], grid.dy[el_y]
         xc, yc = grid.xc[el_x], grid.yc[el_y]
         lamx, lamy = dt / dx, dt / dy
-        local_grid = (dx, dy, xc, yc, lamx, lamy)
+        local_grid = (dx, dy, xc, yc, lamx, lamy, t, dt)
+        in_arrays = u_taylor_arrays[Threads.threadid()]
+        out_arrays = f_taylor_arrays[Threads.threadid()]
+        constants_for_ad = (local_grid, op, source_terms, eq, scheme)
 
         id = Threads.threadid()
 
-        el_x, el_y = element[1], element[2]
-        id = Threads.threadid()
-        F, G, U, S = cell_arrays[id]
-
-        f_g_s = f_g_s_arrays[id]
-        df_g_s = df_g_s_arrays[id]
-        ddf_g_s = ddf_g_s_arrays[id]
-        u_du_array = u_du_arrays[id]
-        u_du_ddu_array = u_du_ddu_arrays[id]
+        F, G, U, S, u, ut, utt = cell_arrays[id]
 
         u1_ = @view u1[:, :, :, el_x, el_y]
         r1 = @view res[:, :, :, el_x, el_y]
         Ub_ = @view Ub[:, :, :, el_x, el_y]
 
-        u = u_du_array.value
-        set_U_u!(U, u, u1_)
-        set_arr_A_B!(u_du_ddu_array.value, u)
+        set_arr_A_B!(u, u1_)
 
-        compute_fluxes_and_sources_array!(f_g_s, u, t, dt, local_grid, op, source_terms, eq,
-                                          scheme)
+        f_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, u, constants_for_ad,
+                                   in_arrays, out_arrays)
 
-        set_F_G_S!(F, G, S, f_g_s, nd_val, nvar_val)
+        compute_div!(ut, f_g_s, op, local_grid, eq, nd_val, nvar_val)
 
-        ut = u_du_array.partials[1]
-        compute_ut!(ut, f_g_s, op, local_grid, dt, eq, nd_val, nvar_val)
+        df_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, (u, ut),
+                                    constants_for_ad, in_arrays, out_arrays)
 
-        # TODO - I wish that u_du_ddu_array.partials was the same as the previous
-        # guy
-        set_arr_A_B!(u_du_ddu_array.partials[1], ut)
+        compute_div!(utt, df_g_s, op, local_grid, eq, nd_val, nvar_val,
+                     0.5) # 1! / 2!
 
-        add_to_U!(U, ut, 0.5)
+        ddf_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, (u, ut, utt),
+                                     constants_for_ad, in_arrays, out_arrays)
 
-        compute_fluxes_and_sources_array!(df_g_s, u_du_array, t, dt, local_grid, op,
-                                          source_terms, eq, scheme)
-        add_to_F_G_S!(F, G, S, df_g_s.partials[1], 0.5, nd_val, nvar_val)
-
-        utt = u_du_ddu_array.partials[2]
-        compute_ut!(utt, df_g_s.partials[1], op, local_grid, dt, eq, nd_val, nvar_val, 0.5)
-
-        compute_fluxes_and_sources_array!(ddf_g_s, u_du_ddu_array, t, dt, local_grid, op,
-                                          source_terms,
-                                          eq, scheme)
-        add_to_F_G_S!(F, G, S, ddf_g_s.partials[2], 1.0 / 3.0, nd_val, nvar_val)
-        add_to_U!(U, utt, 1.0 / 3.0)
+        set_F_G_S_U!(F, G, S, U, out_arrays, in_arrays, nd_val, nvar_val)
 
         FGS2res!(r1, F, G, S, D1, dt, lamx, lamy, nd_val, nvar_val)
 
@@ -466,19 +478,12 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
                              grid.xf[el_x], grid.yf[el_y], op, u1, u, nothing, res)
 
-        # cell_data  = (u, ut, utt, el_x, el_y)
-        # @views extrap_bflux!(eq, grid, cell_data, eval_data, xg, Vl, Vr,
-        #                      F, G, Fb[:, :, :, el_x, el_y], aux)
-
         fb = cache.fb_arrays[id]
         ub = cache.ub_arrays[id]
         Fb_loc = @view Fb[:, :, :, el_x, el_y]
-        bflux_data = (Fb_loc, fb, ub, u_du_ddu_array, local_grid, op, nd_val, nvar_val)
+        bflux_data = (Fb_loc, fb, ub, in_arrays[end], local_grid, op, nd_val, nvar_val)
         compute_bflux_2!(eq, grid, bflux_data, eval_data, xg, Vl, Vr,
                          F, G, Fb_loc, aux, compute_bflux!)
-        # @views eval_bflux_ad_2!(eq, grid, cell_data, eval_data, xg, op, nd_val,
-        #                         F, G, Fb[:, :, :, el_x, el_y], aux)
-
     end
     return nothing
 end
@@ -498,9 +503,6 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
     @unpack compute_bflux! = scheme.bflux
     @unpack eval_data, cell_arrays, u_taylor_arrays, f_taylor_arrays = cache
 
-    f_g_s_arrays, df_g_s_arrays, ddf_g_s_arrays, dddf_g_s_arrays = f_taylor_arrays
-    _, u_du_arrays, u_du_ddu_arrays, u_du_ddu_dddu_arrays = u_taylor_arrays
-
     reset_arr!(res)
     reset_Fb_Ub!(Fb, Ub)
     @inbounds @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
@@ -508,69 +510,41 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
         dx, dy = grid.dx[el_x], grid.dy[el_y]
         xc, yc = grid.xc[el_x], grid.yc[el_y]
         lamx, lamy = dt / dx, dt / dy
-        local_grid = (dx, dy, xc, yc, lamx, lamy)
+        local_grid = (dx, dy, xc, yc, lamx, lamy, t, dt)
+        in_arrays = u_taylor_arrays[Threads.threadid()]
+        out_arrays = f_taylor_arrays[Threads.threadid()]
+        constants_for_ad = (local_grid, op, source_terms, eq, scheme)
 
         id = Threads.threadid()
 
-        el_x, el_y = element[1], element[2]
-        id = Threads.threadid()
-        F, G, U, S = cell_arrays[id]
-
-        f_g_s = f_g_s_arrays[id]
-        df_g_s = df_g_s_arrays[id]
-        ddf_g_s = ddf_g_s_arrays[id]
-        dddf_g_s = dddf_g_s_arrays[id]
-        u_du_array = u_du_arrays[id]
-        u_du_ddu_array = u_du_ddu_arrays[id]
-        u_du_ddu_dddu_array = u_du_ddu_dddu_arrays[id]
+        F, G, U, S, u, ut, utt, uttt = cell_arrays[id]
 
         u1_ = @view u1[:, :, :, el_x, el_y]
         r1 = @view res[:, :, :, el_x, el_y]
         Ub_ = @view Ub[:, :, :, el_x, el_y]
 
-        u = u_du_array.value
-        set_U_u!(U, u, u1_)
-        set_arr_A_B!(u_du_ddu_array.value, u)
-        set_arr_A_B!(u_du_ddu_dddu_array.value, u)
+        set_arr_A_B!(u, u1_)
 
-        compute_fluxes_and_sources_array!(f_g_s, u, t, dt, local_grid, op, source_terms, eq,
-                                          scheme)
+        f_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, u, constants_for_ad,
+                                   in_arrays, out_arrays)
 
-        set_F_G_S!(F, G, S, f_g_s, nd_val, nvar_val)
+        compute_div!(ut, f_g_s, op, local_grid, eq, nd_val, nvar_val)
 
-        ut = u_du_array.partials[1]
-        compute_ut!(ut, f_g_s, op, local_grid, dt, eq, nd_val, nvar_val)
+        df_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, (u, ut),
+                                    constants_for_ad, in_arrays, out_arrays)
 
-        # TODO - I wish that u_du_ddu_array.partials was the same as the previous
-        # guy
-        set_arr_A_B!(u_du_ddu_array.partials[1], ut)
-        set_arr_A_B!(u_du_ddu_dddu_array.partials[1], ut)
+        compute_div!(utt, df_g_s, op, local_grid, eq, nd_val, nvar_val,
+                     0.5) # 1! / 2!
 
-        add_to_U!(U, ut, 0.5)
+        ddf_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, (u, ut, utt),
+                                     constants_for_ad, in_arrays, out_arrays)
 
-        compute_fluxes_and_sources_array!(df_g_s, u_du_array, t, dt, local_grid, op,
-                                          source_terms,
-                                          eq, scheme)
-        add_to_F_G_S!(F, G, S, df_g_s.partials[1], 0.5, nd_val, nvar_val)
+        compute_div!(uttt, ddf_g_s, op, local_grid, eq, nd_val, nvar_val,
+                     1.0 / 3.0) # 2! / 3!
+        dddf_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, (u, ut, utt, uttt),
+                                      constants_for_ad, in_arrays, out_arrays)
 
-        utt = u_du_ddu_array.partials[2]
-        compute_ut!(utt, df_g_s.partials[1], op, local_grid, dt, eq, nd_val, nvar_val, 0.5)
-        set_arr_A_B!(u_du_ddu_dddu_array.partials[2], utt)
-
-        compute_fluxes_and_sources_array!(ddf_g_s, u_du_ddu_array, t, dt, local_grid, op,
-                                          source_terms,
-                                          eq, scheme)
-        add_to_F_G_S!(F, G, S, ddf_g_s.partials[2], 1.0 / 3.0, nd_val, nvar_val)
-        add_to_U!(U, utt, 1.0 / 3.0)
-
-        uttt = u_du_ddu_dddu_array.partials[3]
-        compute_ut!(uttt, ddf_g_s.partials[2], op, local_grid, dt, eq, nd_val, nvar_val,
-                    1.0 / 3.0) # 2! / 3!
-        compute_fluxes_and_sources_array!(dddf_g_s, u_du_ddu_dddu_array, t, dt, local_grid,
-                                          op, source_terms,
-                                          eq, scheme)
-        add_to_F_G_S!(F, G, S, dddf_g_s.partials[3], 1.0 / 4.0, nd_val, nvar_val)
-        add_to_U!(U, uttt, 1.0 / 4.0)
+        set_F_G_S_U!(F, G, S, U, out_arrays, in_arrays, nd_val, nvar_val)
 
         FGS2res!(r1, F, G, S, D1, dt, lamx, lamy, nd_val, nvar_val)
 
@@ -578,16 +552,11 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
 
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
                              grid.xf[el_x], grid.yf[el_y], op, u1, u, nothing, res)
-        # cell_data = (u, ut, utt, uttt, el_x, el_y)
-        # @views eval_bflux_ad_3!(eq, grid, cell_data, eval_data, xg, op, nd_val,
-        #                         F, G, Fb[:, :, :, el_x, el_y], aux)
-        # @views extrap_bflux!(eq, grid, cell_data, eval_data, xg, Vl, Vr,
-        #                       F, G, Fb[:, :, :, el_x, el_y], aux)
 
         fb = cache.fb_arrays[id]
         ub = cache.ub_arrays[id]
         Fb_loc = @view Fb[:, :, :, el_x, el_y]
-        bflux_data = (Fb_loc, fb, ub, u_du_ddu_dddu_array, local_grid, op, nd_val, nvar_val)
+        bflux_data = (Fb_loc, fb, ub, in_arrays[end], local_grid, op, nd_val, nvar_val)
         compute_bflux_3!(eq, grid, bflux_data, eval_data, xg, Vl, Vr,
                          F, G, Fb_loc, aux, compute_bflux!)
     end
@@ -609,110 +578,53 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
     @unpack compute_bflux! = scheme.bflux
     @unpack eval_data, cell_arrays, f_taylor_arrays, u_taylor_arrays = cache
 
-    f_g_s_arrays, df_g_s_arrays, ddf_g_s_arrays, dddf_g_s_arrays, ddddf_g_s_arrays = f_taylor_arrays
-    _, u_du_arrays, u_du_ddu_arrays, u_du_ddu_dddu_arrays, u_du_ddu_dddu_ddddu_arrays = u_taylor_arrays
-
-    reset_arr!(res)
-    reset_Fb_Ub!(Fb, Ub)
+    reset_arr!.((res, Fb, Ub))
     @inbounds @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
         dx, dy = grid.dx[el_x], grid.dy[el_y]
         xc, yc = grid.xc[el_x], grid.yc[el_y]
         lamx, lamy = dt / dx, dt / dy
-        local_grid = (dx, dy, xc, yc, lamx, lamy)
+        local_grid = (dx, dy, xc, yc, lamx, lamy, t, dt)
+        in_arrays = u_taylor_arrays[Threads.threadid()]
+        out_arrays = f_taylor_arrays[Threads.threadid()]
+        constants_for_ad = (local_grid, op, source_terms, eq, scheme)
 
         id = Threads.threadid()
 
-        el_x, el_y = element[1], element[2]
-        id = Threads.threadid()
-        F, G, U, S = cell_arrays[id]
-
-        f_g_s = f_g_s_arrays[id]
-        df_g_s = df_g_s_arrays[id]
-        ddf_g_s = ddf_g_s_arrays[id]
-        dddf_g_s = dddf_g_s_arrays[id]
-        ddddf_g_s = ddddf_g_s_arrays[id]
-        u_du_array = u_du_arrays[id]
-        u_du_ddu_array = u_du_ddu_arrays[id]
-        u_du_ddu_dddu_array = u_du_ddu_dddu_arrays[id]
-        u_du_ddu_dddu_ddddu_array = u_du_ddu_dddu_ddddu_arrays[id]
+        F, G, U, S, u, ut, utt, uttt, utttt = cell_arrays[id]
 
         u1_ = @view u1[:, :, :, el_x, el_y]
         r1 = @view res[:, :, :, el_x, el_y]
         Ub_ = @view Ub[:, :, :, el_x, el_y]
 
-        u = u_du_array.value
-        set_U_u!(U, u, u1_)
-        set_arr_A_B!(u_du_ddu_array.value, u)
-        set_arr_A_B!(u_du_ddu_dddu_array.value, u)
-        set_arr_A_B!(u_du_ddu_dddu_ddddu_array.value, u)
-        # t_val1 = TaylorScalar{1}(t, (dt,))
+        set_arr_A_B!(u, u1_)
 
-        compute_fluxes_and_sources_array!(f_g_s, u, t, dt, local_grid, op, source_terms, eq,
-                                          scheme)
+        f_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, u, constants_for_ad,
+                                   in_arrays, out_arrays)
 
-        set_F_G_S!(F, G, S, f_g_s, nd_val, nvar_val)
+        compute_div!(ut, f_g_s, op, local_grid, eq, nd_val, nvar_val)
 
-        ut = u_du_array.partials[1]
-        compute_ut!(ut, f_g_s, op, local_grid, dt, eq, nd_val, nvar_val)
+        df_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, (u, ut),
+                                    constants_for_ad, in_arrays, out_arrays)
 
-        # TODO - I wish that u_du_ddu_array.partials was the same as the previous
-        # guy
-        set_arr_A_B!(u_du_ddu_array.partials[1], ut)
-        set_arr_A_B!(u_du_ddu_dddu_array.partials[1], ut)
-        set_arr_A_B!(u_du_ddu_dddu_ddddu_array.partials[1], ut)
+        compute_div!(utt, df_g_s, op, local_grid, eq, nd_val, nvar_val,
+                     0.5) # 1! / 2!
 
-        add_to_U!(U, ut, 0.5)
+        ddf_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, (u, ut, utt),
+                                     constants_for_ad, in_arrays, out_arrays)
 
-        t_der = map((x, dx) -> TaylorScalar(x, (dx,)), t, dt)
-        compute_fluxes_and_sources_array!(df_g_s, u_du_array, t_der, dt, local_grid, op,
-                                          source_terms,
-                                          eq, scheme)
-        add_to_F_G_S!(F, G, S, df_g_s.partials[1], 0.5, nd_val, nvar_val)
+        compute_div!(uttt, ddf_g_s, op, local_grid, eq, nd_val, nvar_val,
+                     1.0 / 3.0) # 2! / 3!
+        dddf_g_s = derivative_bundle!(compute_fluxes_and_sources_array!, (u, ut, utt, uttt),
+                                      constants_for_ad, in_arrays, out_arrays)
 
-        utt = u_du_ddu_array.partials[2]
-        compute_ut!(utt, df_g_s.partials[1], op, local_grid, dt, eq, nd_val, nvar_val,
-                    0.5) # 1! / 2!
-        set_arr_A_B!(u_du_ddu_dddu_array.partials[2], utt)
-        set_arr_A_B!(u_du_ddu_dddu_ddddu_array.partials[2], utt)
+        compute_div!(utttt, dddf_g_s, op, local_grid, eq, nd_val, nvar_val,
+                     1.0 / 4.0) # 3! / 4!
+        ddddf_g_s = derivative_bundle!(compute_fluxes_and_sources_array!,
+                                       (u, ut, utt, uttt, utttt),
+                                       constants_for_ad, in_arrays, out_arrays)
 
-        t_der2 = map((x, dx, ddx) -> TaylorScalar(x, (dx, 0.5 * ddx^2)), t, dt, dt)
-        compute_fluxes_and_sources_array!(ddf_g_s, u_du_ddu_array, t_der2, dt, local_grid,
-                                          op, source_terms,
-                                          eq, scheme)
-        add_to_F_G_S!(F, G, S, ddf_g_s.partials[2],
-                      1.0 / 3.0,
-                      nd_val, nvar_val)
-        add_to_U!(U, utt, 1.0 / 3.0)
-
-        uttt = u_du_ddu_dddu_array.partials[3]
-        compute_ut!(uttt, ddf_g_s.partials[2], op, local_grid, dt, eq, nd_val, nvar_val,
-                    1.0 / 3.0) # 2! / 3!
-        set_arr_A_B!(u_du_ddu_dddu_ddddu_array.partials[3], uttt)
-        t_der3 = map((x, dx, ddx, dddx) -> TaylorScalar(x, (dx, 0.5 * ddx^2, dddx^3 / 6.0)),
-                     t, dt, dt, dt)
-        compute_fluxes_and_sources_array!(dddf_g_s, u_du_ddu_dddu_array, t_der3, dt,
-                                          local_grid, op, source_terms,
-                                          eq, scheme)
-        add_to_F_G_S!(F, G, S, dddf_g_s.partials[3],
-                      1.0 / 4.0,
-                      nd_val, nvar_val)
-        add_to_U!(U, uttt, 1.0 / 4.0)
-
-        utttt = u_du_ddu_dddu_ddddu_array.partials[4]
-        compute_ut!(utttt, dddf_g_s.partials[3], op, local_grid, dt, eq, nd_val, nvar_val,
-                    1.0 / 4.0) # 3! / 4!
-
-        t_der4 = map((x, dx, ddx, dddx, ddddx) -> TaylorScalar(x,
-                                                               (dx, 0.5 * ddx^2,
-                                                                dddx^3 / 6.0,
-                                                                ddddx^4 / 24.0)), t, dt, dt,
-                     dt, dt)
-        compute_fluxes_and_sources_array!(ddddf_g_s, u_du_ddu_dddu_ddddu_array, t_der4, dt,
-                                          local_grid, op, source_terms,
-                                          eq, scheme)
-        add_to_F_G_S!(F, G, S, ddddf_g_s.partials[4], 1.0 / 5.0, nd_val, nvar_val)
-        add_to_U!(U, utttt, 1.0 / 5.0)
+        set_F_G_S_U!(F, G, S, U, out_arrays, in_arrays, nd_val, nvar_val)
 
         FGS2res!(r1, F, G, S, D1, dt, lamx, lamy, nd_val, nvar_val)
 
@@ -723,10 +635,8 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
         fb = cache.fb_arrays[id]
         ub = cache.ub_arrays[id]
         Fb_loc = @view Fb[:, :, :, el_x, el_y]
-        bflux_data = (Fb_loc, fb, ub, u_du_ddu_dddu_ddddu_array, local_grid, op, nd_val,
+        bflux_data = (Fb_loc, fb, ub, in_arrays[end], local_grid, op, nd_val,
                       nvar_val)
-        # @views eval_bflux_efficient_4!(cell_data, op, eq, nd_val, nvar_val)
-        # extrap_bflux!(eq, grid, cell_data, eval_data, xg, Vl, Vr, F, G, Fb_loc, aux)
         compute_bflux_4!(eq, grid, bflux_data, eval_data, xg, Vl, Vr,
                          F, G, Fb_loc, aux, compute_bflux!)
     end
@@ -790,7 +700,7 @@ end
 
 function compute_bflux_array!(fb, ub, eq::AbstractEquations{2}, local_grid, op,
                               val_nd::Val{nd}, val_nvar::Val{nvar}) where {nd, nvar}
-    dx, dy, xc, yc, _, _ = local_grid
+    dx, dy, xc, yc, _, _, t, dt = local_grid
     @unpack xg = op
 
     xl = xc - 0.5 * dx
