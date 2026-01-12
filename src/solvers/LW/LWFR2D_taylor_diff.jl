@@ -1,7 +1,12 @@
 using TaylorDiff
 
 # TODO: Add as DerivativeBundleCache{N}. For now, it will be a NamedTuple
-function derivative_bundle!(func_out, func!, bundle::NTuple{N}, cache) where {N}
+function derivative_bundle!(func_out1, func1!, bundle::NTuple{N}, cache) where {N}
+    # Use bundle values to set up cache values
+end
+
+function derivative_bundle!(func_out1, func_out2, func1!, func2!, bundle::NTuple{N},
+                            cache) where {N}
     # Use bundle values to set up cache values
 end
 
@@ -128,6 +133,7 @@ end
     # @turbo for j in Base.OneTo(nd), i in Base.OneTo(nd), n in Base.OneTo(nvar)
     # Surprisingly, this is faster than LoopVectorization which doesn't make
     # sense to me. However, in that case, it should be merged with flux computation loop.
+    reset_arr!(ut)
     for j in Base.OneTo(nd), i in Base.OneTo(nd)
         flux1 = get_node_vars(f_g_s, eq, 1, i, j)
         flux2 = get_node_vars(f_g_s, eq, 2, i, j)
@@ -348,7 +354,6 @@ function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, problem,
 
         # This will be done with loop vectorization
         ut = u_du_array.partials[1]
-        reset_arr!(ut)
         compute_ut!(ut, f_g_s, op, local_grid, dt, eq, nd_val, nvar_val)
 
         add_to_U!(U, ut, 0.5)
@@ -433,7 +438,6 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
         set_F_G_S!(F, G, S, f_g_s, nd_val, nvar_val)
 
         ut = u_du_array.partials[1]
-        reset_arr!(ut)
         compute_ut!(ut, f_g_s, op, local_grid, dt, eq, nd_val, nvar_val)
 
         # TODO - I wish that u_du_ddu_array.partials was the same as the previous
@@ -443,12 +447,10 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
         add_to_U!(U, ut, 0.5)
 
         compute_fluxes_and_sources_array!(df_g_s, u_du_array, t, dt, local_grid, op,
-                                          source_terms,
-                                          eq, scheme)
+                                          source_terms, eq, scheme)
         add_to_F_G_S!(F, G, S, df_g_s.partials[1], 0.5, nd_val, nvar_val)
 
         utt = u_du_ddu_array.partials[2]
-        reset_arr!(utt)
         compute_ut!(utt, df_g_s.partials[1], op, local_grid, dt, eq, nd_val, nvar_val, 0.5)
 
         compute_fluxes_and_sources_array!(ddf_g_s, u_du_ddu_array, t, dt, local_grid, op,
@@ -537,7 +539,6 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
         set_F_G_S!(F, G, S, f_g_s, nd_val, nvar_val)
 
         ut = u_du_array.partials[1]
-        reset_arr!(ut)
         compute_ut!(ut, f_g_s, op, local_grid, dt, eq, nd_val, nvar_val)
 
         # TODO - I wish that u_du_ddu_array.partials was the same as the previous
@@ -553,7 +554,6 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
         add_to_F_G_S!(F, G, S, df_g_s.partials[1], 0.5, nd_val, nvar_val)
 
         utt = u_du_ddu_array.partials[2]
-        reset_arr!(utt)
         compute_ut!(utt, df_g_s.partials[1], op, local_grid, dt, eq, nd_val, nvar_val, 0.5)
         set_arr_A_B!(u_du_ddu_dddu_array.partials[2], utt)
 
@@ -564,7 +564,6 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
         add_to_U!(U, utt, 1.0 / 3.0)
 
         uttt = u_du_ddu_dddu_array.partials[3]
-        reset_arr!(uttt)
         compute_ut!(uttt, ddf_g_s.partials[2], op, local_grid, dt, eq, nd_val, nvar_val,
                     1.0 / 3.0) # 2! / 3!
         compute_fluxes_and_sources_array!(dddf_g_s, u_du_ddu_dddu_array, t, dt, local_grid,
@@ -655,7 +654,6 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
         set_F_G_S!(F, G, S, f_g_s, nd_val, nvar_val)
 
         ut = u_du_array.partials[1]
-        reset_arr!(ut)
         compute_ut!(ut, f_g_s, op, local_grid, dt, eq, nd_val, nvar_val)
 
         # TODO - I wish that u_du_ddu_array.partials was the same as the previous
@@ -673,7 +671,6 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
         add_to_F_G_S!(F, G, S, df_g_s.partials[1], 0.5, nd_val, nvar_val)
 
         utt = u_du_ddu_array.partials[2]
-        reset_arr!(utt)
         compute_ut!(utt, df_g_s.partials[1], op, local_grid, dt, eq, nd_val, nvar_val,
                     0.5) # 1! / 2!
         set_arr_A_B!(u_du_ddu_dddu_array.partials[2], utt)
@@ -689,7 +686,6 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
         add_to_U!(U, utt, 1.0 / 3.0)
 
         uttt = u_du_ddu_dddu_array.partials[3]
-        reset_arr!(uttt)
         compute_ut!(uttt, ddf_g_s.partials[2], op, local_grid, dt, eq, nd_val, nvar_val,
                     1.0 / 3.0) # 2! / 3!
         set_arr_A_B!(u_du_ddu_dddu_ddddu_array.partials[3], uttt)
@@ -704,7 +700,6 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
         add_to_U!(U, uttt, 1.0 / 4.0)
 
         utttt = u_du_ddu_dddu_ddddu_array.partials[4]
-        reset_arr!(utttt)
         compute_ut!(utttt, dddf_g_s.partials[3], op, local_grid, dt, eq, nd_val, nvar_val,
                     1.0 / 4.0) # 3! / 4!
 
