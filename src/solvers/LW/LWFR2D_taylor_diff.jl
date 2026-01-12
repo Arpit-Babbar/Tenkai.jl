@@ -66,35 +66,6 @@ end
     return Iterators.product(Base.OneTo(nd), Base.OneTo(nd)) # TODO - Can this be made better?
 end
 
-# TODO - Can this be made into a compile time function?
-@inline @inbounds function compute_f_g_s_ut_node!(f, g, s, ut, u, op, source_terms, i, j, t,
-                                                  dt,
-                                                  local_grid, eq, ::Val{nd}) where {nd}
-    dx, dy, xc, yc, lamx, lamy = local_grid
-    @unpack xg, Dm = op
-    x = xc - 0.5 * dx + dx * xg[i]
-    y = yc - 0.5 * dy + dy * xg[j]
-
-    u_node = get_node_vars(u, eq, i, j)
-    flux1, flux2 = Tenkai.flux(x, y, u_node, eq)
-    set_node_vars!(f, flux1, eq, i, j)
-    set_node_vars!(g, flux2, eq, i, j)
-
-    s_node = calc_source(u_node, (x, y), t, source_terms, eq)
-    multiply_add_to_node_vars!(ut, dt, s_node, eq, i, j)
-
-    set_node_vars!(s, s_node, eq, i, j)
-
-    # TODO - Is it faster to use `@turbo` here?
-    # TODO - It should be faster to add this in a separate loop with `@turbo`
-    # In that case, you will be bringing out `st` as well
-    @inbounds for ii in Base.OneTo(nd)
-        multiply_add_to_node_vars!(ut, -lamx * Dm[ii, i], flux1, eq, ii, j)
-        # TODO - Is it actually beneficial to have merged this loops?
-        multiply_add_to_node_vars!(ut, -lamy * Dm[ii, j], flux2, eq, i, ii)
-    end
-end
-
 @inline @inbounds function FGS2res!(res, F, G, S, D1, dt, lamx, lamy, ::Val{nd},
                                     ::Val{nvar}) where {
                                                         nd, nvar}
@@ -176,6 +147,7 @@ end
     # @turbo for j in Base.OneTo(nd), i in Base.OneTo(nd), n in Base.OneTo(nvar)
     # Surprisingly, this is faster than LoopVectorization which doesn't make
     # sense to me. However, in that case, it should be merged with flux computation loop.
+    reset_arr!(ut)
     for j in Base.OneTo(nd), i in Base.OneTo(nd)
         flux1 = get_node_vars(f_g_s, eq, 1, i, j)
         flux2 = get_node_vars(f_g_s, eq, 2, i, j)
@@ -193,16 +165,6 @@ end
         end
         # ut[n, i, j] = ut[n, i, j] + dt * f_g_s[n, 3, i, j]
         multiply_add_to_node_vars!(ut, scaling_factor * dt, s_node, eq, i, j)
-    end
-end
-
-@inline @inbounds function add_to_F_G_S_U!(F, G, S, U, f::StaticArray, g::StaticArray,
-                                           s::StaticArray, ut::StaticArray, fac::Real)
-    @turbo for i in eachindex(f)
-        F[i] = F[i] + fac * f[i]
-        G[i] = G[i] + fac * g[i]
-        U[i] = U[i] + fac * ut[i]
-        S[i] = S[i] + fac * s[i]
     end
 end
 
@@ -241,6 +203,19 @@ end
         Ub[n, i, 3] += Vl[j] * U[n, i, j]
         Ub[n, i, 4] += Vr[j] * U[n, i, j]
     end
+end
+
+function construct_taylor_arrays(ArrayType, degree::Val{N}) where {N}
+    nt = Threads.nthreads()
+    # The first one is without derivatives
+    constructor() = zero(ArrayType)
+    cache = (SVector{nt}((constructor() for _ in Base.OneTo(nt))),)
+    for i in 1:N
+        cache = (cache...,
+                 SVector{nt}((TaylorArray{i}(constructor())
+                              for _ in Base.OneTo(nt))))
+    end
+    return cache
 end
 
 function setup_arrays(grid, scheme::Scheme{<:LWTDEltWise}, eq::AbstractEquations{2})
@@ -301,26 +276,11 @@ function setup_arrays(grid, scheme::Scheme{<:LWTDEltWise}, eq::AbstractEquations
 
     nt = Threads.nthreads()
 
-    f_g_s_array() = zero(MArray{Tuple{nvariables(eq), 3, nd, nd}})
-    f_g_s_arrays = SVector{nt}((f_g_s_array() for _ in Base.OneTo(nt)))
-    df_g_s_array() = TaylorArray{1}(f_g_s_array())
-    df_g_s_arrays = SVector{nt}((df_g_s_array() for _ in Base.OneTo(nt)))
-    ddf_g_s_array() = TaylorArray{2}(f_g_s_array())
-    dddf_g_s_array() = TaylorArray{3}(f_g_s_array())
-    ddf_g_s_arrays = SVector{nt}((ddf_g_s_array() for _ in Base.OneTo(nt)))
-    dddf_g_s_arrays = SVector{nt}((dddf_g_s_array() for _ in Base.OneTo(nt)))
-    ddddf_g_s_array() = TaylorArray{4}(f_g_s_array())
-    ddddf_g_s_arrays = SVector{nt}((ddddf_g_s_array() for _ in Base.OneTo(nt)))
-    u_array() = zero(MArray{Tuple{nvar, nd, nd}})
-    u_du_array() = TaylorArray{1}(u_array())
-    u_du_ddu_array() = TaylorArray{2}(u_array())
-    u_du_arrays = SVector{nt}((u_du_array() for _ in Base.OneTo(nt)))
-    u_du_ddu_arrays = SVector{nt}((u_du_ddu_array() for _ in Base.OneTo(nt)))
-    u_du_ddu_dddu_array() = TaylorArray{3}(u_array())
-    u_du_ddu_dddu_arrays = SVector{nt}((u_du_ddu_dddu_array() for _ in Base.OneTo(nt)))
-    u_du_ddu_dddu_ddddu_array() = TaylorArray{4}(u_array())
-    u_du_ddu_dddu_ddddu_arrays = SVector{nt}((u_du_ddu_dddu_ddddu_array()
-                                              for _ in Base.OneTo(nt)))
+    f_taylor_constructor = MArray{Tuple{nvariables(eq), 3, nd, nd}, Float64}
+    f_taylor_arrays = construct_taylor_arrays(f_taylor_constructor, Val(degree))
+
+    u_taylor_constructor = MArray{Tuple{nvar, nd, nd}, Float64}
+    u_taylor_arrays = construct_taylor_arrays(u_taylor_constructor, Val(degree))
 
     fb_eval() = zero(MArray{Tuple{nvariables(eq), 4, nd}, Float64})
     ub_eval() = zero(MArray{Tuple{nvariables(eq), 4, nd}, Float64})
@@ -352,16 +312,12 @@ function setup_arrays(grid, scheme::Scheme{<:LWTDEltWise}, eq::AbstractEquations
     # KLUDGE - Rename this to LWFR cache
     cache = (; u1, ua, res, Fb, Ub,
              eval_data, cell_arrays,
-             f_g_s_arrays, df_g_s_arrays, ddf_g_s_arrays, dddf_g_s_arrays, ddddf_g_s_arrays,
-             u_du_arrays, u_du_ddu_arrays, u_du_ddu_dddu_arrays, u_du_ddu_dddu_ddddu_arrays,
+             f_taylor_arrays,
+             u_taylor_arrays,
              f_g_s_ut_tuples, ub_arrays,
              ghost_cache, fb_arrays)
     return cache
 end
-
-# function derivative_bundle!(func_out, func!, bundle::NTuple{N}, cache::DerivativeBundleCache{N}) where {N}
-#     # Use bundle values to set up cache values
-# end
 
 function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, problem,
                                   scheme::Scheme{<:LWTDEltWise},
@@ -376,7 +332,10 @@ function compute_cell_residual_1!(eq::AbstractEquations{2}, grid, op, problem,
 
     @unpack blend_cell_residual! = aux.blend.subroutines
     @unpack compute_bflux! = scheme.bflux
-    @unpack eval_data, cell_arrays, f_g_s_arrays, df_g_s_arrays, u_du_arrays = cache
+    @unpack eval_data, cell_arrays, f_taylor_arrays, u_taylor_arrays = cache
+
+    f_g_s_arrays, df_g_s_arrays = f_taylor_arrays
+    _, u_du_arrays = u_taylor_arrays
 
     reset_arr!(res)
     reset_Fb_Ub!(Fb, Ub)
@@ -447,8 +406,10 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
 
     @unpack blend_cell_residual! = aux.blend.subroutines
     @unpack compute_bflux! = scheme.bflux
-    @unpack eval_data, cell_arrays, f_g_s_arrays, df_g_s_arrays, u_du_arrays,
-    ddf_g_s_arrays, u_du_ddu_arrays = cache
+    @unpack eval_data, cell_arrays, f_taylor_arrays, u_taylor_arrays = cache
+
+    f_g_s_arrays, df_g_s_arrays, ddf_g_s_arrays = f_taylor_arrays
+    _, u_du_arrays, u_du_ddu_arrays = u_taylor_arrays
 
     reset_arr!(res)
     reset_Fb_Ub!(Fb, Ub)
@@ -543,9 +504,10 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
 
     @unpack blend_cell_residual! = aux.blend.subroutines
     @unpack compute_bflux! = scheme.bflux
-    @unpack eval_data, cell_arrays, f_g_s_arrays, df_g_s_arrays, u_du_arrays,
-    ddf_g_s_arrays, u_du_ddu_arrays, dddf_g_s_arrays,
-    u_du_ddu_dddu_arrays = cache
+    @unpack eval_data, cell_arrays, u_taylor_arrays, f_taylor_arrays = cache
+
+    f_g_s_arrays, df_g_s_arrays, ddf_g_s_arrays, dddf_g_s_arrays = f_taylor_arrays
+    _, u_du_arrays, u_du_ddu_arrays, u_du_ddu_dddu_arrays = u_taylor_arrays
 
     reset_arr!(res)
     reset_Fb_Ub!(Fb, Ub)
@@ -653,10 +615,10 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
 
     @unpack blend_cell_residual! = aux.blend.subroutines
     @unpack compute_bflux! = scheme.bflux
-    @unpack eval_data, cell_arrays, f_g_s_arrays, df_g_s_arrays, u_du_arrays,
-    ddf_g_s_arrays, u_du_ddu_arrays, dddf_g_s_arrays,
-    u_du_ddu_dddu_arrays, ddddf_g_s_arrays,
-    u_du_ddu_dddu_ddddu_arrays = cache
+    @unpack eval_data, cell_arrays, f_taylor_arrays, u_taylor_arrays = cache
+
+    f_g_s_arrays, df_g_s_arrays, ddf_g_s_arrays, dddf_g_s_arrays, ddddf_g_s_arrays = f_taylor_arrays
+    _, u_du_arrays, u_du_ddu_arrays, u_du_ddu_dddu_arrays, u_du_ddu_dddu_ddddu_arrays = u_taylor_arrays
 
     reset_arr!(res)
     reset_Fb_Ub!(Fb, Ub)
