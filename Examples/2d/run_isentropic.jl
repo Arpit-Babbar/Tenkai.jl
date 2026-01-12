@@ -13,17 +13,17 @@ initial_value = Eq.isentropic_iv
 exact_solution = Eq.isentropic_exact
 
 degree = 4
-solver = LWEnzymeTower()
-# solver = LWTDEltWise()
+# solver = LWEnzymeTower()
+solver = LWTDEltWise()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
-final_time = 0.1 # 20 * sqrt(2.0) / 0.5
+final_time = 1.0 # 20 * sqrt(2.0) / 0.5
 
-nx = 100
-ny = 100
+nx = 60
+ny = 60
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0

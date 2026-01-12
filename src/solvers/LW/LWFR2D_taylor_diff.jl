@@ -8,20 +8,20 @@ using TaylorDiff
 
 # MAKE PROPER STRUCTS FOR IN AND OUT ARRAYS WHERE THEIR TYPES ARE WELL-KNOWN.
 
-@inline function derivative_bundle!(func!::SomeFunction, u::AbstractArray, constants,
+@inline @inbounds function derivative_bundle!(func!::SomeFunction, u::AbstractArray, constants,
                             in_arrays, out_arrays) where {SomeFunction}
     # Use bundle values to set up cache values
     in_array = in_arrays[1]
     out_array = out_arrays[1]
 
-    set_arr_A_B!(in_array.value, u)
+    set_arr_A_B!(in_array, u)
 
     func!(out_array, in_array, constants...)
     return out_array
 end
 
 # TODO: Add as DerivativeBundleCache{N}. For now, it will be a NamedTuple
-@inline function derivative_bundle!(func!::SomeFunction, bundle::NTuple{M}, constants,
+@inline @inbounds function derivative_bundle!(func!::SomeFunction, bundle::NTuple{M}, constants,
                             in_arrays, out_arrays) where {SomeFunction, M}
     # Use bundle values to set up cache values
     in_array = in_arrays[M]
@@ -151,7 +151,7 @@ end
     end
 end
 
-@noinline @inbounds function compute_div!(ut, f_g_s, op, local_grid, eq,
+@inline @inbounds function compute_div!(ut, f_g_s, op, local_grid, eq,
                                           nd_val::Val{nd}, nvar_val::Val{nvar},
                                           scaling_factor = 1.0) where {nd, nvar}
     @unpack Dm = op
@@ -322,7 +322,7 @@ function setup_arrays(grid, scheme::Scheme{<:LWTDEltWise}, eq::AbstractEquations
 
     u_taylor_constructor = MArray{Tuple{nvar, nd, nd}, Float64}
     u_taylor_arrays = SVector{nt}([construct_taylor_arrays(u_taylor_constructor,
-                                                           degree + 1)[2:end] for _ in 1:nt])
+                                                           degree) for _ in 1:nt])
 
     fb_eval() = zero(MArray{Tuple{nvariables(eq), 4, nd}, Float64})
     ub_eval() = zero(MArray{Tuple{nvariables(eq), 4, nd}, Float64})
