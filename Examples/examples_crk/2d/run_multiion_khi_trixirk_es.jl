@@ -84,11 +84,11 @@ ny = 64
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
-save_iter_interval = 0
-save_time_interval = 0.2
+save_iter_interval = 300
+save_time_interval = 0.0
 animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
-cfl_safety_factor = 0.9
+cfl_safety_factor = 0.5
 
 xmin, xmax = -1.0, 1.0
 ymin, ymax = -1.0, 1.0
@@ -119,7 +119,7 @@ scheme = Scheme(solver, degree, solution_points, correction_function,
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
                    compute_error_interval, animate = animate,
                    cfl_safety_factor = cfl_safety_factor,
-                   time_scheme = "by degree")
+                   time_scheme = "CarpenterKennedy2N54")
 
 sol = Tenkai.solve(eq, problem, scheme, param);
 

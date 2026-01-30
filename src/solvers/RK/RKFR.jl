@@ -9,7 +9,7 @@ using Tenkai: set_initial_condition!,
 using MuladdMacro
 using LoopVectorization
 using SimpleUnPack
-using OrdinaryDiffEqSSPRK, OrdinaryDiffEqTsit5
+using OrdinaryDiffEqSSPRK, OrdinaryDiffEqTsit5, OrdinaryDiffEqLowStorageRK
 using DiffEqCallbacks: StepsizeLimiter
 using Printf
 using LinearAlgebra: axpy!, axpby!
@@ -338,7 +338,8 @@ function get_time_scheme(degree, param)
                         "SSPRK22" => apply_ssprk22!,
                         "SSPRK33" => apply_ssprk33!,
                         "SSPRK43" => apply_ssprk43!,
-                        "RK4" => apply_rk4!)
+                        "RK4" => apply_rk4!,
+                        "CarpenterKennedy2N54" => CarpenterKennedy2N54)
     @unpack time_scheme = param
     if time_scheme in keys(time_schemes)
         return time_scheme, time_schemes[time_scheme]
@@ -399,7 +400,7 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
     time_scheme, update_solution_rkfr! = get_time_scheme(degree, param)
 
     # Fifth order: use DifferentialEquations
-    if time_scheme in ["Tsit5", "SSPRK54"]
+    if time_scheme in ["Tsit5", "SSPRK54", "CarpenterKennedy2N54"]
         global fcount, iter = 0, 0
         println("Using DifferentialEquations")
         p = (eq, problem, scheme, param, cfl, grid, aux, op, cache, Fb, ub, ua,
@@ -412,8 +413,7 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
         callback = (callback_dt)
         # Try adding another function layer?
         sol = OrdinaryDiffEqSSPRK.solve(odeprob,
-                                        update_solution_rkfr!(stage_limiter!,
-                                                              step_limiter!),
+                                        update_solution_rkfr!(williamson_condition = false),
                                         dt = dt, adaptive = false,
                                         callback = callback,
                                         saveat = final_time, dense = false,

@@ -132,8 +132,10 @@ end
 
 initial_value = (x, y) -> exact_solution_manufactured_solution(x, y, 0.0)
 
-degree = 1
-solver = cRK22()
+degree = 3
+# solver = cRK22()
+# solver = RKFR()
+solver = TrixiRKSolver()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
@@ -141,8 +143,8 @@ bound_limit = "no"
 bflux = evaluate
 final_time = 1.0
 
-nx = 100
-ny = 100
+nx = 16
+ny = 16
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
@@ -150,7 +152,7 @@ save_iter_interval = 0
 save_time_interval = 0.0
 animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
-cfl_safety_factor = 0.9
+cfl_safety_factor = 0.5
 
 xmin, xmax = -1.0, 1.0
 ymin, ymax = -1.0, 1.0
@@ -173,7 +175,7 @@ scheme = Scheme(solver, degree, solution_points, correction_function,
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
                    compute_error_interval, animate = animate,
                    cfl_safety_factor = cfl_safety_factor,
-                   time_scheme = "by degree")
+                   time_scheme = "RK4")
 
 sol = Tenkai.solve(eq, problem, scheme, param);
 
