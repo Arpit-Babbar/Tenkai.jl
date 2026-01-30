@@ -1,3 +1,4 @@
+using Tenkai
 using Tenkai.TenkaicRK
 using Tenkai.TenkaicRK.StaticArrays
 using Tenkai.TenkaicRK.SimpleUnPack
@@ -171,7 +172,8 @@ scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
                    compute_error_interval, animate = animate,
-                   cfl_safety_factor = cfl_safety_factor)
+                   cfl_safety_factor = cfl_safety_factor,
+                   time_scheme = "by degree")
 
 sol = Tenkai.solve(eq, problem, scheme, param);
 

@@ -40,7 +40,7 @@ end
                                    dg::DGSEM, cache, tenkai_op, alpha = true)
     # true * [some floating point value] == [exactly the same floating point value]
     # This can (hopefully) be optimized away due to constant propagation.
-    @unpack derivative_dhat, derivative_split = dg.basis
+    @unpack derivative_hat, derivative_split = dg.basis
     @unpack Dsplit = tenkai_op
 
     weak_form_kernel!(du, u, element, mesh, False(), equations, dg, cache, tenkai_op, alpha)

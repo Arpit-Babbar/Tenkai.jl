@@ -21,13 +21,16 @@ using Trixi: True, False, IdealGlmMhdMultiIonEquations2D
 
 import Tenkai: admissibility_tolerance
 
+import Tenkai.EqEuler1D: tenkai2trixiequation
+
 import Tenkai: flux, prim2con, con2prim,
                eigmatrix,
                limit_slope, zhang_shu_flux_fix,
                apply_tvb_limiter!, apply_bound_limiter!, initialize_plot,
                write_soln!, compute_time_step, post_process_soln,
                update_ghost_values_cRK!, update_ghost_values_u1!,
-               compute_cell_average!, get_trixi_equations
+               compute_cell_average!, get_trixi_equations,
+               update_ghost_values_rkfr!
 
 using Tenkai: PlotData, data_dir, get_filename, neumann, minmod,
               get_node_vars, sum_node_vars_1d,
@@ -39,7 +42,7 @@ using Tenkai: PlotData, data_dir, get_filename, neumann, minmod,
 
 import ..TenkaicRK: calc_non_cons_gradient, calc_non_cons_Bu, non_conservative_equation,
                     update_ghost_values_ub_N!, AbstractNonConservativeEquations,
-                    calc_non_cons_B
+                    calc_non_cons_B, flux_central_nc
 
 import Trixi
 
@@ -63,7 +66,9 @@ struct MultiIonMHD2D{TrixiEquations, NVAR, RealT <: Real} <:
     non_conservative_part::MultiIonMHDNonConservative2D{NVAR}
 end
 
-get_trixi_equations(semi, eq::MultiIonMHD2D) = eq.trixi_equations
+tenkai2trixiequation(eq::MultiIonMHD2D) = eq.trixi_equations
+
+get_trixi_equations(semi, eq::MultiIonMHD2D) = tenkai2trixiequation(eq)
 
 non_conservative_equation(eq::MultiIonMHD2D) = eq.non_conservative_part
 
@@ -127,6 +132,10 @@ function Tenkai.is_admissible(eq::MultiIonMHD2D, u::AbstractVector)
     dens = Trixi.density(u, eq.trixi_equations)
     press = Trixi.pressure(u, eq.trixi_equations)
     return all(p -> p > 0, dens) && all(p -> p > 0, press)
+end
+
+function flux_central_nc(ul, ur, orientation, eq::IdealGlmMhdMultiIonEquations2D)
+    Trixi.flux_nonconservative_central(ul, ur, orientation, eq)
 end
 
 @inline function flux_nonconservative_central_simpler(u_ll, u_rr, orientation::Integer,
@@ -867,6 +876,13 @@ function update_ghost_values_u1!(eq::MultiIonMHD2D, problem, grid, op, u1, aux, 
 
     return nothing
     end # timer
+end
+
+function update_ghost_values_rkfr!(problem, scheme,
+                                   eq::MultiIonMHD2D,
+                                   grid, aux, op, cache, t)
+    @unpack Fb, ub = cache
+    update_ghost_values_periodic!(eq, problem, Fb, ub)
 end
 
 function Tenkai.apply_bound_limiter!(eq::MultiIonMHD2D, grid, scheme, param, op,
