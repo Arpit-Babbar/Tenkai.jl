@@ -667,6 +667,16 @@ end
                   degree = 1, amax = 0.01)
     data_name = "multiion_khi.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_khi.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  solver = TrixiRKSolver(),
+                  solution_points = "gll", correction_function = "g2",
+                  animate = false, final_time = 2.0, nx = 16, ny = 16,
+                  degree = 3, limiter = setup_limiter_none())
+    data_name = "multiion_khi_trixirk.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
 
 @testset "MultiIonMHD2D KHI central RK22" begin
