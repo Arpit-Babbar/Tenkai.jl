@@ -233,7 +233,7 @@ end
 # The D1 part is the cell residual, which we compute here.
 
 function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem,
-                                     scheme::Scheme{<:String},
+                                     scheme::Scheme{<:Union{String, RKFR}},
                                      aux, t, dt, u1, res, Fb, ub, cache)
     @unpack timer = aux
     @timeit aux.timer "Cell residual" begin
