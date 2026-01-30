@@ -1021,7 +1021,8 @@ function update_ghost_values_rkfr!(problem, scheme,
                     x3 = xf[i] + xg[k] * dx[i]
                     # TODO - Not correct, we need to reflect the flux appropriately
                     # This is first order
-                    set_node_vars!(Fb, flux(x3, y3, Ub_reflect, eq, 2), eq, k, 4, i, 0)
+                    set_node_vars!(Fb, flux(x3, y3, Ub_reflect, eq, 2), eq, k, 4, i,
+                                   0)
                 end
             end
         end
@@ -1079,7 +1080,6 @@ function update_ghost_values_rkfr!(problem, scheme,
     end
 
     return nothing
-
     end # timer
 end
 
