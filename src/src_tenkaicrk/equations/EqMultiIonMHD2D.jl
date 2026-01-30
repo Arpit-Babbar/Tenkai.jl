@@ -881,8 +881,206 @@ end
 function update_ghost_values_rkfr!(problem, scheme,
                                    eq::MultiIonMHD2D,
                                    grid, aux, op, cache, t)
-    @unpack Fb, ub = cache
+    @timeit aux.timer "Update ghost values" begin
+    #! format: noindent
+    @unpack Fb, ub, ua = cache
+
     update_ghost_values_periodic!(eq, problem, Fb, ub)
+    update_ghost_values_u1!(eq, problem, grid, op, cache.u1, aux, t)
+
+    @unpack periodic_x, periodic_y = problem
+    if periodic_x && periodic_y
+        return nothing
+    end
+
+    nx, ny = grid.size
+    nvar = nvariables(eq)
+    @unpack degree, xg, wg = op
+    nd = degree + 1
+    @unpack dx, dy, xf, yf = grid
+    @unpack boundary_condition, boundary_value = problem
+    left, right, bottom, top = boundary_condition
+
+    refresh!(u) = fill!(u, zero(eltype(u)))
+
+    # Julia bug occuring here. Below, we have unnecessarily named
+    # x1,y1, x2, y2,.... We should have been able to just call them x,y
+    # Otherwise we were getting a type instability and variables were
+    # called Core.Box. This issue is probably related to
+    # https://discourse.julialang.org/t/type-instability-of-nested-function/57007
+    # https://invenia.github.io/blog/2019/10/30/julialang-features-part-1/#an-aside-on-boxing
+    # https://github.com/JuliaLang/julia/issues/15276
+    # https://docs.julialang.org/en/v1/manual/performance-tips/#man-performance-captured-1
+
+    # For Dirichlet bc, use upwind flux at faces by assigning both physical
+    # and ghost cells through the bc.
+    if left == dirichlet
+        x1 = xf[1]
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                y1 = yf[j] + xg[k] * dy[j]
+                ub_value = boundary_value(x1, y1, t)
+                set_node_vars!(ub, ub_value, eq, k, 2, 0, j)
+                fb_value = flux(x1, y1, ub_value, eq, 1)
+                set_node_vars!(Fb, fb_value, eq, k, 2, 0, j)
+
+                # Purely upwind at boundary
+                set_node_vars!(ub, ub_value, eq, k, 1, 1, j)
+                set_node_vars!(Fb, fb_value, eq, k, 1, 1, j)
+            end
+        end
+    elseif left in (neumann, reflect)
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                Ub_node = get_node_vars(ub, eq, k, 1, 1, j)
+                Fb_node = get_node_vars(Fb, eq, k, 1, 1, j)
+                set_node_vars!(ub, Ub_node, eq, k, 2, 0, j)
+                set_node_vars!(Fb, Fb_node, eq, k, 2, 0, j)
+                if left == reflect
+                    Ub_node = get_node_vars(ub, eq, k, 2, 0, j)
+                    set_node_vars!(ub, x_reflect(Ub_node, eq), eq, k, 2, 0, j)
+                    x1 = xf[1]
+                    y1 = yf[j] + xg[k] * dy[j]
+                    set_node_vars!(Fb, flux(x1, y1, Ub_node, eq, 1), eq, k, 2, 0, j)
+                end
+            end
+        end
+    else
+        @assert left in (periodic,) "Incorrect bc specified at left."
+    end
+
+    if right == dirichlet
+        x2 = xf[nx + 1]
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                y2 = yf[j] + xg[k] * dy[j]
+                ub_value = boundary_value(x2, y2, t)
+                set_node_vars!(ub, ub_value, eq, k, 1, nx + 1, j)
+                fb_value = flux(x2, y2, ub_value, eq, 1)
+                set_node_vars!(Fb, fb_value, eq, k, 1, nx + 1, j)
+
+                # Purely upwind
+                # set_node_vars!(ub, ub_value, eq, k, 2, nx, j)
+                # set_node_vars!(Fb, fb, eq, k, 2, nx, j)
+            end
+        end
+    elseif right in (reflect, neumann)
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                Ub_node = get_node_vars(ub, eq, k, 2, nx, j)
+                Fb_node = get_node_vars(Fb, eq, k, 2, nx, j)
+                set_node_vars!(ub, Ub_node, eq, k, 1, nx + 1, j)
+                set_node_vars!(Fb, Fb_node, eq, k, 1, nx + 1, j)
+
+                if right == reflect
+                    Ub_node = get_node_vars(ub, eq, k, 1, nx + 1, j)
+                    Ub_reflect = x_reflect(Ub_node, eq)
+                    set_node_vars!(ub, Ub_reflect, eq, k, 1, nx + 1, j)
+                    x2 = xf[nx + 1]
+                    y2 = yf[j] + xg[k] * dy[j]
+                    # TODO - Not correct, we need to reflect the flux appropriately.
+                    # This is first order
+                    set_node_vars!(Fb, flux(x2, y2, Ub_reflect, eq, 1), eq, k, 1,
+                                   nx + 1,
+                                   j)
+                end
+            end
+        end
+    else
+        @assert right in (periodic,) "Incorrect bc specified at right."
+    end
+
+    if bottom == dirichlet
+        y3 = yf[1]
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                x3 = xf[i] + xg[k] * dx[i]
+                ub_value = boundary_value(x3, y3, t)
+                fb_value = flux(x3, y3, ub_value, eq, 2)
+                set_node_vars!(ub, ub_value, eq, k, 4, i, 0)
+                set_node_vars!(Fb, fb_value, eq, k, 4, i, 0)
+
+                # Purely upwind
+
+                # set_node_vars!(Ub, ub, eq, k, 3, i, 1)
+                # set_node_vars!(Fb, fb, eq, k, 3, i, 1)
+            end
+        end
+    elseif bottom in (reflect, neumann)
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                Ub_node = get_node_vars(ub, eq, k, 3, i, 1)
+                Fb_node = get_node_vars(Fb, eq, k, 3, i, 1)
+                set_node_vars!(ub, Ub_node, eq, k, 4, i, 0)
+                set_node_vars!(Fb, Fb_node, eq, k, 4, i, 0)
+                if bottom == reflect
+                    Ub_node = get_node_vars(ub, eq, k, 4, i, 0)
+                    Ub_reflect = y_reflect(Ub_node, eq)
+                    set_node_vars!(ub, Ub_reflect, eq, k, 4, i, 0)
+                    y3 = yf[1]
+                    x3 = xf[i] + xg[k] * dx[i]
+                    # TODO - Not correct, we need to reflect the flux appropriately
+                    # This is first order
+                    set_node_vars!(Fb, flux(x3, y3, Ub_reflect, eq, 2), eq, k, 4, i,
+                                   0)
+                end
+            end
+        end
+    elseif periodic_y
+        nothing
+    else
+        @assert typeof(bottom) <: Tuple{Any, Any, Any}
+        bc! = bottom[1]
+        bc!(grid, eq, op, Fb, ub, aux)
+    end
+
+    if top == dirichlet
+        y4 = yf[ny + 1]
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                x4 = xf[i] + xg[k] * dx[i]
+                ub_value = boundary_value(x4, y4, t)
+                fb_value = flux(x4, y4, ub_value, eq, 2)
+                set_node_vars!(ub, ub_value, eq, k, 3, i, ny + 1)
+                set_node_vars!(Fb, fb_value, eq, k, 3, i, ny + 1)
+
+                # Purely upwind
+                # set_node_vars!(Ub, ub, eq, k, 4, i, ny)
+                # set_node_vars!(Fb, fb, eq, k, 4, i, ny)
+            end
+        end
+    elseif top in (reflect, neumann)
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                Ub_node = get_node_vars(ub, eq, k, 4, i, ny)
+                Fb_node = get_node_vars(Fb, eq, k, 4, i, ny)
+                set_node_vars!(ub, Ub_node, eq, k, 3, i, ny + 1)
+                set_node_vars!(Fb, Fb_node, eq, k, 3, i, ny + 1)
+                if top == reflect
+                    Ub_node = get_node_vars(ub, eq, k, 3, i, ny + 1)
+                    Ub_reflect = y_reflect(Ub_node, eq)
+                    set_node_vars!(ub, Ub_reflect, eq, k, 3, i, ny + 1)
+                    y4 = yf[ny + 1]
+                    x4 = xf[i] + xg[k] * dx[i]
+                    # TODO - Not correct, we need to reflect the flux appropriately
+                    # This is first order
+                    set_node_vars!(Fb, flux(x4, y4, Ub_reflect, eq, 2), eq, k, 3, i,
+                                   ny + 1)
+                end
+            end
+        end
+    elseif periodic_y
+        nothing
+    else
+        @assert false "Incorrect bc specific at top"
+    end
+
+    if scheme.limiter.name == "blend"
+        update_ghost_values_fn_blend!(eq, problem, grid, aux)
+    end
+
+    return nothing
+    end # timer
 end
 
 function Tenkai.apply_bound_limiter!(eq::MultiIonMHD2D, grid, scheme, param, op,
