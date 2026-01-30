@@ -66,17 +66,17 @@ end
 
 initial_value = (x, y) -> exact_solution_khi(x, y, 0.0)
 
-degree = 3
-solver = TrixiRKSolver()
-solution_points = "gll"
-correction_function = "g2"
+degree = 1
+solver = cRK22()
+solution_points = "gl"
+correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "no"
 bflux = evaluate
 final_time = 20.0
 
-nx = 64
-ny = 64
+nx = 100
+ny = 100
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
@@ -109,13 +109,11 @@ limiter_blend = setup_limiter_blend(blend_type = fo_blend(eq),
                                     amax = 0.01,
                                     pure_fv = false)
 limiter = limiter_blend
-limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval, save_time_interval,
                    compute_error_interval, animate = animate,
-                   cfl_safety_factor = cfl_safety_factor,
-                   time_scheme = "by degree")
+                   cfl_safety_factor = cfl_safety_factor)
 
 sol = Tenkai.solve(eq, problem, scheme, param);
 
