@@ -634,6 +634,19 @@ end
     data_name = "multiion_convergence.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 
+    trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_convergence.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  degree = 3,
+                  solver = TrixiRKSolver(),
+                  cfl_safety_factor = 0.7, # Don't know why. Maybe it works without it too.
+                  animate = false, final_time = 0.1, nx = 8, ny = 8,
+                  correction_function = "g2",
+                  solution_points = "gll",
+                  time_scheme = "RK4")
+    data_name = "multiion_convergence_trixi_rk.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
     # Non-cheap extrapolation
     volume_integral = Tenkai.VolumeIntegralWeak(cheap_noncons_extrapolation = Tenkai.False())
     trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_convergence.jl"),
