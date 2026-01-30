@@ -140,7 +140,8 @@ end
 
 #------------------------------------------------------------------------------
 function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem,
-                                     scheme::Scheme{<:String}, aux, t, dt, u1, res, Fb,
+                                     scheme::Scheme{<:Union{String, RKFR}}, aux, t, dt,
+                                     u1, res, Fb,
                                      ub, cache)
     @timeit aux.timer "Cell residual" begin
     #! format: noindent

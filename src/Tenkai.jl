@@ -145,6 +145,9 @@ export cRK11, cRK22, cRK33, cRK44, cRK65
 # DCSX dissipation
 export DCSX
 
+# RKFR solver
+export RKFR
+
 # TrixiRKSolver
 export TrixiRKSolver
 
