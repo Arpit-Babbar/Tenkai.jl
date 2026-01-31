@@ -1,3 +1,4 @@
+using Tenkai
 using Tenkai.TenkaicRK
 using Tenkai.TenkaicRK.StaticArrays
 using Tenkai.TenkaicRK.SimpleUnPack
@@ -95,6 +96,8 @@ ymin, ymax = -1.0, 1.0
 domain = [xmin, xmax, ymin, ymax]
 
 boundary_condition = (periodic, periodic, reflect, reflect)
+
+# TODO - Add source terms here
 
 ###############################################################################
 # ODE solvers, callbacks etc.

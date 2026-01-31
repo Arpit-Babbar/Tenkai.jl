@@ -760,29 +760,40 @@ function flux_der!(volume_integral, r1, u_tuples_out, F_G_U_S, A_rk_tuple,
     end
 end
 
-function flux_der!(volume_integral::MyVolumeIntegralFluxDifferencing,
+function get_eq_and_volume_fluxes(volume_integral::MyVolumeIntegralFluxDifferencing, eq)
+    @unpack flux_conservative, flux_non_conservative = volume_integral
+    return eq, flux_conservative, flux_non_conservative
+end
+
+function get_eq_and_volume_fluxes(volume_integral::VolumeIntegralFluxDifferencing, eq)
+    flux_conservative, flux_non_conservative = volume_integral.volume_flux
+    trixi_equations = tenkai2trixiequation(eq)
+    return trixi_equations, flux_conservative, flux_non_conservative
+end
+
+function flux_der!(volume_integral::Union{VolumeIntegralFluxDifferencing,
+                                          MyVolumeIntegralFluxDifferencing},
                    r1, u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, u_in, op,
                    local_grid, eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     b = b_rk_coeff # b is the coefficient for the Runge-Kutta method
-    # @assert false
     F, G, U, S = F_G_U_S
     xc, yc, dx, dy, lamx, lamy, dt = local_grid
-    @unpack flux_conservative, flux_non_conservative = volume_integral
+    eq_flux, flux_conservative, flux_non_conservative = get_eq_and_volume_fluxes(volume_integral,
+                                                                                 eq)
     nd = length(xg)
     # Solution points
     for j in 1:nd, i in 1:nd
         x = xc - 0.5 * dx + xg[i] * dx
         y = yc - 0.5 * dy + xg[j] * dy
         u_node = get_node_vars(u_in, eq, i, j)
-
         flux1, flux2 = flux(x, y, u_node, eq)
         multiply_add_to_node_vars!(F, b_rk_coeff, flux1, eq, i, j)
         multiply_add_to_node_vars!(G, b_rk_coeff, flux2, eq, i, j)
 
         for ii in Base.OneTo(nd)
             u_node_ii = get_node_vars(u_in, eq, ii, j)
-            flux1 = flux_conservative(u_node, u_node_ii, 1, eq)
+            flux1 = flux_conservative(u_node, u_node_ii, 1, eq_flux)
             # ut              += -lam * D * f for each variable
             # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
             # flux1 = flux(x, y, u_node, eq, 1)
@@ -793,7 +804,7 @@ function flux_der!(volume_integral::MyVolumeIntegralFluxDifferencing,
             # C += -lam*g*Dm' for each variable
             # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
             u_node_jj = get_node_vars(u_in, eq, i, jj)
-            flux2 = flux_conservative(u_node, u_node_jj, 2, eq)
+            flux2 = flux_conservative(u_node, u_node_jj, 2, eq_flux)
             # flux2 = flux(x, y, u_node, eq, 2)
             multiply_add_to_node_vars!(r1, 2.0 * b * lamy * Dm[jj, j], flux2, eq, i, jj)
         end
@@ -806,7 +817,7 @@ function flux_der!(volume_integral::MyVolumeIntegralFluxDifferencing,
             a = -A_rk_tuple[i_u]
             for ii in Base.OneTo(nd)
                 u_node_ii = get_node_vars(u_in, eq, ii, j)
-                flux1 = flux_conservative(u_node, u_node_ii, 1, eq)
+                flux1 = flux_conservative(u_node, u_node_ii, 1, eq_flux)
                 # ut              += -lam * D * f for each variable
                 # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
                 multiply_add_to_node_vars!(u, a * lamx * 2.0 * Dm[ii, i], flux1, eq, ii, j)
@@ -815,7 +826,7 @@ function flux_der!(volume_integral::MyVolumeIntegralFluxDifferencing,
                 # C += -lam*g*Dm' for each variable
                 # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
                 u_node_jj = get_node_vars(u_in, eq, i, jj)
-                flux2 = flux_conservative(u_node, u_node_jj, 2, eq)
+                flux2 = flux_conservative(u_node, u_node_jj, 2, eq_flux)
                 multiply_add_to_node_vars!(u, a * lamy * 2.0 * Dm[jj, j], flux2, eq, i, jj)
             end
         end
@@ -861,12 +872,14 @@ function noncons_flux_der!(volume_integral, u_tuples_out, res, A_rk_tuple, b_rk_
     end
 end
 
-function noncons_flux_der!(volume_integral::MyVolumeIntegralFluxDifferencing,
+function noncons_flux_der!(volume_integral::Union{MyVolumeIntegralFluxDifferencing,
+                                                  VolumeIntegralFluxDifferencing},
                            u_tuples_out, res, A_rk_tuple, b_rk_coeff, u_in,
                            op, local_grid, eq::AbstractNonConservativeEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     xc, yc, dx, dy, lamx, lamy, t, dt = local_grid
-    @unpack flux_non_conservative = volume_integral
+    eq_flux, flux_conservative, flux_non_conservative = get_eq_and_volume_fluxes(volume_integral,
+                                                                                 eq)
     nd = length(xg)
     # Solution points
     # Compute the contribution of non-conservative equation (u_x, u_y)
@@ -882,7 +895,7 @@ function noncons_flux_der!(volume_integral::MyVolumeIntegralFluxDifferencing,
             u_node_ii = get_node_vars(u_in, eq, ii, j)
             u_non_cons_ii = calc_non_cons_gradient(u_node_ii, x_, y_, t, eq)
             # noncons_flux1 = calc_non_cons_Bu(u_node, u_non_cons_ii, x_, y_, t, 1, eq)
-            noncons_flux1 = flux_non_conservative(u_node, u_node_ii, 1, eq)
+            noncons_flux1 = flux_non_conservative(u_node, u_node_ii, 1, eq_flux)
             integral_contribution = (integral_contribution +
                                      lamx * Dm[i, ii] * noncons_flux1)
         end
@@ -891,7 +904,7 @@ function noncons_flux_der!(volume_integral::MyVolumeIntegralFluxDifferencing,
             u_node_jj = get_node_vars(u_in, eq, i, jj)
             u_non_cons_jj = calc_non_cons_gradient(u_node_jj, x_, y_, t, eq)
             # noncons_flux2 = calc_non_cons_Bu(u_node, u_non_cons_jj, x_, y_, t, 2, eq)
-            noncons_flux2 = flux_non_conservative(u_node, u_node_jj, 2, eq)
+            noncons_flux2 = flux_non_conservative(u_node, u_node_jj, 2, eq_flux)
             integral_contribution = (integral_contribution +
                                      lamy * Dm[j, jj] * noncons_flux2)
         end
@@ -954,7 +967,9 @@ function source_term_implicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_
     end
 end
 
-function F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
+function F_G_S_to_res_Ub!(volume_integral::Union{VolumeIntegralWeak,
+                                                 VolumeIntegralWeakForm}, r1,
+                          Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                           eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     F, G, U, S = F_G_U_S
@@ -993,7 +1008,8 @@ function F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid
     end
 end
 
-function F_G_S_to_res_Ub!(volume_integral::MyVolumeIntegralFluxDifferencing,
+function F_G_S_to_res_Ub!(volume_integral::Union{MyVolumeIntegralFluxDifferencing,
+                                                 VolumeIntegralFluxDifferencing},
                           r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                           eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, bV, Vl, Vr = op
@@ -1246,7 +1262,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     nx, ny = grid.size
     @unpack solver = scheme
     @unpack volume_integral = solver
-    @unpack cheap_noncons_extrapolation = volume_integral
+    cheap_noncons_extrapolation = get_extrapolation_type(volume_integral)
     @unpack compute_bflux! = scheme.bflux
     @unpack blend = aux
     @unpack bl, br = op
@@ -1328,6 +1344,14 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     end # timer
 end
 
+function get_extrapolation_type(volume_integral::VolumeIntegralFluxDifferencing)
+    return False()
+end
+
+function get_extrapolation_type(volume_integral)
+    return volume_integral.cheap_noncons_extrapolation
+end
+
 function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, op,
                                     problem, scheme::Scheme{<:cRK44}, aux, t, dt, cache)
     @timeit aux.timer "Cell residual" begin
@@ -1338,7 +1362,8 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     nx, ny = grid.size
     @unpack solver = scheme
     @unpack volume_integral = solver
-    @unpack cheap_noncons_extrapolation = volume_integral
+    # @unpack cheap_noncons_extrapolation = volume_integral
+    cheap_noncons_extrapolation = get_extrapolation_type(volume_integral)
     @unpack compute_bflux! = scheme.bflux
     @unpack blend = aux
     @unpack bl, br = op

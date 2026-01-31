@@ -133,7 +133,7 @@ Solver, Dissipation, NumericalFlux, Limiter, BFlux, Cache, DegreeP1, DegreeP1Squ
 function solver2enum(solver)
     if solver == "lwfr"
         solver_enum = lwfr
-    elseif solver == "rkfr"
+    elseif solver == "rkfr" || solver isa RKFR
         solver_enum = rkfr
     elseif solver == "mdrk"
         solver_enum = mdrk
@@ -191,7 +191,7 @@ end
 trivial_function(x) = nothing
 
 function get_bflux_function(solver, degree, bflux)
-    if solver == "rkfr"
+    if solver == "rkfr" || solver isa RKFR
         return trivial_function
     elseif solver == "mdrk"
         if bflux == extrapolate
