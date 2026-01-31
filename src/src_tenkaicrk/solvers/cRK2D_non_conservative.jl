@@ -779,8 +779,6 @@ function flux_der!(volume_integral::Union{VolumeIntegralFluxDifferencing,
     b = b_rk_coeff # b is the coefficient for the Runge-Kutta method
     F, G, U, S = F_G_U_S
     xc, yc, dx, dy, lamx, lamy, dt = local_grid
-    # @unpack flux_conservative, flux_non_conservative = volume_integral
-    # trixi_equations = tenkai2trixiequation(eq)
     eq_flux, flux_conservative, flux_non_conservative = get_eq_and_volume_fluxes(volume_integral,
                                                                                  eq)
     nd = length(xg)
