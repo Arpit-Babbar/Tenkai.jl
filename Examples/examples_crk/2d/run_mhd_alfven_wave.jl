@@ -21,7 +21,8 @@ exact_solution_alfven_wave = Eq.ExactSolutionAlfvenWave(equation)
 initial_value_alfven_wave(x, y) = exact_solution_alfven_wave(x, y, 0.0)
 
 degree = 1
-solver = cRK22()
+# solver = cRK22()
+solver = RKFR()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
@@ -41,7 +42,7 @@ compute_error_interval = 0
 # blend parameters
 indicator_model = "gassner"
 debug_blend = false
-cfl_safety_factor = 0.95
+cfl_safety_factor = 0.5
 pure_fv = false
 
 #------------------------------------------------------------------------------
@@ -56,7 +57,7 @@ param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval;
                    animate = animate,
                    cfl_safety_factor = cfl_safety_factor,
-                   time_scheme = "SSPRK54")
+                   time_scheme = "by degree")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 

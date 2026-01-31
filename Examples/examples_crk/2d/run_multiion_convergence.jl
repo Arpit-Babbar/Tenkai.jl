@@ -135,10 +135,10 @@ initial_value = (x, y) -> exact_solution_manufactured_solution(x, y, 0.0)
 degree = 2
 volume_integral = Trixi.VolumeIntegralFluxDifferencing((Trixi.flux_ruedaramirez_etal,
                                                         Trixi.flux_nonconservative_ruedaramirez_etal))
-# solver = RKFR(volume_integral)
+solver = RKFR(volume_integral)
 # solver = TrixiRKSolver(volume_integral)
 # solver = TrixiRKSolver()
-solver = RKFR()
+# solver = RKFR()
 solution_points = "gll"
 correction_function = "g2"
 numerical_flux = Eq.rusanov

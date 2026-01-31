@@ -198,8 +198,9 @@ function compute_cell_residual_rkfr!(eq::AbstractNonConservativeEquations{2}, gr
     end # timer
 end
 
-function tenkai_flux_diff_kernel!(eq::AbstractNonConservativeEquations{2}, volume_flux, res, u,
-                                  grid, op, cache, element)
+function tenkai_flux_diff_kernel!(eq::AbstractNonConservativeEquations{2}, volume_flux,
+                                  res, u,
+                                  lamx, lamy, grid, op, cache, element)
     @unpack xg, Dsplit = op
     nx, ny = grid.size
     nd = length(xg)
@@ -220,22 +221,23 @@ function tenkai_flux_diff_kernel!(eq::AbstractNonConservativeEquations{2}, volum
         for ii in (i + 1):nd
             u_node_ii = get_node_vars(u, eq, ii, j)
             flux1 = volume_flux(u_node, u_node_ii, 1, trixi_equations)
-            multiply_add_to_node_vars!(res, Dsplit[i, ii], flux1, eq, i, j)
-            multiply_add_to_node_vars!(res, Dsplit[ii, i], flux1, eq, ii, j)
+            multiply_add_to_node_vars!(res, lamx * Dsplit[i, ii], flux1, eq, i, j)
+            multiply_add_to_node_vars!(res, lamx * Dsplit[ii, i], flux1, eq, ii, j)
         end
 
         # y direction
         for jj in (j + 1):nd
             u_node_jj = get_node_vars(u, eq, i, jj)
             flux2 = volume_flux(u_node, u_node_jj, 2, trixi_equations)
-            multiply_add_to_node_vars!(res, Dsplit[j, jj], flux2, eq, i, j)
-            multiply_add_to_node_vars!(res, Dsplit[jj, j], flux2, eq, i, jj)
+            multiply_add_to_node_vars!(res, lamy * Dsplit[j, jj], flux2, eq, i, j)
+            multiply_add_to_node_vars!(res, lamy * Dsplit[jj, j], flux2, eq, i, jj)
         end
     end
 end
 
-function tenkai_flux_diff_nc_kernel!(eq::AbstractNonConservativeEquations{2}, nonconservative_flux,
-                                     res, u, grid, op, cache, element)
+function tenkai_flux_diff_nc_kernel!(eq::AbstractNonConservativeEquations{2},
+                                     nonconservative_flux,
+                                     res, u, lamx, lamy, grid, op, cache, element)
     @unpack xg, Dsplit = op
     nx, ny = grid.size
     nd = length(xg)
@@ -256,7 +258,7 @@ function tenkai_flux_diff_nc_kernel!(eq::AbstractNonConservativeEquations{2}, no
             u_node_ii = get_node_vars(u, eq, ii, j)
             noncons_flux1 = nonconservative_flux(u_node, u_node_ii, 1, trixi_equations)
             integral_contribution = integral_contribution +
-                                    Dsplit[i, ii] * noncons_flux1
+                                    lamx * Dsplit[i, ii] * noncons_flux1
         end
 
         # y direction
@@ -264,20 +266,19 @@ function tenkai_flux_diff_nc_kernel!(eq::AbstractNonConservativeEquations{2}, no
             u_node_jj = get_node_vars(u, eq, i, jj)
             noncons_flux2 = nonconservative_flux(u_node, u_node_jj, 2, trixi_equations)
             integral_contribution = integral_contribution +
-                                    Dsplit[j, jj] * noncons_flux2
+                                    lamy * Dsplit[j, jj] * noncons_flux2
         end
 
         # The factor 0.5 cancels the factor 2 in the flux differencing form
         multiply_add_to_node_vars!(res, 0.5, integral_contribution,
-                                         eq, i, j)
+                                   eq, i, j)
     end
 end
 
 function compute_cell_residual_rkfr!(eq::AbstractNonConservativeEquations{2}, grid, op,
                                      problem,
-                                     scheme::Scheme{<:RKFR{<:VolumeIntegralFluxDifferencing}}, aux, t, dt,
-                                     u1, res, Fb,
-                                     ub, cache)
+                                     scheme::Scheme{<:RKFR{<:VolumeIntegralFluxDifferencing}},
+                                     aux, t, dt, u1, res, Fb, ub, cache)
     @timeit aux.timer "Cell residual" begin
     #! format: noindent
     @unpack xg, D1, Vl, Vr, Dm, Dsplit = op
@@ -305,8 +306,10 @@ function compute_cell_residual_rkfr!(eq::AbstractNonConservativeEquations{2}, gr
         ub_ = @view ub[:, :, :, el_x, el_y]
         Fb_ = @view Fb[:, :, :, el_x, el_y]
 
-        tenkai_flux_diff_kernel!(eq, symmetric_flux, r1, u, grid, op, cache, (el_x, el_y))
-        tenkai_flux_diff_nc_kernel!(eq, nonconservative_flux, r1, u, grid, op, cache, (el_x, el_y))
+        tenkai_flux_diff_kernel!(eq, symmetric_flux, r1, u, lamx, lamy, grid,
+                                 op, cache, (el_x, el_y))
+        tenkai_flux_diff_nc_kernel!(eq, nonconservative_flux, r1, u, lamx, lamy,
+                                    grid, op, cache, (el_x, el_y))
 
         for j in Base.OneTo(nd), i in Base.OneTo(nd) # solution points loop
             x = xc - 0.5 * dx + xg[i] * dx
@@ -329,8 +332,6 @@ function compute_cell_residual_rkfr!(eq::AbstractNonConservativeEquations{2}, gr
         end
 
         local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt)
-
-        Bb_to_res_cheap!(eq, local_grid, op, ub_, r1)
 
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid,
                              dx,
@@ -416,8 +417,8 @@ function compute_face_residual!(eq::AbstractNonConservativeEquations{2}, grid, o
 
             Fn = numerical_flux(X, ul, ur, Fl, Fr, Ul, Ur, eq, 1)
 
-            Fn_l = Fn + 0.5 * Bul
-            Fn_r = Fn + 0.5 * Bur
+            Fn_l = Fn + Bul
+            Fn_r = Fn + Bur
             Fn_l_limited, Fn_r_limited, _ = blend_face_residual_x!(el_x,
                                                                    el_y, jy,
                                                                    x, y, u1,
@@ -454,8 +455,8 @@ function compute_face_residual!(eq::AbstractNonConservativeEquations{2}, grid, o
             Bul, Bur = compute_non_cons_terms(ul, ur, Ul, Ur, x, y, t, 2, solver,
                                               eq)
             Fn = numerical_flux(X, ul, ur, Fl, Fr, Ul, Ur, eq, 2)
-            Fn_l = Fn + 0.5 * Bul
-            Fn_r = Fn + 0.5 * Bur
+            Fn_l = Fn + Bul
+            Fn_r = Fn + Bur
             Fn_l_limited, Fn_r_limited, _ = blend_face_residual_y!(el_x,
                                                                    el_y, ix,
                                                                    x, y,
