@@ -73,6 +73,7 @@ volume_integral = Trixi.VolumeIntegralFluxDifferencing((Trixi.flux_ruedaramirez_
 
 # solver = RKFR(volume_integral)
 solver = cRK44(volume_integral)
+# solver = cRK44()
 # solver = RKFR()
 solution_points = "gll"
 correction_function = "g2"
@@ -80,6 +81,9 @@ numerical_flux = Eq.rusanov
 bound_limit = "no"
 bflux = evaluate
 final_time = 20.0
+
+# iter,dt,t =  2053   1.8964e-03   4.2205e+00
+# ERROR: DomainError with -0.0002541286363241337:
 
 nx = 32
 ny = 32
@@ -90,7 +94,7 @@ save_iter_interval = 0
 save_time_interval = 0.0
 animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
-cfl_safety_factor = 0.5
+cfl_safety_factor = 0.9
 
 xmin, xmax = -1.0, 1.0
 ymin, ymax = -1.0, 1.0

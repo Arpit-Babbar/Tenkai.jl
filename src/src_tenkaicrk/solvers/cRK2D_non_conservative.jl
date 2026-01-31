@@ -842,6 +842,7 @@ function flux_der!(volume_integral::VolumeIntegralFluxDifferencing, # From Trixi
         flux1, flux2 = flux(x, y, u_node, eq)
         multiply_add_to_node_vars!(F, b_rk_coeff, flux1, eq, i, j)
         multiply_add_to_node_vars!(G, b_rk_coeff, flux2, eq, i, j)
+        multiply_add_to_node_vars!(U, b_rk_coeff, u_node, eq, i, j)
 
         for ii in Base.OneTo(nd)
             u_node_ii = get_node_vars(u_in, eq, ii, j)
@@ -860,8 +861,6 @@ function flux_der!(volume_integral::VolumeIntegralFluxDifferencing, # From Trixi
             # flux2 = flux(x, y, u_node, eq, 2)
             multiply_add_to_node_vars!(r1, 2.0 * b * lamy * Dm[jj, j], flux2, eq, i, jj)
         end
-
-        multiply_add_to_node_vars!(U, b_rk_coeff, u_node, eq, i, j)
 
         # TOTHINK - Should the `integral_contribution` approach be tried here?
         # TODO - This repetition needs to be fixed
@@ -978,34 +977,6 @@ function noncons_flux_der!(volume_integral::VolumeIntegralFluxDifferencing, # Fr
     trixi_equations = tenkai2trixiequation(eq)
     # Solution points
     # Compute the contribution of non-conservative equation (u_x, u_y)
-    # for j in Base.OneTo(nd), i in Base.OneTo(nd)
-    #     x_ = xc - 0.5 * dx + xg[j] * dx
-    #     y_ = yc - 0.5 * dy + xg[i] * dy
-    #     u_node = get_node_vars(u_in, eq, i, j)
-
-    #     integral_contribution = zero(u_node)
-    #     for ii in Base.OneTo(nd) # Computes derivative in reference coordinates
-    #         # TODO - Replace with multiply_non_conservative_node_vars!
-    #         # and then you won't need the `eq_nc` struct.
-    #         u_node_ii = get_node_vars(u_in, eq, ii, j)
-    #         noncons_flux1 = flux_non_conservative(u_node, u_node_ii, 1, trixi_equations)
-    #         integral_contribution = (integral_contribution +
-    #                                  lamx * Dm[i, ii] * noncons_flux1)
-    #     end
-
-    #     for jj in Base.OneTo(nd) # Computes derivative in reference coordinates
-    #         u_node_jj = get_node_vars(u_in, eq, i, jj)
-    #         noncons_flux2 = flux_non_conservative(u_node, u_node_jj, 2, trixi_equations)
-    #         integral_contribution = (integral_contribution +
-    #                                  lamy * Dm[j, jj] * noncons_flux2)
-    #     end
-
-    #     for i_u in eachindex(u_tuples_out)
-    #         u = u_tuples_out[i_u]
-    #         multiply_add_to_node_vars!(u, - A_rk_tuple[i_u], integral_contribution, eq, i, j)
-    #     end
-    #     multiply_add_to_node_vars!(res, b_rk_coeff, integral_contribution, eq, i, j)
-    # end
     for j in Base.OneTo(nd), i in Base.OneTo(nd)
         x_ = xc - 0.5 * dx + xg[j] * dx
         y_ = yc - 0.5 * dy + xg[i] * dy
@@ -1016,16 +987,14 @@ function noncons_flux_der!(volume_integral::VolumeIntegralFluxDifferencing, # Fr
             # TODO - Replace with multiply_non_conservative_node_vars!
             # and then you won't need the `eq_nc` struct.
             u_node_ii = get_node_vars(u_in, eq, ii, j)
-            u_non_cons_ii = calc_non_cons_gradient(u_node_ii, x_, y_, t, eq)
-            noncons_flux1 = calc_non_cons_Bu(u_node, u_non_cons_ii, x_, y_, t, 1, eq)
+            noncons_flux1 = flux_non_conservative(u_node, u_node_ii, 1, trixi_equations)
             integral_contribution = (integral_contribution +
                                      lamx * Dm[i, ii] * noncons_flux1)
         end
 
         for jj in Base.OneTo(nd) # Computes derivative in reference coordinates
             u_node_jj = get_node_vars(u_in, eq, i, jj)
-            u_non_cons_jj = calc_non_cons_gradient(u_node_jj, x_, y_, t, eq)
-            noncons_flux2 = calc_non_cons_Bu(u_node, u_non_cons_jj, x_, y_, t, 2, eq)
+            noncons_flux2 = flux_non_conservative(u_node, u_node_jj, 2, trixi_equations)
             integral_contribution = (integral_contribution +
                                      lamy * Dm[j, jj] * noncons_flux2)
         end
@@ -1088,7 +1057,9 @@ function source_term_implicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_
     end
 end
 
-function F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
+function F_G_S_to_res_Ub!(volume_integral::Union{VolumeIntegralWeak,
+                                                 VolumeIntegralWeakForm}, r1,
+                          Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                           eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     F, G, U, S = F_G_U_S
@@ -1127,7 +1098,8 @@ function F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid
     end
 end
 
-function F_G_S_to_res_Ub!(volume_integral::MyVolumeIntegralFluxDifferencing,
+function F_G_S_to_res_Ub!(volume_integral::Union{MyVolumeIntegralFluxDifferencing,
+                                                 VolumeIntegralFluxDifferencing},
                           r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                           eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, bV, Vl, Vr = op
@@ -1380,7 +1352,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     nx, ny = grid.size
     @unpack solver = scheme
     @unpack volume_integral = solver
-    @unpack cheap_noncons_extrapolation = volume_integral
+    cheap_noncons_extrapolation = get_extrapolation_type(volume_integral)
     @unpack compute_bflux! = scheme.bflux
     @unpack blend = aux
     @unpack bl, br = op
@@ -1463,7 +1435,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
 end
 
 function get_extrapolation_type(volume_integral::VolumeIntegralFluxDifferencing)
-    return True()
+    return False()
 end
 
 function get_extrapolation_type(volume_integral)
