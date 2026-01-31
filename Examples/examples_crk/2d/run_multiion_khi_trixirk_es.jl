@@ -71,7 +71,9 @@ degree = 3
 volume_integral = Trixi.VolumeIntegralFluxDifferencing((Trixi.flux_ruedaramirez_etal,
                                                         Trixi.flux_nonconservative_ruedaramirez_etal))
 
-solver = TrixiRKSolver(volume_integral)
+# solver = RKFR(volume_integral)
+solver = cRK44(volume_integral)
+# solver = RKFR()
 solution_points = "gll"
 correction_function = "g2"
 numerical_flux = Eq.rusanov
@@ -79,16 +81,16 @@ bound_limit = "no"
 bflux = evaluate
 final_time = 20.0
 
-nx = 64
-ny = 64
+nx = 32
+ny = 32
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
 save_iter_interval = 0
-save_time_interval = 0.2
+save_time_interval = 0.0
 animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
-cfl_safety_factor = 0.9
+cfl_safety_factor = 0.5
 
 xmin, xmax = -1.0, 1.0
 ymin, ymax = -1.0, 1.0
