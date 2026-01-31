@@ -71,10 +71,7 @@ degree = 3
 volume_integral = Trixi.VolumeIntegralFluxDifferencing((Trixi.flux_ruedaramirez_etal,
                                                         Trixi.flux_nonconservative_ruedaramirez_etal))
 
-# solver = RKFR(volume_integral)
-solver = cRK44(volume_integral)
-# solver = cRK44()
-# solver = RKFR()
+solver = TrixiRKSolver(volume_integral)
 solution_points = "gll"
 correction_function = "g2"
 numerical_flux = Eq.rusanov
@@ -82,11 +79,8 @@ bound_limit = "no"
 bflux = evaluate
 final_time = 20.0
 
-# iter,dt,t =  2053   1.8964e-03   4.2205e+00
-# ERROR: DomainError with -0.0002541286363241337:
-
-nx = 32
-ny = 32
+nx = 64
+ny = 64
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
