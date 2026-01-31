@@ -649,6 +649,19 @@ end
     data_name = "multiion_convergence_rk_flux_diff.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 
+    volume_integral = Trixi.VolumeIntegralFluxDifferencing((Trixi.flux_ruedaramirez_etal,
+                                                            Trixi.flux_nonconservative_ruedaramirez_etal))
+    trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_convergence.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  degree = 3,
+                  solver = cRK44(volume_integral),
+                  animate = false, final_time = 0.1, nx = 8, ny = 8,
+                  correction_function = "g2",
+                  solution_points = "gll")
+    data_name = "multiion_convergence_crk_flux_diff.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
     trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_convergence.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,

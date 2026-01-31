@@ -132,22 +132,17 @@ end
 
 initial_value = (x, y) -> exact_solution_manufactured_solution(x, y, 0.0)
 
-degree = 3
-
-volume_integral = Trixi.VolumeIntegralFluxDifferencing((Trixi.flux_ruedaramirez_etal,
-                                                        Trixi.flux_nonconservative_ruedaramirez_etal))
-
-solver = cRK44()
-solver = cRK44(volume_integral)
-solution_points = "gll"
-correction_function = "g2"
+degree = 1
+solver = cRK22()
+solution_points = "gl"
+correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "no"
 bflux = evaluate
 final_time = 1.0
 
-nx = 20
-ny = 20
+nx = 100
+ny = 100
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
