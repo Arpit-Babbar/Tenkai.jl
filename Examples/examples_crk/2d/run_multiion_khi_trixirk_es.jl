@@ -97,6 +97,8 @@ domain = [xmin, xmax, ymin, ymax]
 
 boundary_condition = (periodic, periodic, reflect, reflect)
 
+# TODO - Add source terms here
+
 ###############################################################################
 # ODE solvers, callbacks etc.
 

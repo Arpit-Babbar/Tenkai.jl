@@ -198,6 +198,190 @@ function compute_cell_residual_rkfr!(eq::AbstractNonConservativeEquations{2}, gr
     end # timer
 end
 
+function tenkai_flux_diff_kernel!(eq::AbstractNonConservativeEquations{2}, volume_flux,
+                                  res, u,
+                                  lamx, lamy, grid, op, cache, element)
+    @unpack xg, Dsplit = op
+    nx, ny = grid.size
+    nd = length(xg)
+    nvar = nvariables(eq)
+
+    trixi_equations = tenkai2trixiequation(eq)
+
+    for j in 1:nd, i in 1:nd
+        # u_node = Trixi.get_node_vars(u, equations, dg, i, j, element...)
+        u_node = get_node_vars(u, eq, i, j)
+
+        # All diagonal entries of `derivative_split` are zero. Thus, we can skip
+        # the computation of the diagonal terms. In addition, we use the symmetry
+        # of the `volume_flux` to save half of the possible two-point flux
+        # computations.
+
+        # x direction
+        for ii in (i + 1):nd
+            u_node_ii = get_node_vars(u, eq, ii, j)
+            flux1 = volume_flux(u_node, u_node_ii, 1, trixi_equations)
+            multiply_add_to_node_vars!(res, lamx * Dsplit[i, ii], flux1, eq, i, j)
+            multiply_add_to_node_vars!(res, lamx * Dsplit[ii, i], flux1, eq, ii, j)
+        end
+
+        # y direction
+        for jj in (j + 1):nd
+            u_node_jj = get_node_vars(u, eq, i, jj)
+            flux2 = volume_flux(u_node, u_node_jj, 2, trixi_equations)
+            multiply_add_to_node_vars!(res, lamy * Dsplit[j, jj], flux2, eq, i, j)
+            multiply_add_to_node_vars!(res, lamy * Dsplit[jj, j], flux2, eq, i, jj)
+        end
+    end
+end
+
+function tenkai_flux_diff_nc_kernel!(eq::AbstractNonConservativeEquations{2},
+                                     nonconservative_flux,
+                                     res, u, lamx, lamy, grid, op, cache, element)
+    @unpack xg, Dsplit = op
+    nx, ny = grid.size
+    nd = length(xg)
+    nvar = nvariables(eq)
+
+    trixi_equations = tenkai2trixiequation(eq)
+
+    # Calculate the remaining volume terms using the nonsymmetric generalized flux
+    for j in 1:nd, i in 1:nd
+        u_node = get_node_vars(u, eq, i, j)
+
+        # The diagonal terms are zero since the diagonal of `derivative_split`
+        # is zero. We ignore this for now.
+
+        # x direction
+        integral_contribution = zero(u_node)
+        for ii in 1:nd
+            u_node_ii = get_node_vars(u, eq, ii, j)
+            noncons_flux1 = nonconservative_flux(u_node, u_node_ii, 1, trixi_equations)
+            integral_contribution = integral_contribution +
+                                    lamx * Dsplit[i, ii] * noncons_flux1
+        end
+
+        # y direction
+        for jj in 1:nd
+            u_node_jj = get_node_vars(u, eq, i, jj)
+            noncons_flux2 = nonconservative_flux(u_node, u_node_jj, 2, trixi_equations)
+            integral_contribution = integral_contribution +
+                                    lamy * Dsplit[j, jj] * noncons_flux2
+        end
+
+        # The factor 0.5 cancels the factor 2 in the flux differencing form
+        multiply_add_to_node_vars!(res, 0.5, integral_contribution,
+                                   eq, i, j)
+    end
+end
+
+function compute_cell_residual_rkfr!(eq::AbstractNonConservativeEquations{2}, grid, op,
+                                     problem,
+                                     scheme::Scheme{<:RKFR{<:VolumeIntegralFluxDifferencing}},
+                                     aux, t, dt, u1, res, Fb, ub, cache)
+    @timeit aux.timer "Cell residual" begin
+    #! format: noindent
+    @unpack xg, D1, Vl, Vr, Dm, Dsplit = op
+    nx, ny = grid.size
+    nd = length(xg)
+    nvar = nvariables(eq)
+    @unpack bflux_ind = scheme.bflux
+    @unpack blend = aux
+    @unpack blend_cell_residual! = blend.subroutines
+    @unpack source_terms = problem
+    @unpack solver = scheme
+    symmetric_flux, nonconservative_flux = solver.volume_integral.volume_flux
+    refresh!(u) = fill!(u, zero(eltype(u)))
+
+    refresh!.((ub, Fb, res))
+    @timeit aux.timer "Cell loop" begin
+    #! format: noindent
+    @threaded for element in CartesianIndices((1:nx, 1:ny)) # element loop
+        el_x, el_y = element[1], element[2]
+        dx, dy = grid.dx[el_x], grid.dy[el_y]
+        xc, yc = grid.xc[el_x], grid.yc[el_y]
+        lamx, lamy = dt / dx, dt / dy
+        u = @view u1[:, :, :, el_x, el_y]
+        r1 = @view res[:, :, :, el_x, el_y]
+        ub_ = @view ub[:, :, :, el_x, el_y]
+        Fb_ = @view Fb[:, :, :, el_x, el_y]
+
+        tenkai_flux_diff_kernel!(eq, symmetric_flux, r1, u, lamx, lamy, grid,
+                                 op, cache, (el_x, el_y))
+        tenkai_flux_diff_nc_kernel!(eq, nonconservative_flux, r1, u, lamx, lamy,
+                                    grid, op, cache, (el_x, el_y))
+
+        for j in Base.OneTo(nd), i in Base.OneTo(nd) # solution points loop
+            x = xc - 0.5 * dx + xg[i] * dx
+            y = yc - 0.5 * dy + xg[j] * dy
+            X = SVector(x, y)
+            u_node = get_node_vars(u, eq, i, j)
+
+            s_node = calc_source(u_node, X, t, source_terms, eq)
+            multiply_add_to_node_vars!(r1, -dt, s_node, eq, i, j)
+
+            # Ub = UT * V
+            # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
+            multiply_add_to_node_vars!(ub_, Vl[i], u_node, eq, j, 1)
+            multiply_add_to_node_vars!(ub_, Vr[i], u_node, eq, j, 2)
+
+            # Ub = U * V
+            # Ub[i] += ∑_j U[i,j]*V[j]
+            multiply_add_to_node_vars!(ub_, Vl[j], u_node, eq, i, 3)
+            multiply_add_to_node_vars!(ub_, Vr[j], u_node, eq, i, 4)
+        end
+
+        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt)
+
+        blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid,
+                             dx,
+                             dy,
+                             grid.xf[el_x], grid.yf[el_y], op, u1, u,
+                             nothing, res)
+
+        if bflux_ind == extrapolate
+            # Very inefficient, not meant to be used.
+            for j in Base.OneTo(nd), i in Base.OneTo(nd) # solution points loop
+                x = xc - 0.5 * dx + xg[i] * dx
+                y = yc - 0.5 * dy + xg[j] * dy
+                u_node = get_node_vars(u, eq, i, j)
+                f_node, g_node = flux(x, y, u_node, eq)
+
+                # Ub = UT * V
+                # Ub[j] += ∑_i UT[j,i] * V[i] = ∑_i U[i,j] * V[i]
+                multiply_add_to_node_vars!(Fb_, Vl[i], f_node, eq, j, 1)
+                multiply_add_to_node_vars!(Fb_, Vr[i], f_node, eq, j, 2)
+
+                # Ub = U * V
+                # Ub[i] += ∑_j U[i,j]*V[j]
+                multiply_add_to_node_vars!(Fb_, Vl[j], g_node, eq, i, 3)
+                multiply_add_to_node_vars!(Fb_, Vr[j], g_node, eq, i, 4)
+            end
+        else
+            xl, xr = grid.xf[el_x], grid.xf[el_x + 1]
+            yd, yu = grid.yf[el_y], grid.yf[el_y + 1]
+            dx, dy = grid.dx[el_x], grid.dy[el_y]
+            for ii in 1:nd
+                ubl, ubr = get_node_vars(ub_, eq, ii, 1),
+                           get_node_vars(ub_, eq, ii, 2)
+                ubd, ubu = get_node_vars(ub_, eq, ii, 3),
+                           get_node_vars(ub_, eq, ii, 4)
+                x = xc - 0.5 * dx + xg[ii] * dx
+                y = yc - 0.5 * dy + xg[ii] * dy
+                fbl, fbr = flux(xl, y, ubl, eq, 1), flux(xr, y, ubr, eq, 1)
+                fbd, fbu = flux(x, yd, ubd, eq, 2), flux(x, yu, ubu, eq, 2)
+                set_node_vars!(Fb_, fbl, eq, ii, 1)
+                set_node_vars!(Fb_, fbr, eq, ii, 2)
+                set_node_vars!(Fb_, fbd, eq, ii, 3)
+                set_node_vars!(Fb_, fbu, eq, ii, 4)
+            end
+        end
+    end
+    end # timer
+    return nothing
+    end # timer
+end
+
 function compute_face_residual!(eq::AbstractNonConservativeEquations{2}, grid, op,
                                 cache, problem,
                                 scheme::Scheme{<:Union{String, RKFR}}, param, aux, t,
