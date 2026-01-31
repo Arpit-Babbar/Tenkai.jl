@@ -71,7 +71,10 @@ degree = 3
 volume_integral = Trixi.VolumeIntegralFluxDifferencing((Trixi.flux_ruedaramirez_etal,
                                                         Trixi.flux_nonconservative_ruedaramirez_etal))
 
-solver = TrixiRKSolver(volume_integral)
+# solver = RKFR(volume_integral)
+solver = cRK44(volume_integral)
+# solver = cRK44()
+# solver = RKFR()
 solution_points = "gll"
 correction_function = "g2"
 numerical_flux = Eq.rusanov
@@ -79,13 +82,16 @@ bound_limit = "no"
 bflux = evaluate
 final_time = 20.0
 
-nx = 64
-ny = 64
+# iter,dt,t =  2053   1.8964e-03   4.2205e+00
+# ERROR: DomainError with -0.0002541286363241337:
+
+nx = 32
+ny = 32
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
 save_iter_interval = 0
-save_time_interval = 0.2
+save_time_interval = 0.0
 animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
 cfl_safety_factor = 0.9
@@ -97,7 +103,9 @@ domain = [xmin, xmax, ymin, ymax]
 
 boundary_condition = (periodic, periodic, reflect, reflect)
 
-# TODO - Add source terms here
+function source_terms_lorentz_khi(u, x, t, eq::MultiIonMHD2D)
+    Trixi.source_terms_lorentz(u, x, t, eq.trixi_equations)
+end
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -105,7 +113,7 @@ boundary_condition = (periodic, periodic, reflect, reflect)
 grid_size = [nx, ny]
 
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
-                  final_time, exact_solution_khi)
+                  final_time, exact_solution_khi, source_terms = source_terms_lorentz_khi)
 limiter_blend = setup_limiter_blend(blend_type = fo_blend(eq),
                                     # indicating_variables = Eq.rho_p_indicator!,
                                     indicating_variables = conservative_indicator!,
