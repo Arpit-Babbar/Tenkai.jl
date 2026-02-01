@@ -9,11 +9,11 @@ import Tenkai.TenkaicRK.Trixi
 ###############################################################################
 
 # semidiscretization of the ideal multi-ion MHD equations
+cfl_safety_factor = 0.34
 trixi_equations = IdealGlmMhdMultiIonEquations2D(gammas = (5 / 3, 1.4),
                                                  charge_to_mass = (1, 1 / 2),
                                                  initial_c_h = 0.0)
-
-eq = Eq.get_equation(trixi_equations) # Deactivate GLM divergence cleaning
+eq = Eq.get_equation(trixi_equations; glm_scale = cfl_safety_factor) # Deactivate GLM divergence cleaning
 
 """
 Initial (and exact) solution for the the manufactured solution test. Runs with 
@@ -71,7 +71,7 @@ degree = 3
 volume_integral = Trixi.VolumeIntegralFluxDifferencing((Trixi.flux_ruedaramirez_etal,
                                                         Trixi.flux_nonconservative_ruedaramirez_etal))
 
-solver = TrixiRKSolver(volume_integral)
+solver = cRK44(volume_integral)
 solution_points = "gll"
 correction_function = "g2"
 numerical_flux = Eq.rusanov
@@ -85,10 +85,9 @@ cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
 save_iter_interval = 0
-save_time_interval = 0.2
+save_time_interval = 0.5
 animate = true # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
-cfl_safety_factor = 0.9
 
 xmin, xmax = -1.0, 1.0
 ymin, ymax = -1.0, 1.0
@@ -97,7 +96,9 @@ domain = [xmin, xmax, ymin, ymax]
 
 boundary_condition = (periodic, periodic, reflect, reflect)
 
-# TODO - Add source terms here
+function source_terms_lorentz_khi(u, x, t, eq::MultiIonMHD2D)
+    Trixi.source_terms_lorentz(u, x, t, eq.trixi_equations)
+end
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -105,16 +106,7 @@ boundary_condition = (periodic, periodic, reflect, reflect)
 grid_size = [nx, ny]
 
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
-                  final_time, exact_solution_khi)
-limiter_blend = setup_limiter_blend(blend_type = fo_blend(eq),
-                                    # indicating_variables = Eq.rho_p_indicator!,
-                                    indicating_variables = conservative_indicator!,
-                                    reconstruction_variables = conservative_reconstruction,
-                                    indicator_model = "gassner",
-                                    debug_blend = false,
-                                    amax = 0.01,
-                                    pure_fv = false)
-limiter = limiter_blend
+                  final_time, exact_solution_khi, source_terms = source_terms_lorentz_khi)
 limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
