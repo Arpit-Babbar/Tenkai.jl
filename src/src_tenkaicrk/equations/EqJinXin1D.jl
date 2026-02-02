@@ -414,7 +414,7 @@ function modal_smoothness_indicator_gassner(eq::JinXin1D, t, iter,
         end
         E[i] = maximum(ind) # maximum content among all indicating variables
 
-        epsilon_arr[i] = max(epsilon_min, min(epsilon_max, E[i]))
+        epsilon_arr[i] = max(epsilon_min, min(epsilon_max, 200000 * E[i]))
     end
 
     if problem.periodic_x
@@ -446,8 +446,6 @@ function modal_smoothness_indicator_gassner(eq::JinXin1D, t, iter,
     if dt > 0.0
         blend.dt[1] = dt # hacky fix for compatibility with OrdinaryDiffEq
     end
-
-    @show maximum(epsilon_arr)
 
     blend.lamx .= zero(eltype(blend.lamx))
 
@@ -490,7 +488,7 @@ function get_equation(equations::AbstractEquations{NDIMS, NVARS},
     numfluxes = Dict("roe" => roe, "rusanov" => rusanov)
     initial_values = Dict()
 
-    RealT = Float64 # TODO - Float64!
+    RealT = typeof(epsilon) # TODO - Float64!
 
     TWO_NVAR = 2 * NVARS
 

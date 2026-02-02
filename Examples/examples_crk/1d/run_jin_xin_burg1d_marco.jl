@@ -19,11 +19,11 @@ advection_jin_xin = (x, u, eq) -> A()^2 * u
 advection_jin_xin_plus(ul, ur, F, eq) = 0.5 * (F[1] + A() * F[2]) * SVector(A(), 1.0)
 advection_jin_xin_minus(ul, ur, F, eq) = 0.5 * (F[1] - A() * F[2]) * SVector(-A(), 1.0)
 
-nx = 20
+nx = 100
 
 equation_jin_xin = Eq.get_equation(equation_burg, advection_jin_xin, advection_jin_xin_plus,
                                    advection_jin_xin_minus, epsilon_relaxation, nx;
-                                   thresholds = (1e-4, 1e-3))
+                                   thresholds = (1.5e-12, 2e-3))
 
 # initial_value_burg = EqBurg1D.initial_value_burger_sin
 
@@ -90,7 +90,7 @@ scheme = Scheme(solver, degree, solution_points, correction_function,
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
                    animate = animate,
-                   cfl_safety_factor = cfl_safety_factor)
+                   cfl_safety_factor = cfl_safety_factor, saveto = "jinxin_nx$nx")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation_jin_xin, problem, scheme, param);
 
