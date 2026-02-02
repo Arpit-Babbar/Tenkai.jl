@@ -2329,10 +2329,10 @@ function Blend(eq::AbstractEquations{1}, op, grid,
 
     @unpack p_ua = plot_data
 
-    for n in 0:(nvar - 1)
-        plot!(p_ua[end - n], grid.xc, alpha[1:(end - 1)], seriestype = :scatter,
-              markershape = :square, color = :black, markersize = 1)
-    end
+    # for n in 0:(nvar - 1)
+    #     plot!(p_ua[end - n], grid.xc, alpha[1:(end - 1)], seriestype = :scatter,
+    #           markershape = :square, color = :black, markersize = 1)
+    # end
 
     # Elastic arrays to create space time diagrams
     RealT = eltype(grid.xc)

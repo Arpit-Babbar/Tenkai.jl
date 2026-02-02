@@ -1178,7 +1178,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     nx, ny = grid.size
     @unpack solver = scheme
     @unpack volume_integral = solver
-    @unpack cheap_noncons_extrapolation = volume_integral
+    cheap_noncons_extrapolation = get_extrapolation_type(volume_integral)
     @unpack compute_bflux! = scheme.bflux
     @unpack blend = aux
     @unpack bl, br = op
