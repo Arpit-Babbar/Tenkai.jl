@@ -19,7 +19,7 @@ advection_jin_xin = (x, u, eq) -> A()^2 * u
 advection_jin_xin_plus(ul, ur, F, eq) = 0.5 * (F[1] + A() * F[2]) * SVector(A(), 1.0)
 advection_jin_xin_minus(ul, ur, F, eq) = 0.5 * (F[1] - A() * F[2]) * SVector(-A(), 1.0)
 
-nx = 100
+nx = 20
 
 equation_jin_xin = Eq.get_equation(equation_burg, advection_jin_xin, advection_jin_xin_plus,
                                    advection_jin_xin_minus, epsilon_relaxation, nx;

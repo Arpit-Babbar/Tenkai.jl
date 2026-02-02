@@ -32,6 +32,8 @@ import Tenkai.TenkaicRK: implicit_source_solve, get_cache_node_vars
 
 using Tenkai.TenkaicRK: newton_solver
 
+import Tenkai.EqEuler1D: rho_p_indicator!, rusanov, max_abs_eigen_value
+
 (using Tenkai: PlotData, data_dir, get_filename, neumann, minmod,
                get_node_vars,
                nvariables, eachvariable,
@@ -297,9 +299,14 @@ function max_abs_eigen_value(eq::JinXin1D, u)
 end
 
 @inbounds @inline function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::JinXin1D, dir)
-    λ = max(max_abs_eigen_value(eq, ual), max_abs_eigen_value(eq, uar)) # local wave speed
+    λ = max(max_abs_eigen_value(eq.equations, ual), max_abs_eigen_value(eq.equations, uar)) # local wave speed
 
     return 0.5 * (Fl + Fr - λ * (Ur - Ul))
+    # rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq.equations, dir)
+end
+
+@inbounds @inline function rho_p_indicator!(un, eq::JinXin1D)
+    return Tenkai.EqEuler1D.rho_p_indicator!(un, eq.equations)
 end
 
 function pre_process_limiter!(eq::JinXin1D, t, iter, fcount, dt, grid, problem, scheme,
@@ -308,7 +315,8 @@ function pre_process_limiter!(eq::JinXin1D, t, iter, fcount, dt, grid, problem, 
     #! format: noindent
     @timeit aux.timer "Pre process limiter" begin
     #! format: noindent
-    @unpack indicator_model = eq
+    @unpack limiter = scheme
+    @unpack indicator_model = limiter
     update_ghost_values_u1!(eq, problem, grid, op, u1, aux, t)
     # This will set epislon to E, and keep alpha to be zero.
     if indicator_model == "gassner"
@@ -449,6 +457,9 @@ function modal_smoothness_indicator_gassner(eq::JinXin1D, t, iter,
 
     blend.lamx .= zero(eltype(blend.lamx))
 
+    alpha .= 0.0
+    alpha0 .= 0.0
+
     # KLUDGE - Should this be in apply_limiter! function?
     debug_blend_limiter!(eq, grid, problem, scheme, param, aux, op,
                          dt, t, iter, fcount, ua, u1)
@@ -465,7 +476,7 @@ function compute_time_step(eq::JinXin1D, problem, grid, aux, op, cfl, u1,
                            ua)
     @timeit aux.timer "Time step computation" begin
     #! format: noindent
-    speed = eq.equations.speed
+    # speed = eq.equations.speed
     nx = grid.size
     xc = grid.xc
     dx = grid.dx

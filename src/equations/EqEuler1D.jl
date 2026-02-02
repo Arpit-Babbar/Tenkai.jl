@@ -389,6 +389,15 @@ function chandrashekar!(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler1D, dir, F)
     return nothing
 end
 
+function max_abs_eigen_value(eq::Euler1D, u)
+    @unpack γ = eq
+    ρ = u[1]
+    v = u[2] / ρ
+    p = (γ - 1.0) * (u[3] - 0.5 * u[2]^2 / ρ)
+    c = sqrt(γ * p / ρ)
+    return abs(v) + c
+end
+
 @inbounds @inline function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler1D, dir)
     @unpack γ = eq
     rho_ll, rho_v1_ll, rho_e_ll = ual
