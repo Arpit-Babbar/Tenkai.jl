@@ -13,7 +13,7 @@ initial_value = Eq.isentropic_iv
 exact_solution = Eq.isentropic_exact
 
 degree = 3
-solver = cRK44()
+solver = "mdrk"
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
@@ -21,8 +21,8 @@ bound_limit = "yes"
 bflux = evaluate
 final_time = 1.0 # 20 * sqrt(2.0) / 0.5
 
-nx = 60
-ny = 60
+nx = 120
+ny = 120
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
@@ -45,7 +45,7 @@ limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               debug_blend = false,
                               pure_fv = true,
                               tvbM = Inf)
-limiter = setup_limiter_none()
+# limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux,
                 2)
