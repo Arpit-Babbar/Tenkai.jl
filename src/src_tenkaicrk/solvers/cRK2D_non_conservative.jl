@@ -834,6 +834,11 @@ function flux_der!(volume_integral::Union{VolumeIntegralFluxDifferencing,
 end
 
 function noncons_flux_der!(volume_integral, u_tuples_out, res, A_rk_tuple, b_rk_coeff, u_in,
+                           op, local_grid, eq::AbstractEquations{2})
+    return nothing
+end
+
+function noncons_flux_der!(volume_integral, u_tuples_out, res, A_rk_tuple, b_rk_coeff, u_in,
                            op, local_grid, eq::AbstractNonConservativeEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     xc, yc, dx, dy, lamx, lamy, t, dt = local_grid
@@ -1118,6 +1123,12 @@ end
     return nothing
 end
 
+function Bb_to_res!(eq::AbstractEquations{2},
+                    cheap_noncons_extrapolation,
+                    tb_rk, local_grid, op, Ub, res, u1_, ustages, eval_data)
+    return nothing
+end
+
 function Bb_to_res!(eq::AbstractNonConservativeEquations{2},
                     cheap_noncons_extrapolation::True,
                     tb_rk, local_grid, op, Ub, res, u1_, ustages, eval_data)
@@ -1352,7 +1363,7 @@ function get_extrapolation_type(volume_integral)
     return volume_integral.cheap_noncons_extrapolation
 end
 
-function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, op,
+function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
                                     problem, scheme::Scheme{<:cRK44}, aux, t, dt, cache)
     @timeit aux.timer "Cell residual" begin
     #! format: noindent
