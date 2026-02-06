@@ -780,5 +780,4 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
         end
     end # timer
 end
-
 end # muladd
