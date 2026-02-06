@@ -478,6 +478,8 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::MHD2D, grid,
         println("Wrote final average solution to avg.vtr.")
     end
 
+    println("Wrote average solution to $filename.vtr")
+
     write_poly(eq, grid, op, u1, fcount)
 
     fcount += 1
