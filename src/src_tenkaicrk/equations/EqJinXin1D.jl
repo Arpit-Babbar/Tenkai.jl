@@ -170,58 +170,12 @@ end
     return 0.5 * (Fl + Fr)
 end
 
-function my_correct_variable_bound_limiter!(variable, eq,
-                                            grid, op, ua, u1)
-    @unpack Vl, Vr = op
-    nx = grid.size
-    nd = op.degree + 1
-    eps = 1e-10 # TODO - Get a better one
-    for element in 1:nx
-        var_ll = var_rr = 0.0
-        var_min = 1e20
-        for i in Base.OneTo(nd)
-            u_node = get_node_vars(u1, eq, i, element)
-            var = variable(eq, u_node)
-            var_ll += var * Vl[i]
-            var_rr += var * Vr[i]
-            var_min = min(var_min, var)
-        end
-        var_min = min(var_min, var_ll, var_rr)
-
-        # In order to correct the solution at the faces, we need to extrapolate it to faces
-        # and then correct it.
-        ul = Tenkai.sum_node_vars_1d(Vl, u1, eq, 1:nd, element) # ul = ∑ Vl*u
-        ur = Tenkai.sum_node_vars_1d(Vr, u1, eq, 1:nd, element) # ur = ∑ Vr*u
-        var_u_ll, var_u_rr = variable(eq, ul), variable(eq, ur)
-        var_min = min(var_min, var_u_ll, var_u_rr)
-
-        ua_ = get_node_vars(ua, eq, element)
-        var_avg = variable(eq, ua_)
-        @assert var_avg>0.0 "Failed at element $element", var_avg
-        eps_ = min(eps, 0.1 * var_avg)
-        ratio = abs(eps_ - var_avg) / (abs(var_min - var_avg) + 1e-13)
-        theta = min(ratio, 1.0) # theta for preserving positivity of density
-        if var_avg < 0.0
-            theta = 0.0
-        end
-        if theta < 1.0
-            for i in 1:nd
-                u_node = get_node_vars(u1, eq, i, element)
-                multiply_add_set_node_vars!(u1,
-                                            theta, u_node,
-                                            1 - theta, ua_,
-                                            eq, i, element)
-            end
-        end
-    end
-end
-
 function iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
                                           u1, aux, variables::NTuple{N, Any}) where {N}
     variable = first(variables)
     remaining_variables = Base.tail(variables)
 
-    my_correct_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
+    correct_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
 
     # test_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
     iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,

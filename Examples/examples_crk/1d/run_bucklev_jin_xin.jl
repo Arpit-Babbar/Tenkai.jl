@@ -47,7 +47,7 @@ bflux = evaluate
 numerical_flux = EqJinXin.rusanov
 bound_limit = "no"
 
-nx = 300
+nx = 200
 cfl = 0.0
 bounds = ([0.0], [1.0])
 tvbM = 0.0

@@ -686,7 +686,7 @@ function Tenkai.apply_bound_limiter!(eq::Euler1D, grid, scheme, param, op, ua,
             println("Fatal: Negative states in cell averages")
             @show variable
             println("       minimum cell average = $eps")
-            # throw(DomainError(eps, "Positivity limiter failed"))
+            throw(DomainError(eps, "Positivity limiter failed"))
         end
     end
 
