@@ -1152,6 +1152,7 @@ function exact_solution_data(test_case)
         exact_data[:, 4] = temp
     elseif test_case == "dwave"
         nx = 1000
+        RealT = Float64 # Can't be improved
         exact_data = zeros(RealT, nx, 4)
         exact_data[:, 1] .= LinRange(0.0, 1.0, nx)
         for i in 1:nx
