@@ -23,7 +23,7 @@ nx = 20
 
 equation_jin_xin = Eq.get_equation(equation_burg, advection_jin_xin, advection_jin_xin_plus,
                                    advection_jin_xin_minus, epsilon_relaxation, nx;
-                                   thresholds = (1.5e-12, 0.25e-3))
+                                   thresholds = (1.5e-12, 2.0e-3))
 
 # initial_value_burg = EqBurg1D.initial_value_burger_sin
 

@@ -134,15 +134,16 @@ end
 # equation is lhs + coefficient * s(u^{n+1}) = u^{n+1}
 function implicit_source_solve(lhs, eq_jin_xin::JinXin1D, x, t, coefficient,
                                source_terms::typeof(jin_xin_source),
-                               u_node, implicit_solver = nothing)
+                               aux_node, implicit_solver = nothing)
+    (u_node, epsilon_node) = aux_node
     equations = eq_jin_xin.equations
     u_var_new = u_var(lhs, eq_jin_xin) # Since there is no source term for this part
     flux_new = flux(x, u_var_new, equations)
     v_lhs = v_var(lhs, eq_jin_xin)
-    epsilon = eq_jin_xin.epsilon
+    epsilon = epsilon_node
     v_var_new = (epsilon * v_lhs + coefficient * flux_new) / (epsilon + coefficient)
     sol_new = SVector(u_var_new..., v_var_new...)
-    source = jin_xin_source(sol_new, x, t, eq_jin_xin)
+    source = jin_xin_source(sol_new, epsilon_node, x, t, eq_jin_xin)
     return sol_new, source
 end
 
@@ -207,7 +208,7 @@ function max_abs_eigen_value(eq::JinXin1D, u)
 end
 
 @inbounds @inline function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::JinXin1D, dir)
-    λ = max(max_abs_eigen_value(eq.equations, ual), max_abs_eigen_value(eq.equations, uar)) # local wave speed
+    λ = λ = max(max_abs_eigen_value(eq, ual), max_abs_eigen_value(eq, uar))
 
     return 0.5 * (Fl + Fr - λ * (Ur - Ul))
     # rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq.equations, dir)
@@ -433,7 +434,7 @@ function compute_time_step(eq_jin_xin::JinXin1D, problem, grid, aux, op, cfl, u1
     end
 
     # Jin-Xin constant is made larger by this factor
-    dt_scaling = 0.5
+    dt_scaling = 1.0
 
     dt = cfl * dt_scaling^2 / den
     eq_jin_xin.advection_evolution[1] = jin_xin_adv / dt_scaling
