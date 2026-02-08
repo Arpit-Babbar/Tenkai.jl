@@ -17,9 +17,15 @@ equation_euler = Eq.get_equation(γ)
 A = () -> 100.0
 
 advection_jin_xin = (x, u, eq) -> A()^2 * u
+<<<<<<< HEAD
 nx = 50
 
 epsilon_relaxation = 1e-6
+=======
+nx = 400
+
+epsilon_relaxation = 0.4e-7
+>>>>>>> master
 
 advection_jin_xin_plus(ul, ur, F, eq) = nothing
 advection_jin_xin_minus(ul, ur, F, eq) = nothing

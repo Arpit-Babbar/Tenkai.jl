@@ -44,6 +44,10 @@ import Tenkai.EqEuler1D: rho_p_indicator!, rusanov, max_abs_eigen_value
 
 import Tenkai.EqEuler1D: max_abs_eigen_value, get_density, get_pressure
 
+import Tenkai.EqEuler1D: max_abs_eigen_value, get_density, get_pressure
+
+import Tenkai.TenkaicRK: implicit_source_solve
+
 # The original system is u_t + f(u)_x = 0. The Jin-Xin relaxed system has variables (u,v).
 # The flux is (v, advection(u)). The source terms are (0, -(v-f(u)) / epsilon).
 
@@ -104,27 +108,19 @@ function jin_xin_source(u, epsilon, x, t, eq::JinXin1D)
     return SVector(source_1..., source_2...)
 end
 
-function get_cache_node_vars(aux, u1, problem, scheme, eq::JinXin1D, i, cell)
-    u_node = get_node_vars(u1, eq, i, cell)
-    epsilon_node = eq.epsilon_arr[cell]
-    return (u_node, epsilon_node)
-end
-
-function implicit_source_solve(lhs, eq::JinXin1D, x, t, coefficient, source_terms, aux_node,
-                               implicit_solver = newton_solver)
-    (u_node, epsilon_node) = aux_node
-    # TODO - Make sure that the final source computation is used after the implicit solve
-    implicit_F(u_new) = u_new - lhs -
-                        coefficient * jin_xin_source(u_new, epsilon_node, x, t, eq)
-
-    u_new = implicit_solver(implicit_F, u_node) # TODO - replace it with the exact solver
-    source = jin_xin_source(u_new, epsilon_node, x, t, eq)
-    return u_new, source
-end
-
-function set_node_vars!(u, aux_node::Tuple, eq::JinXin1D, i)
-    (u_node, _) = aux_node
-    set_node_vars!(u, u_node, eq, i)
+# equation is lhs + coefficient * s(u^{n+1}) = u^{n+1}
+function implicit_source_solve(lhs, eq_jin_xin::JinXin1D, x, t, coefficient,
+                               source_terms::typeof(jin_xin_source),
+                               u_node, implicit_solver = nothing)
+    equations = eq_jin_xin.equations
+    u_var_new = u_var(lhs, eq_jin_xin) # Since there is no source term for this part
+    flux_new = flux(x, u_var_new, equations)
+    v_lhs = v_var(lhs, eq_jin_xin)
+    epsilon = eq_jin_xin.epsilon
+    v_var_new = (epsilon * v_lhs + coefficient * flux_new) / (epsilon + coefficient)
+    sol_new = SVector(u_var_new..., v_var_new...)
+    source = jin_xin_source(sol_new, x, t, eq_jin_xin)
+    return sol_new, source
 end
 
 struct JinXinICBC{InitialCondition, Equations}
