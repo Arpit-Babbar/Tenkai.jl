@@ -14,6 +14,7 @@ using Tenkai.LoopVectorization
 using Tenkai.JSON3
 
 using Tenkai
+using Accessors: @set
 import Tenkai.EqTenMoment1D
 using Tenkai.Basis
 
@@ -33,6 +34,10 @@ import Tenkai: flux, prim2con, prim2con!, con2prim, con2prim!,
                add_to_node_vars!, subtract_from_node_vars!,
                multiply_add_to_node_vars!)
 
+import Tenkai.EqEuler1D: max_abs_eigen_value, get_density, get_pressure
+
+import Tenkai.TenkaicRK: implicit_source_solve
+
 # The original system is u_t + f(u)_x = 0. The Jin-Xin relaxed system has variables (u,v).
 # The flux is (v, advection(u)). The source terms are (0, -(v-f(u)) / epsilon).
 
@@ -42,6 +47,7 @@ struct JinXin1D{NDIMS, NVAR, TWO_NVAR, Equations <: AbstractEquations{NDIMS, NVA
                 RealT <: Real} <: AbstractEquations{NDIMS, TWO_NVAR}
     equations::Equations
     advection::Advection
+    advection_evolution::Vector{RealT}
     advection_plus::AdvectionPlus
     advection_minus::AdvectionMinus
     epsilon::RealT
@@ -64,11 +70,20 @@ function u_var(u, eq::JinXin1D)
     return u_
 end
 
+function get_density(eq_jin_xin::JinXin1D, u)
+    get_density(eq_jin_xin.equations, u_var(u, eq_jin_xin))
+end
+
+function get_pressure(eq_jin_xin::JinXin1D, u)
+    get_pressure(eq_jin_xin.equations, u_var(u, eq_jin_xin))
+end
+
 function flux(x, u, eq::JinXin1D)
+    adv = eq.advection_evolution[1]
     u_var_ = u_var(u, eq)
     v_var_ = v_var(u, eq)
     flux_1 = v_var_
-    flux_2 = eq.advection(x, u_var_, eq)
+    flux_2 = adv^2 * u_var_
     return SVector(flux_1..., flux_2...)
 end
 
@@ -79,6 +94,21 @@ function jin_xin_source(u, x, t, eq::JinXin1D)
     source_1 = zero(u_var_)
     source_2 = -(v_var_ - flux(x, u_var_, equations)) / eq.epsilon
     return SVector(source_1..., source_2...)
+end
+
+# equation is lhs + coefficient * s(u^{n+1}) = u^{n+1}
+function implicit_source_solve(lhs, eq_jin_xin::JinXin1D, x, t, coefficient,
+                               source_terms::typeof(jin_xin_source),
+                               u_node, implicit_solver = nothing)
+    equations = eq_jin_xin.equations
+    u_var_new = u_var(lhs, eq_jin_xin) # Since there is no source term for this part
+    flux_new = flux(x, u_var_new, equations)
+    v_lhs = v_var(lhs, eq_jin_xin)
+    epsilon = eq_jin_xin.epsilon
+    v_var_new = (epsilon * v_lhs + coefficient * flux_new) / (epsilon + coefficient)
+    sol_new = SVector(u_var_new..., v_var_new...)
+    source = jin_xin_source(sol_new, x, t, eq_jin_xin)
+    return sol_new, source
 end
 
 struct JinXinICBC{InitialCondition, Equations}
@@ -103,156 +133,31 @@ end
 
 function Tenkai.initialize_plot(eq_jin_xin::JinXin1D, op, grid, problem, scheme, timer, u1_,
                                 ua_)
-    nvar = nvariables(eq_jin_xin.equations)
-
+    equations = eq_jin_xin.equations
+    nvar = nvariables(equations)
     u1 = @view u1_[1:nvar, :, :]
-    ua = @view ua_[1:nvar, :]
-
-    @timeit timer "Write solution" begin
-    #! format: noindent
-    # Clear and re-create output directory
-    rm("output", force = true, recursive = true)
-    mkdir("output")
-
-    nx = grid.size
-    xf = grid.xf
-    xc = grid.xc
-    @unpack xg, degree = op
-    nd = degree + 1
-    initial_value = problem.initial_value
-    initial_value_(x) = initial_value(x)[1]
-    nu = max(nd, 2)
-    xu = LinRange(0.0, 1.0, nu)
-    Vu = Vandermonde_lag(xg, xu) # To get equispaced point values
-    p_ua = plot() # Initialize plot object
-    y = initial_value_.(xc)
-    ymin, ymax = @views minimum(y), maximum(y)
-    # Add initial value at cell centres as a curve to p_ua, which write_soln!
-    # will later replace with cell average values
-    @views plot!(p_ua, xc, y, legend = false,
-                 label = "Numerical Solution", title = "Cell averages, t = 0.0",
-                 ylim = (ymin - 0.1, ymax + 0.1), linestyle = :dot,
-                 color = :blue, markerstrokestyle = :dot, seriestype = :scatter,
-                 markershape = :circle, markersize = 2, markerstrokealpha = 0)
-    x = LinRange(xf[1], xf[end], 1000)
-    plot!(p_ua, x, initial_value_.(x), label = "Exact", color = :black) # Placeholder for exact
-    xlabel!(p_ua, "x")
-    ylabel!(p_ua, "u")
-
-    p_u1 = plot() # Initialize plot object
-    # Set up p_u1 to contain polynomial approximation as a different curve
-    # for each cell
-    x = LinRange(xf[1], xf[2], nu)
-    u = @views Vu * u1_[1, :, 1]
-    plot!(p_u1, x, u, color = :blue, label = "u1")
-    for i in 2:nx
-        x = LinRange(xf[i], xf[i + 1], nu)
-        u = @views Vu * u1_[1, :, i]
-        @views plot!(p_u1, x, u, color = :blue, label = nothing)
-    end
-    x = LinRange(xf[1], xf[end], 1000)
-    plot!(p_u1, x, initial_value_.(x), label = "Exact", color = :black) # Placeholder for exact
-    anim_ua, anim_u1 = Animation(), Animation() # Initialize animation objects
-    plot_data = PlotData(p_ua, anim_ua, p_u1, anim_u1)
-    return plot_data
-    end # timer
+    ua = @view ua_[1:nvar, :, :]
+    # @assert false fieldnames(problem.initial_value)
+    problem_correct = @set problem.initial_value = problem.initial_value.initial_condition
+    return Tenkai.initialize_plot(equations, op, grid, problem_correct, scheme, timer, u1,
+                                  ua)
 end
 
-function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::JinXin1D, grid,
+function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq_jin_xin::JinXin1D, grid,
                             problem, param, op, ua_, u1_, aux, ndigits = 3)
-    nvar = nvariables(eq.equations)
+    equations = eq_jin_xin.equations
+    nvar = nvariables(equations)
     u1 = @view u1_[1:nvar, :, :]
-    ua = @view ua_[1:nvar, :]
-
-    @timeit aux.timer "Write solution" begin
-    #! format: noindent
-    @unpack plot_data = aux
-    avg_filename = get_filename("output/avg", ndigits, fcount)
-    @unpack p_ua, p_u1, anim_ua, anim_u1 = plot_data
-    xc = grid.xc
-    nx = grid.size
-    @unpack xg, degree = op
-    nd = degree + 1
-    @unpack animate, save_time_interval, save_iter_interval = param
-    @unpack exact_solution, final_time = problem
-    exact(x) = exact_solution(x, time)[1]
-    nu = max(2, nd)
-    xu = LinRange(0.0, 1.0, nu)
-    Vu = Vandermonde_lag(xg, xu)
-
-    # Update exact solution value in plots
-    np = length(p_ua[1][2][:x]) # number of points of exact soln plotting
-    for i in 1:np
-        x = p_ua[1][2][:x][i]
-        value = exact(x)
-        p_ua[1][2][:y][i] = value
-        p_u1[1][nx + 1][:y][i] = value
-    end
-
-    # Update ylims
-    ylims = @views (minimum(p_ua[1][2][:y]) - 0.1, maximum(p_ua[1][2][:y]) + 0.1)
-    ylims!(p_ua, ylims)
-    ylims!(p_u1, ylims)
-
-    # Write cell averages
-    u = @view ua[1, 1:nx]
-    writedlm("$avg_filename.txt", zip(xc, u), " ")
-    # update solution by updating the y-series values
-    for i in 1:nx
-        p_ua[1][1][:y][i] = ua[1, i] # Loop is needed for plotly bug
-    end
-    t = round(time, digits = 3)
-    title!(p_ua, "t = $t, iter=$iter")
-
-    # write equispaced values within each cell
-    sol_filename = get_filename("output/sol", ndigits, fcount)
-    sol_file = open("$sol_filename.txt", "w")
-    x, u = zeros(nu), zeros(nu) # Set up to store equispaced point values
-    for i in 1:nx
-        @views mul!(u, Vu, u1[1, :, i])
-        @. x = grid.xf[i] + grid.dx[i] * xu
-        p_u1[1][i][:y] .= u
-        for ii in 1:nu
-            @printf(sol_file, "%e %e\n", x[ii], u[ii])
-        end
-    end
-    title!(p_u1, "t = $t, iter=$iter")
-    close(sol_file)
-    println("Wrote $avg_filename.txt $sol_filename.txt.")
-    if problem.final_time - time < 1e-10
-        cp("$avg_filename.txt", "./output/avg.txt", force = true)
-        cp("$sol_filename.txt", "./output/sol.txt", force = true)
-        println("Wrote final solution to avg.txt, sol.txt.")
-    end
-    if animate == true
-        if abs(time - final_time) < 1.0e-10
-            frame(anim_ua, p_ua)
-            frame(anim_u1, p_u1)
-        end
-        if save_iter_interval > 0
-            animate_iter_interval = save_iter_interval
-            if mod(iter, animate_iter_interval) == 0
-                frame(anim_ua, p_ua)
-                frame(anim_u1, p_u1)
-            end
-        elseif save_time_interval > 0
-            animate_time_interval = save_time_interval
-            k1, k2 = ceil(t / animate_time_interval),
-                     floor(t / animate_time_interval)
-            if (abs(t - k1 * animate_time_interval) < 1e-10 ||
-                abs(t - k2 * animate_time_interval) < 1e-10)
-                frame(anim_ua, p_ua)
-                frame(anim_u1, p_u1)
-            end
-        end
-    end
-    fcount += 1
-    return fcount
-    end # timer
+    ua = @view ua_[1:nvar, :, :]
+    problem_correct = @set problem.initial_value = problem.initial_value.initial_condition
+    problem_correct = @set problem.exact_solution = problem.exact_solution.initial_condition
+    return Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq_jin_xin.equations, grid,
+                              problem_correct, param, op, ua, u1, aux)
 end
 
 function Tenkai.post_process_soln(eq::JinXin1D, aux, problem, param, scheme)
-    post_process_soln(eq.equations, aux, problem, param, scheme)
+    problem_correct = @set problem.initial_value = problem.initial_value.initial_condition
+    post_process_soln(eq.equations, aux, problem_correct, param, scheme)
 end
 
 @inbounds @inline function roe(x, ual, uar, Fl, Fr, Ul, Ur, eq::JinXin1D, dir)
@@ -262,7 +167,8 @@ end
 end
 
 function max_abs_eigen_value(eq::JinXin1D, u)
-    return sqrt(eq.advection(0.0, 1.0, eq)) # TODO - Pretty ugly hack
+    # return sqrt(eq.advection(0.0, 1.0, eq)) # TODO - Pretty ugly hack
+    return eq.advection_evolution[1]
 end
 
 @inbounds @inline function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::JinXin1D, dir)
@@ -271,28 +177,70 @@ end
     return 0.5 * (Fl + Fr - λ * (Ur - Ul))
 end
 
+# DOES NOT WORK AS WELL AS RUSANOV. STRANGE!!!
+@inbounds @inline function upwind(x, ual, uar, Fl, Fr, Ul, Ur, eq::JinXin1D, dir)
+    return Fl
+end
+
+# As bad as the upwind flux
+@inbounds @inline function flux_central(x, ual, uar, Fl, Fr, Ul, Ur, eq::JinXin1D, dir)
+    return 0.5 * (Fl + Fr)
+end
+
+function iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
+                                          u1, aux, variables::NTuple{N, Any}) where {N}
+    variable = first(variables)
+    remaining_variables = Base.tail(variables)
+
+    correct_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
+
+    # test_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
+    iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
+                                     u1, aux, remaining_variables)
+    return nothing
+end
+
+function iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
+                                          u1, aux, variables::Tuple{})
+    return nothing
+end
+
 # TODO - Implement the bound limiter
-apply_bound_limiter!(eq::JinXin1D, grid, scheme, param, op, ua, u1, aux) = nothing
+function apply_bound_limiter!(eq_jin_xin::JinXin1D, grid, scheme, param, op, ua, u1, aux)
+    if scheme.bound_limit == "no"
+        return nothing
+    end
+    # equations = eq_jin_xin.equations
+    # nvar = nvariables(equations)
+    # u1 = @view u1_[1:nvar, :, :]
+    # ua = @view ua_[1:nvar, :, :]
+    variables = (get_density, get_pressure)
+    iteratively_apply_bound_limiter!(eq_jin_xin, grid, scheme, param, op, ua, u1, aux,
+                                     variables)
+end
 
 #-------------------------------------------------------------------------------
 # Compute dt using cell average
 #-------------------------------------------------------------------------------
-function compute_time_step(eq::JinXin1D, problem, grid, aux, op, cfl, u1,
-                           ua)
+function compute_time_step(eq_jin_xin::JinXin1D, problem, grid, aux, op, cfl, u1, ua)
     @timeit aux.timer "Time step computation" begin
     #! format: noindent
-    speed = eq.equations.speed
     nx = grid.size
-    xc = grid.xc
     dx = grid.dx
+    jin_xin_adv = 0.0
     den = 0.0
     for i in 1:nx
-        # sx = @views speed(xc[i], ua[1, i], eq.equations)
-        sx = max_abs_eigen_value(eq, ua[:, i])
+        sx = max_abs_eigen_value(eq_jin_xin.equations, ua[:, i])
+        jin_xin_adv = max(sx, jin_xin_adv)
         den = max(den, abs.(sx) / dx[i] + 1.0e-12)
     end
-    dt = cfl / den
-    return dt, eq
+
+    # Jin-Xin constant is made larger by this factor
+    dt_scaling = 0.5
+
+    dt = cfl * dt_scaling^2 / den
+    eq_jin_xin.advection_evolution[1] = jin_xin_adv / dt_scaling
+    return dt, eq_jin_xin
     end # Timer
 end
 
@@ -303,11 +251,16 @@ function get_equation(equations::AbstractEquations{NDIMS, NVARS},
     numfluxes = Dict("roe" => roe, "rusanov" => rusanov)
     initial_values = Dict()
 
+    RealT = Float64
+
+    advection_evolution = zeros(RealT, 1)
+
     TWO_NVAR = 2 * NVARS
 
     return JinXin1D{NDIMS, NVARS, TWO_NVAR, typeof(equations), typeof(advection),
                     typeof(advection_plus), typeof(advection_minus), typeof(epsilon)}(equations,
                                                                                       advection,
+                                                                                      advection_evolution,
                                                                                       advection_plus,
                                                                                       advection_minus,
                                                                                       epsilon,

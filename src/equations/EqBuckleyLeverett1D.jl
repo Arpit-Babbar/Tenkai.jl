@@ -8,6 +8,8 @@ import Tenkai: flux
 
 import Roots: find_zero
 
+import Tenkai.EqEuler1D: max_abs_eigen_value
+
 using StaticArrays
 using MuladdMacro
 
@@ -68,6 +70,10 @@ function max_speed(x, u, eq::BuckleyLeverret1D)
     smax = fprime(eq.u_buck, eq)
     smax = max(smax, abs(fprime(u, eq)))
     return smax
+end
+
+function max_abs_eigen_value(eq::BuckleyLeverret1D, u)
+    return max_speed(nothing, u, eq)
 end
 
 # Rusanov flux
