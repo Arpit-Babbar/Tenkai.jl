@@ -44,6 +44,8 @@ import Tenkai.EqEuler1D: rho_p_indicator!, rusanov, max_abs_eigen_value
 
 import Tenkai.EqEuler1D: max_abs_eigen_value, get_density, get_pressure
 
+import Tenkai.EqEuler1D: max_abs_eigen_value, get_density, get_pressure
+
 # The original system is u_t + f(u)_x = 0. The Jin-Xin relaxed system has variables (u,v).
 # The flux is (v, advection(u)). The source terms are (0, -(v-f(u)) / epsilon).
 
