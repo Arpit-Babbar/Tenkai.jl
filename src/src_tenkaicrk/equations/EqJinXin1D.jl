@@ -36,6 +36,8 @@ import Tenkai: flux, prim2con, prim2con!, con2prim, con2prim!,
 
 import Tenkai.EqEuler1D: max_abs_eigen_value, get_density, get_pressure
 
+import Tenkai.TenkaicRK: implicit_source_solve
+
 # The original system is u_t + f(u)_x = 0. The Jin-Xin relaxed system has variables (u,v).
 # The flux is (v, advection(u)). The source terms are (0, -(v-f(u)) / epsilon).
 
@@ -92,6 +94,21 @@ function jin_xin_source(u, x, t, eq::JinXin1D)
     source_1 = zero(u_var_)
     source_2 = -(v_var_ - flux(x, u_var_, equations)) / eq.epsilon
     return SVector(source_1..., source_2...)
+end
+
+# equation is lhs + coefficient * s(u^{n+1}) = u^{n+1}
+function implicit_source_solve(lhs, eq_jin_xin::JinXin1D, x, t, coefficient,
+                               source_terms::typeof(jin_xin_source),
+                               u_node, implicit_solver = nothing)
+    equations = eq_jin_xin.equations
+    u_var_new = u_var(lhs, eq_jin_xin) # Since there is no source term for this part
+    flux_new = flux(x, u_var_new, equations)
+    v_lhs = v_var(lhs, eq_jin_xin)
+    epsilon = eq_jin_xin.epsilon
+    v_var_new = (epsilon * v_lhs + coefficient * flux_new) / (epsilon + coefficient)
+    sol_new = SVector(u_var_new..., v_var_new...)
+    source = jin_xin_source(sol_new, x, t, eq_jin_xin)
+    return sol_new, source
 end
 
 struct JinXinICBC{InitialCondition, Equations}
