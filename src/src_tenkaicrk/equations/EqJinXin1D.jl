@@ -97,7 +97,8 @@ function jin_xin_source(u, x, t, eq::JinXin1D)
 end
 
 # equation is lhs + coefficient * s(u^{n+1}) = u^{n+1}
-function implicit_source_solve(lhs, eq_jin_xin::JinXin1D, x, t, coefficient, source_terms::typeof(jin_xin_source),
+function implicit_source_solve(lhs, eq_jin_xin::JinXin1D, x, t, coefficient,
+                               source_terms::typeof(jin_xin_source),
                                u_node, implicit_solver = nothing)
     equations = eq_jin_xin.equations
     u_var_new = u_var(lhs, eq_jin_xin) # Since there is no source term for this part
