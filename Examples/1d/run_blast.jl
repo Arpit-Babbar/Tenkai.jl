@@ -15,7 +15,7 @@ initial_value = Eq.blast
 exact_solution = Eq.exact_blast # dummy function
 boundary_value = Eq.exact_blast # dummy function
 
-degree = 3
+degree = 4
 solver = "lwfr"
 solution_points = "gl"
 correction_function = "radau"
@@ -23,7 +23,7 @@ numerical_flux = Eq.rusanov
 bound_limit = "yes"
 bflux = evaluate
 
-nx = 400
+nx = 100
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 300.0
