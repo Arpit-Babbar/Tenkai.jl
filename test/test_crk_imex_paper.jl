@@ -186,6 +186,13 @@ end
                   animate = false, final_time = 0.5, nx = 5)
     data_name = "jin_xin_dwave_1d.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_blast_jin_xin.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.01, nx = 5)
+    data_name = "jin_xin_blast.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
 end
 
 @testset "Burger 1D stiff double source non-linear" begin
