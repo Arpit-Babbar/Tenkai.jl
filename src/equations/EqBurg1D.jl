@@ -8,6 +8,8 @@ using Tenkai
 # flux function will be extended to Burg1D
 import Tenkai: flux
 
+import Tenkai.EqEuler1D: max_abs_eigen_value
+
 import Roots.find_zero
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
@@ -33,6 +35,10 @@ function Tenkai.flux(x, u, eq::Burg1D)
 end
 
 speed(x, u, eq::Burg1D) = u[1]
+
+function max_abs_eigen_value(eq::Burg1D, u)
+    return abs(u[1])
+end
 
 # Rusanov flux
 function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::Burg1D, dir)

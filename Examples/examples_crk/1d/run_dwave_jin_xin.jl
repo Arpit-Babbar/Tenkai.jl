@@ -41,7 +41,7 @@ initial_value_struct = EqJinXin.JinXinICBC(initial_value_dwave, equation_jin_xin
 initial_value = initial_value_struct
 # initial_value = initial_value_dwave
 boundary_value_struct = EqJinXin.JinXinICBC(exact_solution_dwave, equation_jin_xin)
-boundary_value = (x, t) -> boundary_value_struct(x, t)
+boundary_value = boundary_value_struct
 # boundary_value = boundary_value_dwave
 exact_solution = boundary_value
 

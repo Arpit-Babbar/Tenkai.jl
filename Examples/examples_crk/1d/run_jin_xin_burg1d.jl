@@ -20,7 +20,7 @@ equation_jin_xin = Eq.get_equation(equation_burg, advection_jin_xin, advection_j
 
 initial_value_burg = EqBurg1D.initial_value_burger_sin
 initial_value = Eq.JinXinICBC(initial_value_burg, equation_jin_xin)
-initial_value_ = (x) -> initial_value(x)
+initial_value_ = initial_value
 boundary_value_burg = EqBurg1D.zero_boundary_value # dummy function
 boundary_value = Eq.JinXinICBC(boundary_value_burg, equation_jin_xin)
 boundary_value_ = (x, t) -> boundary_value(x, t)
@@ -29,7 +29,7 @@ final_time = 4.9
 
 exact_solution_burg = EqBurg1D.exact_solution_burger_sin
 exact_solution = Eq.JinXinICBC(exact_solution_burg, equation_jin_xin)
-exact_solution_jin_xin = (x, t) -> exact_solution(x, t)
+exact_solution_jin_xin = exact_solution
 
 degree = 2
 solver = cSSP2IMEX222()

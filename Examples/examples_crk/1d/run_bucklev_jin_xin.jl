@@ -36,7 +36,8 @@ equation_jin_xin = EqJinXin.get_equation(eq_bucklev, advection_jin_xin,
 initial_value_struct = EqJinXin.JinXinICBC(Eq.hatbuck_iv, equation_jin_xin)
 initial_value = initial_value_struct
 boundary_value_struct = EqJinXin.JinXinICBC(Eq.hatbuck_exact, equation_jin_xin)
-boundary_value = (x, t) -> boundary_value_struct(x, t)
+boundary_value = boundary_value_struct
+exact_solution = EqJinXin.JinXinICBC(Eq.hatbuck_exact_a025, equation_jin_xin)
 
 degree = 3
 solver = cSSP2IMEX433()
