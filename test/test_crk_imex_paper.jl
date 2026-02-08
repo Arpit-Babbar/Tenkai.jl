@@ -192,7 +192,7 @@ end
                   compute_error_interval = 0,
                   animate = false, final_time = 0.01, nx = 5)
     data_name = "jin_xin_blast.txt"
-    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
 end
 
 @testset "Burger 1D stiff double source non-linear" begin
