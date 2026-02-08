@@ -271,6 +271,16 @@ end
     return 0.5 * (Fl + Fr - λ * (Ur - Ul))
 end
 
+# DOES NOT WORK AS WELL AS RUSANOV. STRANGE!!!
+@inbounds @inline function upwind(x, ual, uar, Fl, Fr, Ul, Ur, eq::JinXin1D, dir)
+    return Fl
+end
+
+# As bad as the upwind flux
+@inbounds @inline function flux_central(x, ual, uar, Fl, Fr, Ul, Ur, eq::JinXin1D, dir)
+    return 0.5 * (Fl + Fr)
+end
+
 # TODO - Implement the bound limiter
 apply_bound_limiter!(eq::JinXin1D, grid, scheme, param, op, ua, u1, aux) = nothing
 
