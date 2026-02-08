@@ -26,10 +26,9 @@ advection_jin_xin_minus(ul, ur, F, eq) = nothing
 
 equation = EqJinXin.get_equation(equation_euler, advection_jin_xin, advection_jin_xin_plus,
                                  advection_jin_xin_minus, epsilon_relaxation,
-                                   nx ;
-                                #    thresholds = (1.5e-1, 1e-1)
-                                thresholds = (1.0e-12, 0.1e-6)
-                                 )
+                                 nx;
+                                 #    thresholds = (1.5e-1, 1e-1)
+                                 thresholds = (1.0e-12, 0.1e-6))
 
 initial_value = EqJinXin.JinXinICBC(Eq.blast, equation)
 initial_value_ = initial_value
