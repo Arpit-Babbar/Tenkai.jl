@@ -173,11 +173,11 @@ end
     data_name = "jin_xin_burg1d_marco.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 
-    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_super_burg_jin_xin.jl"),
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_bucklev_jin_xin.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,
-                  animate = false, final_time = 1.0, nx = 5)
-    data_name = "jin_xin_sup_burg1d.txt"
+                  animate = false, final_time = 0.15, nx = 5)
+    data_name = "jin_xin_bucklev_burg1d.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
 
