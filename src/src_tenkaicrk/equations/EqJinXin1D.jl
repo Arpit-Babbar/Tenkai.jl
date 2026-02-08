@@ -281,7 +281,6 @@ function compute_time_step(eq::JinXin1D, problem, grid, aux, op, cfl, u1,
                            ua)
     @timeit aux.timer "Time step computation" begin
     #! format: noindent
-    speed = eq.equations.speed
     nx = grid.size
     xc = grid.xc
     dx = grid.dx
