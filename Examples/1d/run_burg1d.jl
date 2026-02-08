@@ -26,7 +26,7 @@ boundary_value = Eq.zero_boundary_value # dummy function
 boundary_condition = (periodic, periodic)
 final_time = 0.5
 
-exact_solution = exact_solution_burger_sin_marco
+exact_solution = exact_solution_burger_marco
 
 source_terms(u, x, t, eq) = zero(u)
 
@@ -38,7 +38,7 @@ bflux = evaluate
 numerical_flux = Eq.rusanov
 bound_limit = "no"
 
-nx = 100
+nx = 20
 cfl = 0.0
 bounds = ([-0.2], [0.2])
 tvbM = 0.0

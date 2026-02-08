@@ -23,7 +23,7 @@ nx = 20
 
 equation_jin_xin = Eq.get_equation(equation_burg, advection_jin_xin, advection_jin_xin_plus,
                                    advection_jin_xin_minus, epsilon_relaxation, nx;
-                                   thresholds = (1.5e-12, 2e-3))
+                                   thresholds = (1.5e-12, 0.25e-3))
 
 # initial_value_burg = EqBurg1D.initial_value_burger_sin
 
@@ -36,10 +36,10 @@ end
 initial_value_burg = initial_value_burg_marco
 
 initial_value = Eq.JinXinICBC(initial_value_burg, equation_jin_xin)
-initial_value_ = (x) -> initial_value(x)
+initial_value_ = initial_value
 boundary_value_burg = EqBurg1D.zero_boundary_value # dummy function
 boundary_value = Eq.JinXinICBC(boundary_value_burg, equation_jin_xin)
-boundary_value_ = (x, t) -> boundary_value(x, t)
+boundary_value_ = boundary_value
 boundary_condition = (periodic, periodic)
 final_time = 0.5
 
@@ -53,8 +53,8 @@ function exact_solution_burger_marco(x, t_)
     return value
 end
 
-exact_solution = exact_solution_burger_marco
-exact_solution_ = (x, t) -> exact_solution(x, t)
+exact_solution = Eq.JinXinICBC(exact_solution_burger_marco, equation_jin_xin)
+exact_solution_ = exact_solution
 
 degree = 3
 solver = cSSP2IMEX433()
