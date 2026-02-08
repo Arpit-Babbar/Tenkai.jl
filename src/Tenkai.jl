@@ -114,12 +114,12 @@ include("$lwfr_dir/LWFR2D_taylor_diff.jl")
 include("$mdrk_dir/MDRK.jl")
 
 # 1D
+include("$eq_dir/EqEuler1D.jl")
 include("$eq_dir/EqLinAdv1D.jl")
 include("$eq_dir/EqBurg1D.jl")
-include("$eq_dir/EqBuckleyLeverett1D.jl")
-include("$eq_dir/EqEuler1D.jl")
 include("$eq_dir/EqTenMoment1D.jl")
 include("$eq_dir/EqMHD1D.jl")
+include("$eq_dir/EqBuckleyLeverett1D.jl")
 
 # 2D
 include("$eq_dir/EqBurg2D.jl")

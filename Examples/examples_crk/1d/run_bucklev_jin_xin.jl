@@ -1,5 +1,6 @@
 import Roots.find_zero
 using Tenkai
+using Tenkai.TenkaicRK
 # Submodules
 
 Eq = Tenkai.EqBuckleyLeverett1D
@@ -33,7 +34,7 @@ equation_jin_xin = EqJinXin.get_equation(eq_bucklev, advection_jin_xin,
 
 # Is it really a struct?
 initial_value_struct = EqJinXin.JinXinICBC(Eq.hatbuck_iv, equation_jin_xin)
-initial_value = (x) -> initial_value_struct(x)
+initial_value = initial_value_struct
 boundary_value_struct = EqJinXin.JinXinICBC(Eq.hatbuck_exact, equation_jin_xin)
 boundary_value = (x, t) -> boundary_value_struct(x, t)
 
@@ -45,7 +46,7 @@ bflux = evaluate
 numerical_flux = EqJinXin.rusanov
 bound_limit = "no"
 
-nx = 200
+nx = 300
 cfl = 0.0
 bounds = ([0.0], [1.0])
 tvbM = 0.0

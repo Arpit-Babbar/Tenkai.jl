@@ -191,6 +191,12 @@ end
 #-------------------------------------------------------------------------------
 # Scheme information
 #-------------------------------------------------------------------------------
+function max_abs_eigen_value(eq::Euler1D, u)
+    rho, v, p = con2prim(eq, u)
+    c = sqrt(eq.γ * p / rho)
+    return abs(v) + c
+end
+
 function compute_time_step(eq::Euler1D, problem, grid, aux, op, cfl, u1, ua)
     nx = grid.size
     dx = grid.dx
@@ -680,7 +686,7 @@ function Tenkai.apply_bound_limiter!(eq::Euler1D, grid, scheme, param, op, ua,
             println("Fatal: Negative states in cell averages")
             @show variable
             println("       minimum cell average = $eps")
-            throw(DomainError(eps, "Positivity limiter failed"))
+            # throw(DomainError(eps, "Positivity limiter failed"))
         end
     end
 
