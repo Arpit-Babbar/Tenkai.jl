@@ -97,8 +97,7 @@ function jin_xin_source(u, x, t, eq::JinXin1D)
 end
 
 # equation is lhs + coefficient * s(u^{n+1}) = u^{n+1}
-function implicit_source_solve(lhs, eq_jin_xin::JinXin1D, x, t, coefficient,
-                               source_terms::typeof(jin_xin_source),
+function implicit_source_solve(lhs, eq_jin_xin::JinXin1D, x, t, coefficient, source_terms::typeof(jin_xin_source),
                                u_node, implicit_solver = nothing)
     equations = eq_jin_xin.equations
     u_var_new = u_var(lhs, eq_jin_xin) # Since there is no source term for this part
@@ -116,7 +115,7 @@ struct JinXinICBC{InitialCondition, Equations}
     equations::Equations
 end
 
-function (jin_xin_ic::JinXinICBC)(x)
+function (jin_xin_ic::JinXinICBC{<:Any, <:AbstractEquations{1}})(x)
     @unpack equations = jin_xin_ic.equations
     u = jin_xin_ic.initial_condition(x)
     v = flux(x, u, equations)
@@ -131,12 +130,24 @@ function (jin_xin_bc::JinXinICBC)(x, t)
     return SVector(u..., v...)
 end
 
-function Tenkai.initialize_plot(eq_jin_xin::JinXin1D, op, grid, problem, scheme, timer, u1_,
+function Tenkai.initialize_plot(eq_jin_xin::JinXin1D{1}, op, grid, problem, scheme, timer, u1_,
                                 ua_)
     equations = eq_jin_xin.equations
     nvar = nvariables(equations)
     u1 = @view u1_[1:nvar, :, :]
     ua = @view ua_[1:nvar, :, :]
+    # @assert false fieldnames(problem.initial_value)
+    problem_correct = @set problem.initial_value = problem.initial_value.initial_condition
+    return Tenkai.initialize_plot(equations, op, grid, problem_correct, scheme, timer, u1,
+                                  ua)
+end
+
+function Tenkai.initialize_plot(eq_jin_xin::JinXin1D{2}, op, grid, problem, scheme, timer, u1_,
+                                ua_)
+    equations = eq_jin_xin.equations
+    nvar = nvariables(equations)
+    u1 = @view u1_[1:nvar, :, :, :, :]
+    ua = @view ua_[1:nvar, :, :, :, :]
     # @assert false fieldnames(problem.initial_value)
     problem_correct = @set problem.initial_value = problem.initial_value.initial_condition
     return Tenkai.initialize_plot(equations, op, grid, problem_correct, scheme, timer, u1,
