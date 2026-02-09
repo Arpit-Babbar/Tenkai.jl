@@ -454,7 +454,7 @@ function get_equation(equations::AbstractEquations{NDIMS, NVARS},
                       epsilon, nx; indicator_model = "gassner",
                       thresholds = (1e-12, 1e-4),
                       jin_xin_dt_scaling = 0.5) where {NDIMS, NVARS}
-    name = "1D shallow water equations"
+    name = "1D Jin-Xin equations"
     numfluxes = Dict("roe" => roe, "rusanov" => rusanov)
     initial_values = Dict()
 

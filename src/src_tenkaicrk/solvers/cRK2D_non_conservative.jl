@@ -1738,7 +1738,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     end # timer
 end
 
-function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, op,
+function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
                                     problem, scheme::Scheme{<:cBPR343}, aux, t, dt,
                                     cache)
     @timeit aux.timer "Cell residual" begin
@@ -1865,7 +1865,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
     end # timer
 end
 
-function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, op,
+function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
                                     problem, scheme::Scheme{<:cARS443}, aux, t, dt,
                                     cache)
     @timeit aux.timer "Cell residual" begin

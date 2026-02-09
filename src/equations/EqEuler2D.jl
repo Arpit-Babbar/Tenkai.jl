@@ -40,7 +40,7 @@ using Tenkai
 using Tenkai: correct_variable!
 
 using Trixi: Trixi
-import Tenkai.EqEuler1D: tenkai2trixiequation
+import Tenkai.EqEuler1D: tenkai2trixiequation, max_abs_eigen_value
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -188,6 +188,17 @@ end
 #-------------------------------------------------------------------------------
 # Scheme information
 #-------------------------------------------------------------------------------
+function max_abs_eigen_value(eq::Euler2D, u, dir)
+    @unpack γ = eq
+    rho, v1, v2, p = con2prim(eq, u)
+    c = sqrt(γ * p / rho)
+    if dir == 1
+        return abs(v1) + c
+    else # dir == 2
+        return abs(v2) + c
+    end
+end
+
 function compute_time_step(eq::Euler2D, problem, grid, aux, op, cfl, u1, ua)
     @timeit aux.timer "Time Step computation" begin
     #! format: noindent

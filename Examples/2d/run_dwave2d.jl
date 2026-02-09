@@ -35,17 +35,17 @@ exact_solution = dwave_exact
 # exact_solution = Eq.constant_state_exact
 boundary_value = exact_solution
 
-degree = 1
-solver = "lwfr"
+degree = 3
+solver = cBPR343()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = Eq.rusanov
 bound_limit = "no"
-bflux = evaluate
+bflux = extrapolate
 final_time = 0.1
 
-nx = 16
-ny = 16
+nx = 32
+ny = 32
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
@@ -69,7 +69,7 @@ limiter = setup_limiter_blend(blend_type = mh_blend(equation),
                               debug_blend = false,
                               pure_fv = true,
                               tvbM = Inf)
-# limiter = setup_limiter_none()
+limiter = setup_limiter_none()
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
