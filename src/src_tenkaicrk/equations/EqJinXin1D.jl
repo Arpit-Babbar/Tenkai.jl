@@ -111,7 +111,8 @@ function jin_xin_source(u, epsilon, x, t, eq::JinXin1D)
     return SVector(source_1..., source_2...)
 end
 
-function get_cache_node_vars(aux, u, problem, scheme, eq::JinXin1D, ignored_cell::UsuallyIgnored,
+function get_cache_node_vars(aux, u, problem, scheme, eq::JinXin1D,
+                             ignored_cell::UsuallyIgnored,
                              i)
     cell = ignored_cell.value
     u_node = get_node_vars(u, eq, i)
