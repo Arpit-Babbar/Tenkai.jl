@@ -209,6 +209,15 @@ end
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
 end
 
+@testset "Jin-Xin 2D" begin
+    trixi_include(joinpath(cRK_examples_dir(), "2d", "run_isentropic_jin_xin.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.01, nx = 5)
+    data_name = "jin_xin_isentropic.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 4e-13)
+end
+
 @testset "Burger 1D stiff double source non-linear" begin
     trixi_include(joinpath(cRK_examples_dir(), "1d",
                            "run_burg1d_stiff_source_non_linear.jl"),
