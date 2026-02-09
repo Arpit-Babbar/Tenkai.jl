@@ -187,7 +187,7 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq_jin_xin::JinXi
     u1 = @view u1_[1:nvar, :, :, :, :]
     ua = @view ua_[1:nvar, :, :, :, :]
     problem_correct = @set problem.initial_value = problem.initial_value.initial_condition
-    problem_correct = @set problem.exact_solution = problem.exact_solution.initial_condition
+    problem_correct = @set problem_correct.exact_solution = problem.exact_solution.initial_condition
     return Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq_jin_xin.equations, grid,
                               problem_correct, param, op, ua, u1, aux)
 end
