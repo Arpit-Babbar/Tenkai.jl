@@ -228,6 +228,9 @@ function pre_process_limiter!(eq::JinXin1D, t, iter, fcount, dt, grid, problem, 
     @timeit aux.timer "Pre process limiter" begin
     #! format: noindent
     @unpack limiter = scheme
+    if limiter.name != "blend"
+        return nothing
+    end
     @unpack indicator_model = limiter
     update_ghost_values_u1!(eq, problem, grid, op, u1, aux, t)
     # This will set epislon to E, and keep alpha to be zero.
@@ -454,13 +457,14 @@ function get_equation(equations::AbstractEquations{NDIMS, NVARS},
     numfluxes = Dict("roe" => roe, "rusanov" => rusanov)
     initial_values = Dict()
 
-    RealT = Float64
+    RealT = typeof(epsilon)
 
     advection_evolution = zeros(RealT, 1)
 
     TWO_NVAR = 2 * NVARS
 
     epsilon_arr = OffsetArray(zeros(RealT, nx + 2), 0:(nx + 1))
+    epsilon_arr .= epsilon
 
     return JinXin1D{NDIMS, NVARS, TWO_NVAR, typeof(equations), typeof(advection),
                     typeof(advection_plus), typeof(advection_minus), typeof(epsilon)}(equations,

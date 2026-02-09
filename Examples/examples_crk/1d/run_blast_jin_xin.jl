@@ -27,7 +27,6 @@ advection_jin_xin_minus(ul, ur, F, eq) = nothing
 equation = EqJinXin.get_equation(equation_euler, advection_jin_xin, advection_jin_xin_plus,
                                  advection_jin_xin_minus, epsilon_relaxation,
                                  nx;
-                                 #    thresholds = (1.5e-1, 1e-1)
                                  thresholds = (1.0e-12, 1e-7),
                                  jin_xin_dt_scaling = 1.0)
 
