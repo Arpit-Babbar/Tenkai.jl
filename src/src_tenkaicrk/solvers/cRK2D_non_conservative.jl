@@ -1914,11 +1914,12 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
     c_rk = (z0, 1 / 2, 2 / 3, 1 / 2, 1.0)
 
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
+        ignored_element = UsuallyIgnored((el_x, el_y))
         el_x, el_y = element[1], element[2]
         dx, dy = grid.dx[el_x], grid.dy[el_y]
         xc, yc = grid.xc[el_x], grid.yc[el_y]
         lamx, lamy = dt / dx, dt / dy
-        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt, el_x, el_y)
+        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt, ignored_element)
 
         id = Threads.threadid()
         u2, u3, u4, u5, F, G, U, S = cell_arrays[id]
@@ -1947,7 +1948,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
         source_term_explicit!((u2, u3, u4, u5), F_G_U_S,
                               (A_rk[2][1], A_rk[3][1], A_rk[4][1], A_rk[5][1]),
                               b_rk[1], c_rk[1], u1_, op, local_grid,
-                              source_terms, eq)
+                              problem, scheme, source_terms, aux, eq)
         source_term_implicit!((u2, u3, u4, u5), F_G_U_S,
                               (A_rk[2][2], A_rk[3][2], A_rk[4][2], A_rk[5][2]), b_rk[2],
                               c_rk[2], u1_, op,
