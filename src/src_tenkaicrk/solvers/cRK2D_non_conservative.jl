@@ -960,7 +960,8 @@ function source_term_implicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_
         X = SVector(x_, y_)
         # Source terms
         lhs = get_node_vars(u_tuples_out[1], eq, i, j) # lhs in the implicit source solver
-        aux_node = get_cache_node_vars(aux, u_in, problem, scheme, eq, ignored_element, i, j)
+        aux_node = get_cache_node_vars(aux, u_in, problem, scheme, eq, ignored_element, i,
+                                       j)
         u_node_implicit, s_node = implicit_source_solve(lhs, eq, X, t + c_rk_coeff * dt,
                                                         A_rk_tuple[1] * dt,
                                                         source_terms,

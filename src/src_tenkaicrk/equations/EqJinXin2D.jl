@@ -109,7 +109,8 @@ function jin_xin_source(u, epsilon, x, t, eq::JinXin2D)
     return SVector(source_1..., source_2..., source_3...)
 end
 
-function get_cache_node_vars(aux, u1, problem, scheme, eq::JinXin2D, ignored_element::UsuallyIgnored, i, j)
+function get_cache_node_vars(aux, u1, problem, scheme, eq::JinXin2D,
+                             ignored_element::UsuallyIgnored, i, j)
     el_x, el_y = ignored_element.value
     u_node = get_node_vars(u1, eq, i, j)
     epsilon_node = eq.epsilon_arr[el_x, el_y]
@@ -440,7 +441,7 @@ function compute_time_step(eq_jin_xin::JinXin2D, problem, grid, aux, op, cfl,
         jin_xin_adv2 = max(sy, jin_xin_adv2)
         den = max(den, abs(sx) / dx[el_x] + abs(sy) / dy[el_y] + 1.0e-12)
     end
-    
+
     dt = cfl * jin_xin_dt_scaling^2 / den
     eq_jin_xin.advection_evolution[1] = jin_xin_adv1 / jin_xin_dt_scaling
     eq_jin_xin.advection_evolution[2] = jin_xin_adv2 / jin_xin_dt_scaling

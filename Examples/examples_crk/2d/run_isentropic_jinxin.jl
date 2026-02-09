@@ -13,7 +13,6 @@ boundary_condition = (periodic, periodic, periodic, periodic)
 
 equation_euler = Eq.get_equation(γ)
 
-
 epsilon_relaxation = 1e-12
 
 nx = 120
