@@ -1,6 +1,7 @@
 using Tenkai.TenkaicRK
 using Tenkai.TenkaicRK.Tenkai
 Eq = Tenkai.EqBurg1D
+using Tenkai.EqBurg1D
 using StaticArrays
 
 using SimpleUnPack
@@ -29,7 +30,7 @@ function TenkaicRK.get_cache_node_vars(aux, u1,
                                        problem::Problem{<:Real,
                                                         <:typeof(burg_smooth_source_terms)},
                                        scheme_cache::Scheme{<:TenkaicRK.cRKSolver},
-                                       eq, i, cell)
+                                       eq::Burg1D, i, cell)
     # @assert false
     @unpack cache_homogeneous = aux
     u1 = cache_homogeneous.u1

@@ -124,7 +124,7 @@ function get_equation()
     Burg1D(speed, nvar, name, initial_values_burg, numfluxes)
 end
 
-export flux, speed
+export flux, speed, Burg1D
 end # @muladd
 
 end
