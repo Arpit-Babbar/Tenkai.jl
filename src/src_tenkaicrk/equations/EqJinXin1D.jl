@@ -214,7 +214,6 @@ end
     λ = max(max_abs_eigen_value(eq, ual), max_abs_eigen_value(eq, uar)) # local wave speed
 
     return 0.5 * (Fl + Fr - λ * (Ur - Ul))
-    # rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq.equations, dir)
 end
 
 @inbounds @inline function rho_p_indicator!(un, eq::JinXin1D)
