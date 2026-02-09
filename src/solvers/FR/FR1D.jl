@@ -386,7 +386,7 @@ function correct_variable_bound_limiter!(variable, eq::AbstractEquations{1},
 
         ua_ = get_node_vars(ua, eq, element)
         var_avg = variable(eq, ua_)
-        # @assert var_avg>0.0 "Failed at element $element", var_avg
+        @assert var_avg>0.0 "Failed at element $element", var_avg
         eps_ = min(eps, 0.1 * var_avg)
         ratio = abs(eps_ - var_avg) / (abs(var_min - var_avg) + 1e-13)
         theta = min(ratio, 1.0) # theta for preserving positivity of density
