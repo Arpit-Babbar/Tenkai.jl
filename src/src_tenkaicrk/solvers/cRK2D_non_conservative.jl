@@ -923,9 +923,10 @@ function noncons_flux_der!(volume_integral::Union{MyVolumeIntegralFluxDifferenci
 end
 
 function source_term_explicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_rk_coeff,
-                               u_in, op, local_grid, source_terms, aux, eq::AbstractEquations{2})
+                               u_in, op, local_grid, problem, scheme, source_terms, aux,
+                               eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
-    xc, yc, dx, dy, lamx, lamy, t, dt, el_x, el_y = local_grid
+    xc, yc, dx, dy, lamx, lamy, t, dt, ignored_element = local_grid
     nd = length(xg)
     _, _, _, S = F_G_U_S
     # Solution points
@@ -934,7 +935,7 @@ function source_term_explicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_
         x_ = xc - 0.5 * dx + xg[i] * dx
         y_ = yc - 0.5 * dy + xg[j] * dy
         X = SVector(x_, y_)
-        u_node = get_node_vars(u_in, eq, i, j)
+        u_node = get_cache_node_vars(aux, u_in, problem, scheme, eq, ignored_element, i, j)
 
         # Source terms
         s_node = calc_source(u_node, X, t + c_rk_coeff * dt, source_terms, eq)
@@ -950,7 +951,7 @@ function source_term_implicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_
                                u_in, op, local_grid, problem, scheme, implicit_solver,
                                source_terms, aux, eq::AbstractEquations{2})
     @unpack xg, wg, Dm, D1, Vl, Vr = op
-    xc, yc, dx, dy, lamx, lamy, t, dt = local_grid
+    xc, yc, dx, dy, lamx, lamy, t, dt, ignored_element = local_grid
     nd = length(xg)
     _, _, _, S = F_G_U_S
     for j in 1:nd, i in 1:nd
@@ -959,7 +960,7 @@ function source_term_implicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_
         X = SVector(x_, y_)
         # Source terms
         lhs = get_node_vars(u_tuples_out[1], eq, i, j) # lhs in the implicit source solver
-        aux_node = get_cache_node_vars(aux, u_in, problem, scheme, eq, i, j)
+        aux_node = get_cache_node_vars(aux, u_in, problem, scheme, eq, ignored_element, i, j)
         u_node_implicit, s_node = implicit_source_solve(lhs, eq, X, t + c_rk_coeff * dt,
                                                         A_rk_tuple[1] * dt,
                                                         source_terms,
@@ -1813,7 +1814,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
         source_term_explicit!((u2, u3, u4, u5), F_G_U_S,
                               (A_rk[2][1], A_rk[3][1], A_rk[4][1], A_rk[5][1]),
                               b_rk[1], c_rk[1], u1_, op, local_grid,
-                              source_terms, aux, eq)
+                              problem, scheme, source_terms, aux, eq)
         source_term_implicit!((u2, u3, u4, u5), F_G_U_S,
                               (A_rk[2][2], A_rk[3][2], A_rk[4][2], A_rk[5][2]), b_rk[2],
                               c_rk[2], u1_, op,

@@ -27,7 +27,8 @@ import Tenkai: flux, prim2con, prim2con!, con2prim, con2prim!,
                apply_tvb_limiter!, apply_bound_limiter!, initialize_plot,
                write_soln!, compute_time_step, post_process_soln,
                compute_face_residual!, correct_variable_bound_limiter!,
-               pre_process_limiter!, modal_smoothness_indicator_gassner, set_node_vars!
+               pre_process_limiter!, modal_smoothness_indicator_gassner, set_node_vars!,
+               calc_source
 
 import Tenkai.TenkaicRK: implicit_source_solve, get_cache_node_vars
 
@@ -41,7 +42,7 @@ using Tenkai: PlotData, data_dir, get_filename, neumann, minmod,
               nvariables, eachvariable,
               add_to_node_vars!, subtract_from_node_vars!,
               multiply_add_to_node_vars!, update_ghost_values_u1!,
-              debug_blend_limiter!
+              debug_blend_limiter!, UsuallyIgnored
 
 # TODO - Have an abstract Jin-Xin as well.
 
@@ -108,8 +109,9 @@ function jin_xin_source(u, epsilon, x, t, eq::JinXin2D)
     return SVector(source_1..., source_2..., source_3...)
 end
 
-function get_cache_node_vars(aux, u1, problem, scheme, eq::JinXin2D, i, j, el_x, el_y)
-    u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
+function get_cache_node_vars(aux, u1, problem, scheme, eq::JinXin2D, ignored_element::UsuallyIgnored, i, j)
+    el_x, el_y = ignored_element.value
+    u_node = get_node_vars(u1, eq, i, j)
     epsilon_node = eq.epsilon_arr[el_x, el_y]
     return (u_node, epsilon_node)
 end
@@ -119,11 +121,15 @@ function set_node_vars!(u, aux_node::Tuple, eq::JinXin2D, indices...)
     set_node_vars!(u, u_node, eq, indices...)
 end
 
+function calc_source(aux_node, x, t, source_terms::typeof(jin_xin_source), eq::JinXin2D)
+    (u_node, epsilon_node) = aux_node
+    return source_terms(u_node, epsilon_node, x, t, eq)
+end
+
 # equation is lhs + coefficient * s(u^{n+1}) = u^{n+1}
 function implicit_source_solve(lhs, eq_jin_xin::JinXin2D, x, t, coefficient,
                                source_terms::typeof(jin_xin_source),
                                aux_node, implicit_solver = nothing)
-    @assert false
     (u_node, epsilon_node) = aux_node
     equations = eq_jin_xin.equations
     u_var_new = u_var(lhs, eq_jin_xin) # Since there is no source term for this part
@@ -134,6 +140,7 @@ function implicit_source_solve(lhs, eq_jin_xin::JinXin2D, x, t, coefficient,
     v2_var_new = (epsilon * v2_lhs + coefficient * g_new) / (epsilon + coefficient)
     sol_new = SVector(u_var_new..., v1_var_new..., v2_var_new...)
     source = jin_xin_source(sol_new, epsilon_node, x, t, eq_jin_xin)
+    @assert false sol_new, source, lhs, u_node
     return sol_new, source
 end
 
