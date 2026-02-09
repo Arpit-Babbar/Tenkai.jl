@@ -327,6 +327,7 @@ function modal_smoothness_indicator_gassner(eq::JinXin2D, t, iter,
                                       min(epsilon_max, 200000 * E[el_x, el_y]))
     end
 
+    alpha .= zero(eltype(alpha))
     alpha_temp .= epsilon_arr
 
     if problem.periodic_x
