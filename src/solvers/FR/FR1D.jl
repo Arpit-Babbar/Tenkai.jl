@@ -557,9 +557,9 @@ function apply_hierarchical_limiter!(eq::AbstractEquations{1}, # 1D equations
     # Get all the coefficients stored in modes
     for i in 1:nx
         @views multiply_dimensionwise!(modes[:, :, i], Pn2m, u1[:, :, i])
-        # for n in eachvariable(eq)
-        #    @views modes[n,:,i] .= Pn2m * u1[n,:,i]
-        # end
+        for n in eachvariable(eq)
+            @views modes[n, :, i] .= Pn2m * u1[n, :, i]
+        end
     end
 
     # Convert to reconstruction variables
