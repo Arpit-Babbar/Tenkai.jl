@@ -32,7 +32,9 @@ nx = 200
 equation_jin_xin = EqJinXin.get_equation(eq_bucklev, advection_jin_xin,
                                          advection_jin_xin_plus,
                                          advection_jin_xin_minus, epsilon_relaxation,
-                                         nx)
+                                         nx,
+                                         jin_xin_dt_scaling = 0.5 # Strange that it is needed
+                                         )
 
 # Is it really a struct?
 initial_value_struct = EqJinXin.JinXinICBC(Eq.hatbuck_iv, equation_jin_xin)

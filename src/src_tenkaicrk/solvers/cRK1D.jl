@@ -995,6 +995,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
     @inbounds for cell in Base.OneTo(nx) # Loop over cells
         dx = grid.dx[cell]
         xc = grid.xc[cell]
+        ignored_cell = UsuallyIgnored(cell)
         lamx = dt / dx
         u2 .= @view u1[:, :, cell]
         u3 .= @view u1[:, :, cell]
@@ -1025,7 +1026,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 
             lhs = get_node_vars(u3, eq, i) # lhs in the implicit source solver
             # aux_node = get_node_vars(u2_sec, eq, i)
-            aux_node = get_cache_node_vars(aux, u2_sec, problem, scheme, eq, i, 1)
+            aux_node = get_cache_node_vars(aux, u2_sec, problem, scheme, eq, ignored_cell, i)
             u3_node, s3_node = implicit_source_solve(lhs, eq, x_, t + c2 * dt,
                                                      a22 * dt,
                                                      source_terms,
@@ -1060,7 +1061,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             guess_u4 = get_node_vars(u3, eq, i) # Initial guess in the implicit solver
             lhs = get_node_vars(u4, eq, i) # lhs in the implicit source solver
             # aux_node = get_node_vars(u3_sec, eq, i)
-            aux_node = get_cache_node_vars(aux, u3_sec, problem, scheme, eq, i, 1)
+            aux_node = get_cache_node_vars(aux, u3_sec, problem, scheme, eq, ignored_cell, i)
             u4_node, s4_node = implicit_source_solve(lhs, eq, x_, t + c3 * dt,
                                                      a33 * dt,
                                                      source_terms,
@@ -1086,7 +1087,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             u_guess = get_node_vars(u4, eq, i) # Initial guess in the implicit solver
             lhs = get_node_vars(u5, eq, i) # lhs in the implicit source solver
             # aux_node = get_node_vars(u4_sec, eq, i)
-            aux_node = get_cache_node_vars(aux, u4_sec, problem, scheme, eq, i, 1)
+            aux_node = get_cache_node_vars(aux, u4_sec, problem, scheme, eq, ignored_cell, i)
             u5_node, s5_node = implicit_source_solve(lhs, eq, x_, t + c4 * dt,
                                                      a44 * dt, source_terms,
                                                      aux_node)

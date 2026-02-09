@@ -31,6 +31,13 @@ using ForwardDiff: Dual
 # Temporary hack
 using FastGaussQuadrature
 
+# Typically added to be ignored. But if you want the value, you can recover it
+# with multiple dispatch. It is used when putting the value leads to undesired behaviour
+# in the default case.
+struct UsuallyIgnored{IgnoredValue}
+    value::IgnoredValue
+end
+
 @enum BCType periodic dirichlet neumann reflect hllc_bc
 @enum BFluxType extrapolate evaluate
 @enum SolverType rkfr lwfr mdrk ssfr rktrixi # TODO - Is this only needed for D2 / D1?
