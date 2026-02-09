@@ -31,15 +31,9 @@ using ForwardDiff: Dual
 # Temporary hack
 using FastGaussQuadrature
 
-<<<<<<< HEAD
-# Typically added to be ignored. But if you want the value, you can recover it
-# with multiple dispatch. It is used when putting the value leads to undesired behaviour
-# in the default case.
-=======
 # Added to be ignored in the default case through multiple dispatch.
 # It is used when directly putting the value leads to the function doing undesired behaviour
 # Multiple dispatch is also used to access the value.
->>>>>>> fix_jin_xin_shock_capturing_bug
 struct UsuallyIgnored{IgnoredValue}
     value::IgnoredValue
 end
