@@ -19,7 +19,7 @@ using Accessors: @set
 import Tenkai.EqTenMoment1D
 using Tenkai.Basis
 
-import Tenkai: admissibility_tolerance
+import Tenkai: admissibility_tolerance, calc_source
 
 import Tenkai: flux, prim2con, prim2con!, con2prim, con2prim!,
                eigmatrix,
@@ -109,6 +109,11 @@ function jin_xin_source(u, epsilon, x, t, eq::JinXin1D)
     source_1 = zero(u_var_)
     source_2 = -(v_var_ - flux(x, u_var_, equations)) / epsilon
     return SVector(source_1..., source_2...)
+end
+
+function calc_source(aux_node, x, t, source_terms::typeof(jin_xin_source), eq::JinXin1D)
+    (u_node, epsilon_node) = aux_node
+    return jin_xin_source(u_node, epsilon_node, x, t, eq)
 end
 
 function get_cache_node_vars(aux, u1, problem, scheme, eq::JinXin1D, i, cell)

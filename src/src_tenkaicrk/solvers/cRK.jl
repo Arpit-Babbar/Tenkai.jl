@@ -171,8 +171,13 @@ function cSSP2IMEX433(; implicit_solver = newton_solver,
                                                                           volume_integral)
 end
 
-function get_cache_node_vars(aux, u1, problem, scheme, eq, i, cell)
-    u_node = get_node_vars(u1, eq, i, cell)
+function get_cache_node_vars(aux, u1, problem, scheme, eq, indices...)
+    u_node = get_node_vars(u1, eq, indices...)
+    return u_node
+end
+
+function get_cache_node_vars(aux, u1, problem, scheme, eq, ignored_value::UsuallyIgnored, indices...)
+    u_node = get_node_vars(u1, eq, indices...)
     return u_node
 end
 

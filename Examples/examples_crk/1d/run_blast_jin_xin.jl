@@ -37,7 +37,7 @@ boundary_value_ = (x, t) -> boundary_value(x, t)
 exact_solution = boundary_value
 
 degree = 3
-solver = cSSP2IMEX433()
+solver = cHT112()
 solution_points = "gl"
 correction_function = "radau"
 numerical_flux = EqJinXin.rusanov

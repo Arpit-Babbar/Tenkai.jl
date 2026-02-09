@@ -43,8 +43,6 @@ using Tenkai: PlotData, data_dir, get_filename, neumann, minmod,
               multiply_add_to_node_vars!, update_ghost_values_u1!,
               debug_blend_limiter!
 
-import Tenkai.TenkaicRK: implicit_source_solve
-
 # TODO - Have an abstract Jin-Xin as well.
 
 # The original system is u_t + f(u)_x = 0. The Jin-Xin relaxed system has variables (u,v).
@@ -125,6 +123,7 @@ end
 function implicit_source_solve(lhs, eq_jin_xin::JinXin2D, x, t, coefficient,
                                source_terms::typeof(jin_xin_source),
                                aux_node, implicit_solver = nothing)
+    @assert false
     (u_node, epsilon_node) = aux_node
     equations = eq_jin_xin.equations
     u_var_new = u_var(lhs, eq_jin_xin) # Since there is no source term for this part
