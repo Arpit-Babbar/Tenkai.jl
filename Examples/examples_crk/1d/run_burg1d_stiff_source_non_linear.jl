@@ -2,6 +2,7 @@ using Tenkai.TenkaicRK
 using Tenkai
 using Tenkai.StaticArrays
 using Tenkai.TenkaicRK: newton_solver
+using Tenkai.EqBurg1D
 Eq = Tenkai.EqBurg1D
 # Submodules
 
@@ -72,7 +73,7 @@ function TenkaicRK.get_cache_node_vars(aux, u1,
                                        problem::Problem{<:Real,
                                                         <:typeof(source_terms_stiff_burg_non_linear)},
                                        scheme,
-                                       eq, i, cell)
+                                       eq::Burg1D, i, cell)
     (; cache_homogeneous) = aux
     u1 = cache_homogeneous.u1
     # u1 = aux.cache_source.u1
