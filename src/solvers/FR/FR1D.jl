@@ -2192,6 +2192,8 @@ end
     return Fn
 end
 
+n_plotted_variables(eq::AbstractEquations{1}) = nvariables(eq)
+
 # Create Blend1D struct
 function Blend(eq::AbstractEquations{1}, op, grid,
                problem::Problem,
@@ -2329,7 +2331,7 @@ function Blend(eq::AbstractEquations{1}, op, grid,
 
     @unpack p_ua = plot_data
 
-    for n in 0:(nvar - 1)
+    for n in 0:(n_plotted_variables(eq) - 1)
         plot!(p_ua[end - n], grid.xc, alpha[1:(end - 1)], seriestype = :scatter,
               markershape = :square, color = :black, markersize = 1)
     end

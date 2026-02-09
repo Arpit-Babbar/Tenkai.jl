@@ -29,9 +29,10 @@ end
 
 epsilon_relaxation = 1e-10
 
+nx = 20
 equation_jin_xin = EqJinXin.get_equation(equation_euler, advection_jin_xin,
                                          advection_jin_xin_plus,
-                                         advection_jin_xin_minus, epsilon_relaxation)
+                                         advection_jin_xin_minus, epsilon_relaxation, nx)
 
 initial_value_dwave, exact_solution_dwave, final_time, ic_name = Eq.dwave_data
 boundary_value_dwave = exact_solution_dwave # dummy function
@@ -54,7 +55,6 @@ bound_limit = "no"
 bflux = evaluate
 final_time = 0.1
 
-nx = 20
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0

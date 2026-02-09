@@ -169,7 +169,8 @@ end
     trixi_include(joinpath(cRK_examples_dir(), "1d", "run_jin_xin_burg1d_marco.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,
-                  animate = false, final_time = 0.01, nx = 5)
+                  animate = false, final_time = 0.01, nx = 5,
+                  limiter = setup_limiter_none())
     data_name = "jin_xin_burg1d_marco.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 
@@ -190,8 +191,21 @@ end
     trixi_include(joinpath(cRK_examples_dir(), "1d", "run_blast_jin_xin.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,
-                  animate = false, final_time = 0.01, nx = 5)
+                  animate = false, final_time = 0.01, nx = 5,
+                  cfl_safety_factor = 0.9,
+                  limiter = setup_limiter_none(),
+                  jin_xin_dt_scaling = 0.5)
     data_name = "jin_xin_blast.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
+
+    # Blast Jin-Xin shock capturing
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_blast_jin_xin.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.01, nx = 5,
+                  cfl_safety_factor = 0.95,
+                  jin_xin_dt_scaling = 1.0)
+    data_name = "jin_xin_blast_shock_capturing.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
 end
 
