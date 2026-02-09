@@ -1235,9 +1235,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         noncons_flux_der!(volume_integral, (u2,), r1, (tA_rk[2][1],), tb_rk[1], u1_, op,
                           local_grid, eq)
         source_term_explicit!((u2,), F_G_U_S, (tA_rk[2][1],), tb_rk[1], tc_rk[1], u1_,
-                              op,
-                              local_grid,
-                              source_terms, eq)
+                              op, local_grid, problem, scheme, source_terms, aux, eq)
         noncons_flux_der!(volume_integral, (), r1, (tA_rk[2][2],), tb_rk[2], u2, op,
                           local_grid, eq)
 
@@ -1245,8 +1243,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
                   local_grid, eq)
 
         source_term_explicit!((), F_G_U_S, (tA_rk[2][2],), tb_rk[2], tc_rk[2], u2, op,
-                              local_grid,
-                              source_terms, eq)
+                              local_grid, problem, scheme, source_terms, aux, eq)
 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
@@ -1319,7 +1316,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         noncons_flux_der!(volume_integral, (u2,), r1, (tA_rk[2][1],), tb_rk[1], u1_, op,
                           local_grid, eq)
         source_term_explicit!((u2,), F_G_U_S, (tA_rk[2][1],), tb_rk[1], tc_rk[1], u1_,
-                              op, local_grid, source_terms, eq)
+                              op, local_grid, problem, scheme, source_terms, aux, eq)
 
         # Stage 2
         flux_der!(volume_integral, r1, (u3,), F_G_U_S, (tA_rk[3][2],), tb_rk[2], u2, op,
@@ -1328,8 +1325,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
                           local_grid, eq)
         source_term_explicit!((u3,), F_G_U_S, (tA_rk[3][2],), tb_rk[2], tc_rk[2], u2,
                               op,
-                              local_grid,
-                              source_terms, eq)
+                              local_grid, problem, scheme, source_terms, aux, eq)
 
         # Stage 3 (no derivatives)
         flux_der!(volume_integral, r1, (), F_G_U_S, (tA_rk[3][3],), tb_rk[3], u3, op,
@@ -1337,8 +1333,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         noncons_flux_der!(volume_integral, (), r1, (tA_rk[3][3],), tb_rk[3], u3, op,
                           local_grid, eq)
         source_term_explicit!((), F_G_U_S, (tA_rk[3][3],), tb_rk[3], tc_rk[3], u3, op,
-                              local_grid,
-                              source_terms, eq)
+                              local_grid, problem, scheme, source_terms, aux, eq)
 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
@@ -1398,10 +1393,11 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
 
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
+        ignored_element = UsuallyIgnored((el_x, el_y))
         dx, dy = grid.dx[el_x], grid.dy[el_y]
         xc, yc = grid.xc[el_x], grid.yc[el_y]
         lamx, lamy = dt / dx, dt / dy
-        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt, el_x, el_y)
+        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt, ignored_element)
 
         id = Threads.threadid()
         u2, u3, u4, F, G, U, S = cell_arrays[id]
@@ -1422,7 +1418,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
         noncons_flux_der!(volume_integral, (u2,), r1, (tA_rk[2][1],), tb_rk[1], u1_, op,
                           local_grid, eq)
         source_term_explicit!((u2,), F_G_U_S, (tA_rk[2][1],), tb_rk[1], tc_rk[1], u1_,
-                              op, local_grid, source_terms, eq)
+                              op, local_grid, problem, scheme, source_terms, aux, eq)
 
         # Stage 2
         flux_der!(volume_integral, r1, (u3,), F_G_U_S, (tA_rk[3][2],), tb_rk[2], u2, op,
@@ -1430,7 +1426,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
         noncons_flux_der!(volume_integral, (u3,), r1, (tA_rk[3][2],), tb_rk[2], u2, op,
                           local_grid, eq)
         source_term_explicit!((u3,), F_G_U_S, (tA_rk[3][2],), tb_rk[2], tc_rk[2], u2,
-                              op, local_grid, source_terms, eq)
+                              op, local_grid, problem, scheme, source_terms, aux, eq)
 
         # Stage 3
         flux_der!(volume_integral, r1, (u4,), F_G_U_S, (tA_rk[4][3],), tb_rk[3], u3, op,
@@ -1438,8 +1434,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
         noncons_flux_der!(volume_integral, (u4,), r1, (tA_rk[4][3],), tb_rk[3], u3, op,
                           local_grid, eq)
         source_term_explicit!((u4,), F_G_U_S, (tA_rk[4][3],), tb_rk[3], tc_rk[3], u3,
-                              op,
-                              local_grid, source_terms, eq)
+                              op, local_grid, problem, scheme, source_terms, aux, eq)
 
         # Stage 4 (no derivatives)
         flux_der!(volume_integral, r1, (), F_G_U_S, (tA_rk[4][4],), tb_rk[4], u4, op,
@@ -1447,7 +1442,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
         noncons_flux_der!(volume_integral, (), r1, (tA_rk[4][4],), tb_rk[4], u4, op,
                           local_grid, eq)
         source_term_explicit!((), F_G_U_S, (tA_rk[4][4],), tb_rk[4], tc_rk[4],
-                              u4, op, local_grid, source_terms, eq)
+                              u4, op, local_grid, problem, scheme, source_terms, aux,
+                              eq)
 
         F_G_S_to_res_Ub!(volume_integral, r1, Ub_, u1_, F_G_U_S, op, local_grid, scheme,
                          eq)
@@ -1500,10 +1496,11 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
 
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
+        ignored_element = UsuallyIgnored((el_x, el_y))
         dx, dy = grid.dx[el_x], grid.dy[el_y]
         xc, yc = grid.xc[el_x], grid.yc[el_y]
         lamx, lamy = dt / dx, dt / dy
-        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt, el_x, el_y)
+        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt, ignored_element)
 
         id = Threads.threadid()
         u2, F, G, U, S = cell_arrays[id]
@@ -1522,8 +1519,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         noncons_flux_der!(volume_integral, (u2,), r1, (tA_rk[2][1],), tb_rk[1], u1_, op,
                           local_grid, eq)
         source_term_explicit!((u2,), F_G_U_S, (A_rk[2][1],), b_rk[1], c_rk[1], u1_, op,
-                              local_grid,
-                              source_terms, eq)
+                              local_grid, problem, scheme, source_terms, aux, eq)
         source_term_implicit!((u2,), F_G_U_S, (A_rk[2][2],), b_rk[2], c_rk[2], u1_, op,
                               local_grid,
                               problem, scheme, implicit_solver, source_terms, aux, eq)
@@ -1588,10 +1584,11 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
 
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
+        ignored_element = UsuallyIgnored((el_x, el_y))
         dx, dy = grid.dx[el_x], grid.dy[el_y]
         xc, yc = grid.xc[el_x], grid.yc[el_y]
         lamx, lamy = dt / dx, dt / dy
-        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt, el_x, el_y)
+        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt, ignored_element)
 
         id = Threads.threadid()
         u1_, u2, F, G, U, S = cell_arrays[id]
@@ -1615,8 +1612,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
         noncons_flux_der!(volume_integral, (u2,), r1, (tA_rk[2][1],), tb_rk[1], u1_, op,
                           local_grid, eq)
         source_term_explicit!((u2,), F_G_U_S, (A_rk[2][1],), b_rk[1], c_rk[1], u1_, op,
-                              local_grid,
-                              source_terms, eq)
+                              local_grid, problem, scheme, source_terms, aux, eq)
         source_term_implicit!((u2,), F_G_U_S, (A_rk[2][2],), b_rk[2], c_rk[2], u1_, op,
                               local_grid,
                               problem, scheme, implicit_solver, source_terms, aux, eq)
@@ -1684,10 +1680,11 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
 
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
+        ignored_element = UsuallyIgnored((el_x, el_y))
         dx, dy = grid.dx[el_x], grid.dy[el_y]
         xc, yc = grid.xc[el_x], grid.yc[el_y]
         lamx, lamy = dt / dx, dt / dy
-        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt, el_x, el_y)
+        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt, ignored_element)
 
         id = Threads.threadid()
         u2, u3, F, G, U, S = cell_arrays[id]
@@ -1914,8 +1911,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
     c_rk = (z0, 1 / 2, 2 / 3, 1 / 2, 1.0)
 
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
-        ignored_element = UsuallyIgnored((el_x, el_y))
         el_x, el_y = element[1], element[2]
+        ignored_element = UsuallyIgnored((el_x, el_y))
         dx, dy = grid.dx[el_x], grid.dy[el_y]
         xc, yc = grid.xc[el_x], grid.yc[el_y]
         lamx, lamy = dt / dx, dt / dy
@@ -2066,10 +2063,11 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
 
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
+        ignored_element = UsuallyIgnored((el_x, el_y))
         dx, dy = grid.dx[el_x], grid.dy[el_y]
         xc, yc = grid.xc[el_x], grid.yc[el_y]
         lamx, lamy = dt / dx, dt / dy
-        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt, el_x, el_y)
+        local_grid = (xc, yc, dx, dy, lamx, lamy, t, dt, ignored_element)
 
         id = Threads.threadid()
         u1_, u2, u3, u4, F, G, U, S = cell_arrays[id]
