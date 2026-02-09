@@ -170,6 +170,8 @@ function (jin_xin_bc::JinXinICBC)(x, t)
     return SVector(u..., v...)
 end
 
+Tenkai.n_plotted_variables(eq_jin_xin::JinXin1D) = nvariables(eq_jin_xin.equations)
+
 function Tenkai.initialize_plot(eq_jin_xin::JinXin1D, op, grid, problem, scheme, timer, u1_,
                                 ua_)
     equations = eq_jin_xin.equations
