@@ -11,16 +11,6 @@ overwrite_errors = false
 
 # Reactive Euler 1D
 
-solver2string(s::String) = s
-solver2string(s::cRK22) = "cRK22"
-solver2string(s::cRK33) = "cRK33"
-solver2string(s::cRK44) = "cRK44"
-solver2string(s::cIMEX111) = "cIMEX111"
-solver2string(s::cHT112) = "cHT112"
-solver2string(s::cSSP2IMEX433) = "cSSP2IMEX433"
-solver2string(s::cSSP2IMEX222) = "cSSP2IMEX222"
-solver2string(s::cSSP2IMEX332) = "cSSP2IMEX332"
-
 @testset "Reactive Euler 1D" begin
     EqReactive = Tenkai.TenkaicRK.EqEulerReactive1D
     # Pure FV blending test
@@ -179,9 +169,44 @@ end
     trixi_include(joinpath(cRK_examples_dir(), "1d", "run_jin_xin_burg1d_marco.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,
-                  animate = false, final_time = 0.01, nx = 5)
+                  animate = false, final_time = 0.01, nx = 5,
+                  limiter = setup_limiter_none())
     data_name = "jin_xin_burg1d_marco.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_bucklev_jin_xin.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.15, nx = 5)
+    data_name = "jin_xin_bucklev_burg1d.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_dwave_jin_xin.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.5, nx = 5)
+    data_name = "jin_xin_dwave_1d.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_blast_jin_xin.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.01, nx = 5,
+                  cfl_safety_factor = 0.9,
+                  limiter = setup_limiter_none(),
+                  jin_xin_dt_scaling = 0.5)
+    data_name = "jin_xin_blast.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
+
+    # Blast Jin-Xin shock capturing
+    trixi_include(joinpath(cRK_examples_dir(), "1d", "run_blast_jin_xin.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  animate = false, final_time = 0.01, nx = 5,
+                  cfl_safety_factor = 0.95,
+                  jin_xin_dt_scaling = 1.0)
+    data_name = "jin_xin_blast_shock_capturing.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-12)
 end
 
 @testset "Burger 1D stiff double source non-linear" begin
@@ -644,6 +669,47 @@ end
     data_name = "multiion_convergence.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 
+    # RKFR flux differencing solver
+    volume_integral = Trixi.VolumeIntegralFluxDifferencing((Trixi.flux_ruedaramirez_etal,
+                                                            Trixi.flux_nonconservative_ruedaramirez_etal))
+    trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_convergence.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  degree = 3,
+                  solver = RKFR(volume_integral),
+                  animate = false, final_time = 0.1, nx = 8, ny = 8,
+                  correction_function = "g2",
+                  solution_points = "gll",
+                  time_scheme = "RK4")
+    data_name = "multiion_convergence_rk_flux_diff.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    volume_integral = Trixi.VolumeIntegralFluxDifferencing((Trixi.flux_ruedaramirez_etal,
+                                                            Trixi.flux_nonconservative_ruedaramirez_etal))
+    trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_convergence.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  degree = 3,
+                  solver = cRK44(volume_integral),
+                  animate = false, final_time = 0.1, nx = 8, ny = 8,
+                  correction_function = "g2",
+                  solution_points = "gll")
+    data_name = "multiion_convergence_crk_flux_diff.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_convergence.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  degree = 3,
+                  solver = TrixiRKSolver(),
+                  cfl_safety_factor = 0.7, # Don't know why. Maybe it works without it too.
+                  animate = false, final_time = 0.1, nx = 8, ny = 8,
+                  correction_function = "g2",
+                  solution_points = "gll",
+                  time_scheme = "RK4")
+    data_name = "multiion_convergence_trixi_rk.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
     # Non-cheap extrapolation
     volume_integral = Tenkai.VolumeIntegralWeak(cheap_noncons_extrapolation = Tenkai.False())
     trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_convergence.jl"),
@@ -663,6 +729,26 @@ end
                   animate = false, final_time = 0.1, nx = 5, ny = 5,
                   degree = 1, amax = 0.01)
     data_name = "multiion_khi.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_khi.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  solver = TrixiRKSolver(),
+                  solution_points = "gll", correction_function = "g2",
+                  animate = false, final_time = 2.0, nx = 16, ny = 16,
+                  degree = 3, limiter = setup_limiter_none())
+    data_name = "multiion_khi_trixirk.txt"
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
+
+    trixi_include(joinpath(cRK_examples_dir(), "2d", "run_multiion_khi.jl"),
+                  save_time_interval = 0.0, save_iter_interval = 0,
+                  compute_error_interval = 0,
+                  solver = TrixiRKSolver(),
+                  solution_points = "gll", correction_function = "g2",
+                  animate = false, final_time = 2.0, nx = 16, ny = 16,
+                  degree = 3, limiter = setup_limiter_none())
+    data_name = "multiion_khi_trixirk_flux_diff.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
 end
 

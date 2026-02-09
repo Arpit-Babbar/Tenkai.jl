@@ -61,19 +61,9 @@ function get_cfl(eq::AbstractEquations{1}, scheme::Scheme{<:LWEnzymeTower}, para
     if dissipation == get_second_node_vars # Diss 2
         cfl_radau = os_vector([1.0, 0.333, 0.170, 0.103, 0.069, 0.02419])
         cfl_g2 = os_vector([1.0, 1.000, 0.333, 0.170, 0.103, 0.02482])
-        if solver == "rkfr"
-            println("Using LW-D2 CFL with RKFR")
-        else
-            println("Using LW-D2 CFL with LW-D2")
-        end
     elseif dissipation == get_first_node_vars # Diss 1
         cfl_radau = os_vector([1.0, 0.226, 0.117, 0.072, 0.049, 0.01988])
         cfl_g2 = os_vector([1.0, 0.465, 0.204, 0.116, 0.060, 0.0205])
-        if solver == "rkfr"
-            println("Using LW-D1 CFL with RKFR")
-        else
-            println("Using LW-D1 CFL with LW-D1")
-        end
     end
 
     # Reduce this cfl by a small amount

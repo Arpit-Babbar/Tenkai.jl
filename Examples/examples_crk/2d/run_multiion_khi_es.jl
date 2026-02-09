@@ -112,13 +112,17 @@ domain = [xmin, xmax, ymin, ymax]
 
 boundary_condition = (periodic, periodic, reflect, reflect)
 
+function source_terms_lorentz_khi(u, x, t, eq::MultiIonMHD2D)
+    Trixi.source_terms_lorentz(u, x, t, eq.trixi_equations)
+end
+
 ###############################################################################
 # ODE solvers, callbacks etc.
 
 grid_size = [nx, ny]
 
 problem = Problem(domain, initial_value, boundary_value, boundary_condition,
-                  final_time, exact_solution_khi)
+                  final_time, exact_solution_khi, source_terms = source_terms_lorentz_khi)
 limiter_blend = setup_limiter_blend(blend_type = fo_blend(eq),
                                     # indicating_variables = Eq.rho_p_indicator!,
                                     indicating_variables = conservative_indicator!,

@@ -100,6 +100,7 @@ include("$lwfr_dir/LWFR1D.jl")
 include("$lwfr_dir/LWFR1D_ad.jl")
 include("$lwfr_dir/LWFR2D.jl")
 include("$lwfr_dir/LWFR2D_ad.jl")
+include("$lwfr_dir/LWFR2D_taylor_diff.jl")
 
 # ( # LWFR API exported
 # export setup_arrays_lwfr,
@@ -113,12 +114,12 @@ include("$lwfr_dir/LWFR2D_ad.jl")
 include("$mdrk_dir/MDRK.jl")
 
 # 1D
+include("$eq_dir/EqEuler1D.jl")
 include("$eq_dir/EqLinAdv1D.jl")
 include("$eq_dir/EqBurg1D.jl")
-include("$eq_dir/EqBuckleyLeverett1D.jl")
-include("$eq_dir/EqEuler1D.jl")
 include("$eq_dir/EqTenMoment1D.jl")
 include("$eq_dir/EqMHD1D.jl")
+include("$eq_dir/EqBuckleyLeverett1D.jl")
 
 # 2D
 include("$eq_dir/EqBurg2D.jl")
@@ -144,15 +145,19 @@ export cRK11, cRK22, cRK33, cRK44, cRK65
 # DCSX dissipation
 export DCSX
 
+# RKFR solver
+export RKFR
+
 # TrixiRKSolver
 export TrixiRKSolver
 
 export scheme_degree_plus_one, scheme_n_solution_points
 
-export LWEnzymeTower, MDRKEnzymeTower
+export LWTDEltWise, LWEnzymeTower, MDRKEnzymeTower
 
 export PositivityBlending, NoPositivityBlending
 
 include("src_tenkaicrk/TenkaicRK.jl")
+using .TenkaicRK
 
 end # module

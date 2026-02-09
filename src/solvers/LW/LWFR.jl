@@ -24,6 +24,7 @@ using MuladdMacro
 abstract type LWSolver end
 abstract type LWADSolver <: LWSolver end
 struct LWEnzymeTower <: LWADSolver end
+struct LWTDEltWise <: LWADSolver end
 
 Tenkai.solver2enum(solver::LWADSolver) = Tenkai.ssfr # solver type enum
 

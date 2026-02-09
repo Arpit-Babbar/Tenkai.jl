@@ -15,12 +15,13 @@ advection_jin_xin = (x, u, eq) -> A()^2 * u
 advection_jin_xin_plus(ul, ur, F, eq) = 0.5 * (F[1] + A() * F[2]) * SVector(A(), 1.0)
 advection_jin_xin_minus(ul, ur, F, eq) = 0.5 * (F[1] - A() * F[2]) * SVector(-A(), 1.0)
 
+nx = 100
 equation_jin_xin = Eq.get_equation(equation_burg, advection_jin_xin, advection_jin_xin_plus,
-                                   advection_jin_xin_minus, 0.001)
+                                   advection_jin_xin_minus, 0.001, nx)
 
 initial_value_burg = EqBurg1D.initial_value_burger_sin
 initial_value = Eq.JinXinICBC(initial_value_burg, equation_jin_xin)
-initial_value_ = (x) -> initial_value(x)
+initial_value_ = initial_value
 boundary_value_burg = EqBurg1D.zero_boundary_value # dummy function
 boundary_value = Eq.JinXinICBC(boundary_value_burg, equation_jin_xin)
 boundary_value_ = (x, t) -> boundary_value(x, t)
@@ -29,7 +30,7 @@ final_time = 4.9
 
 exact_solution_burg = EqBurg1D.exact_solution_burger_sin
 exact_solution = Eq.JinXinICBC(exact_solution_burg, equation_jin_xin)
-exact_solution_jin_xin = (x, t) -> exact_solution(x, t)
+exact_solution_jin_xin = exact_solution
 
 degree = 2
 solver = cSSP2IMEX222()
@@ -39,7 +40,6 @@ bflux = evaluate
 numerical_flux = Eq.rusanov
 bound_limit = "no"
 
-nx = 100
 cfl = 0.0
 bounds = ([-0.2], [0.2])
 tvbM = 0.0

@@ -4,8 +4,6 @@ import Tenkai: compute_time_step, correct_variable!, apply_tvb_limiter!,
                apply_tvb_limiterβ!, write_poly, write_soln!,
                compute_time_step
 
-import Tenkai.EqEuler2D: save_solution_file
-
 using Tenkai.EqEuler2D: Euler2D, con2prim!, get_pressure, con2prim
 
 using EllipsisNotation

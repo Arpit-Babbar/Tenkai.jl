@@ -19,8 +19,11 @@ advection_jin_xin = (x, u, eq) -> A()^2 * u
 advection_jin_xin_plus(ul, ur, F, eq) = 0.5 * (F[1] + A() * F[2]) * SVector(A(), 1.0)
 advection_jin_xin_minus(ul, ur, F, eq) = 0.5 * (F[1] - A() * F[2]) * SVector(-A(), 1.0)
 
+nx = 20
+
 equation_jin_xin = Eq.get_equation(equation_burg, advection_jin_xin, advection_jin_xin_plus,
-                                   advection_jin_xin_minus, epsilon_relaxation)
+                                   advection_jin_xin_minus, epsilon_relaxation, nx;
+                                   thresholds = (1.5e-12, 2.0e-3))
 
 # initial_value_burg = EqBurg1D.initial_value_burger_sin
 
@@ -33,12 +36,12 @@ end
 initial_value_burg = initial_value_burg_marco
 
 initial_value = Eq.JinXinICBC(initial_value_burg, equation_jin_xin)
-initial_value_ = (x) -> initial_value(x)
+initial_value_ = initial_value
 boundary_value_burg = EqBurg1D.zero_boundary_value # dummy function
 boundary_value = Eq.JinXinICBC(boundary_value_burg, equation_jin_xin)
-boundary_value_ = (x, t) -> boundary_value(x, t)
+boundary_value_ = boundary_value
 boundary_condition = (periodic, periodic)
-final_time = 0.25
+final_time = 0.5
 
 exact_solution_burg = EqBurg1D.exact_solution_burger_sin
 
@@ -50,8 +53,8 @@ function exact_solution_burger_marco(x, t_)
     return value
 end
 
-exact_solution = exact_solution_burger_marco
-exact_solution_ = (x, t) -> exact_solution(x, t)
+exact_solution = Eq.JinXinICBC(exact_solution_burger_marco, equation_jin_xin)
+exact_solution_ = exact_solution
 
 degree = 3
 solver = cSSP2IMEX433()
@@ -61,7 +64,6 @@ bflux = evaluate
 numerical_flux = Eq.rusanov
 bound_limit = "no"
 
-nx = 20
 cfl = 0.0
 bounds = ([-0.2], [0.2])
 tvbM = 0.0
@@ -77,13 +79,18 @@ domain = [xmin, xmax]
 problem = Problem(domain, initial_value_, boundary_value_, boundary_condition,
                   final_time, exact_solution_,
                   source_terms = Eq.jin_xin_source)
-limiter = setup_limiter_none()
+# limiter = setup_limiter_none()
+limiter = Tenkai.setup_limiter_blend(blend_type = Tenkai.fo_blend(equation_jin_xin),
+                                     indicating_variables = Tenkai.conservative_indicator!,
+                                     reconstruction_variables = Tenkai.conservative_reconstruction,
+                                     indicator_model = "gassner",
+                                     debug_blend = false)
 scheme = Scheme(solver, degree, solution_points, correction_function,
                 numerical_flux, bound_limit, limiter, bflux, diss)
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
                    animate = animate,
-                   cfl_safety_factor = cfl_safety_factor)
+                   cfl_safety_factor = cfl_safety_factor, saveto = "jinxin_nx$nx")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation_jin_xin, problem, scheme, param);
 

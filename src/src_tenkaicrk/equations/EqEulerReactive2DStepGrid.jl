@@ -1,7 +1,7 @@
 using Tenkai
 
 import Tenkai: compute_time_step, correct_variable!, apply_tvb_limiter!,
-               apply_tvb_limiterβ!, write_poly, write_soln!, save_solution_file,
+               apply_tvb_limiterβ!, write_poly, write_soln!,
                compute_time_step
 
 using EllipsisNotation
@@ -337,6 +337,74 @@ function write_poly(eq::EulerReactive2D, grid::StepGrid, op, u1, fcount)
     println("Wrote pointwise solution to $filename")
 
     out = vtk_save(vtk_sol)
+end
+
+function save_solution_file(u_, time, dt, iter,
+                            mesh::StepGrid,
+                            equations, op,
+                            element_variables = Dict{Symbol, Any}();
+                            system = "")
+    # Filename without extension based on current time step
+    output_directory = "output"
+    if isempty(system)
+        filename = joinpath(output_directory, @sprintf("solution_%06d.h5", iter))
+    else
+        filename = joinpath(output_directory, @sprintf("solution_%s_%06d.h5", system, iter))
+    end
+
+    solution_variables(u) = con2prim(equations, u) # For broadcasting
+
+    nx_tuple, ny_tuple = mesh.size
+    u = @view u_[:, :, :, 1:nx_tuple[2], 1:ny_tuple[2]] # Don't plot ghost cells
+
+    # Convert to different set of variables if requested
+    # Reinterpret the solution array as an array of conservative variables,
+    # compute the solution variables via broadcasting, and reinterpret the
+    # result as a plain array of floating point numbers
+    # OffsetArray(reinterpret(eltype(ua), con2prim_.(reinterpret(SVector{nvariables(equation), eltype(ua)}, ua))))
+    u_static_reinter = reinterpret(SVector{nvariables(equations), eltype(u)}, u)
+    data = Array(reinterpret(eltype(u), solution_variables.(u_static_reinter)))
+
+    # Find out variable count by looking at output from `solution_variables` function
+    n_vars = size(data, 1)
+
+    # Open file (clobber existing content)
+    h5open(filename, "w") do file
+        # Add context information as attributes
+        attributes(file)["ndims"] = 2
+        attributes(file)["equations"] = "2D Euler Equations"
+        attributes(file)["polydeg"] = op.degree
+        attributes(file)["n_vars"] = n_vars
+        attributes(file)["n_elements"] = nx_tuple[2] * ny_tuple[2]
+        attributes(file)["mesh_type"] = "StructuredMesh" # For Trixi2Vtk
+        attributes(file)["mesh_file"] = "mesh.h5"
+        attributes(file)["time"] = convert(Float64, time) # Ensure that `time` is written as a double precision scalar
+        attributes(file)["dt"] = convert(Float64, dt) # Ensure that `dt` is written as a double precision scalar
+        attributes(file)["timestep"] = iter
+
+        # Store each variable of the solution data
+        var_names = ("Density", "Velocity x", "Velocity y", "Pressure", "Reactant mass")
+        for v in 1:n_vars
+            # Convert to 1D array
+            file["variables_$v"] = vec(data[v, .., :])
+
+            # Add variable name as attribute
+            var = file["variables_$v"]
+            attributes(var)["name"] = var_names[v]
+        end
+
+        # Store element variables
+        for (v, (key, element_variable)) in enumerate(element_variables)
+            # Add to file
+            file["element_variables_$v"] = element_variable
+
+            # Add variable name as attribute
+            var = file["element_variables_$v"]
+            attributes(var)["name"] = string(key)
+        end
+    end
+
+    return filename
 end
 
 function write_soln!(base_name, fcount, iter, time, dt, eq::EulerReactive2D,

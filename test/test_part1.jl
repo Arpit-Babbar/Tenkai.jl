@@ -85,15 +85,17 @@ end
 @testset "Isentropic 2D" begin
     local solver_degrees = Dict("mdrk" => [3],
                                 "lwfr" => [1, 2, 3, 4],
-                                "rkfr" => [1, 2, 3, 4])
-    for solver in ["mdrk", "lwfr", "rkfr"], degree in solver_degrees[solver]
+                                "rkfr" => [1, 2, 3, 4],
+                                LWTDEltWise() => [1, 2, 3, 4])
+    for solver in ["mdrk", "lwfr", "rkfr", LWTDEltWise()], degree in solver_degrees[solver]
         trixi_include(joinpath(examples_dir(), "2d", "run_isentropic.jl"),
                       save_time_interval = 0.0, save_iter_interval = 0,
                       compute_error_interval = 0,
                       solver = solver, degree = degree,
                       limiter = setup_limiter_none(),
                       animate = false, final_time = 1.0, nx = 5, ny = 5)
-        data_name = "isentropic_2d_$(solver)_$(degree).txt"
+        solver_name = solver2string(solver)
+        data_name = "isentropic_2d_$(solver_name)_$(degree).txt"
         compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors)
     end
 

@@ -13,6 +13,7 @@ using OrdinaryDiffEqSSPRK, OrdinaryDiffEqTsit5
 using DiffEqCallbacks: StepsizeLimiter
 using Printf
 using LinearAlgebra: axpy!, axpby!
+using Trixi: AbstractVolumeIntegral, VolumeIntegralWeakForm
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
@@ -22,6 +23,14 @@ using LinearAlgebra: axpy!, axpby!
 #! format: noindent
 
 abstract type AbstractRKSolver end
+
+struct RKFR{VolumeIntegral <: AbstractVolumeIntegral} <: AbstractRKSolver
+    volume_integral::VolumeIntegral
+end
+
+RKFR() = RKFR(VolumeIntegralWeakForm())
+
+solver2string(solver::RKFR) = "rkfr"
 
 #------------------------------------------------------------------------------
 # Dimension independent methods in FR used here
