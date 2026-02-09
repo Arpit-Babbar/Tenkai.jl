@@ -2,6 +2,7 @@ using Tenkai.TenkaicRK
 using Tenkai
 using Tenkai.StaticArrays
 using Tenkai.TenkaicRK: newton_solver
+using Tenkai.EqBurg1D
 Eq = Tenkai.EqBurg1D
 # Submodules
 

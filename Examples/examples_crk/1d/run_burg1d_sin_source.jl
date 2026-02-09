@@ -1,6 +1,7 @@
 using Tenkai.TenkaicRK
 using Tenkai.TenkaicRK.Tenkai
 Eq = Tenkai.EqBurg1D
+using Tenkai.EqBurg1D
 using StaticArrays
 
 using SimpleUnPack
