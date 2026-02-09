@@ -24,7 +24,7 @@ bound_limit = "yes"
 bflux = evaluate
 final_time = 0.2
 
-ny = 150
+ny = 20
 nx = 4 * ny
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler

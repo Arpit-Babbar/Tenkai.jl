@@ -40,7 +40,8 @@ using Tenkai
 using Tenkai: correct_variable!
 
 using Trixi: Trixi
-import Tenkai.EqEuler1D: tenkai2trixiequation, max_abs_eigen_value
+import Tenkai.EqEuler1D: tenkai2trixiequation, max_abs_eigen_value, get_density,
+                         get_pressure
 
 # By default, Julia/LLVM does not use fused multiply-add operations (FMAs).
 # Since these FMAs can increase the performance of many numerical algorithms,
