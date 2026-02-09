@@ -213,7 +213,7 @@ end
     trixi_include(joinpath(cRK_examples_dir(), "2d", "run_isentropic_jin_xin.jl"),
                   save_time_interval = 0.0, save_iter_interval = 0,
                   compute_error_interval = 0,
-                  animate = false, final_time = 0.01, nx = 5)
+                  animate = false, final_time = 0.2, nx = 5)
     data_name = "jin_xin_isentropic.txt"
     compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 4e-13)
 end
