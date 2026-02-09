@@ -28,9 +28,11 @@ function advection_jin_xin_minus(ul, ur, F, eq_bucklev)
     0.5 * (F[1] - A() * F[2]) * SVector(-A(), 1.0)
 end
 
+nx = 200
 equation_jin_xin = EqJinXin.get_equation(eq_bucklev, advection_jin_xin,
                                          advection_jin_xin_plus,
-                                         advection_jin_xin_minus, epsilon_relaxation)
+                                         advection_jin_xin_minus, epsilon_relaxation,
+                                         nx)
 
 # Is it really a struct?
 initial_value_struct = EqJinXin.JinXinICBC(Eq.hatbuck_iv, equation_jin_xin)
@@ -47,7 +49,6 @@ bflux = evaluate
 numerical_flux = EqJinXin.rusanov
 bound_limit = "no"
 
-nx = 200
 cfl = 0.0
 bounds = ([0.0], [1.0])
 tvbM = 0.0

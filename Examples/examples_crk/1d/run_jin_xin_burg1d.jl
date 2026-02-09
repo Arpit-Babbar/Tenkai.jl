@@ -15,8 +15,9 @@ advection_jin_xin = (x, u, eq) -> A()^2 * u
 advection_jin_xin_plus(ul, ur, F, eq) = 0.5 * (F[1] + A() * F[2]) * SVector(A(), 1.0)
 advection_jin_xin_minus(ul, ur, F, eq) = 0.5 * (F[1] - A() * F[2]) * SVector(-A(), 1.0)
 
+nx = 100
 equation_jin_xin = Eq.get_equation(equation_burg, advection_jin_xin, advection_jin_xin_plus,
-                                   advection_jin_xin_minus, 0.001)
+                                   advection_jin_xin_minus, 0.001, nx)
 
 initial_value_burg = EqBurg1D.initial_value_burger_sin
 initial_value = Eq.JinXinICBC(initial_value_burg, equation_jin_xin)
@@ -39,7 +40,6 @@ bflux = evaluate
 numerical_flux = Eq.rusanov
 bound_limit = "no"
 
-nx = 100
 cfl = 0.0
 bounds = ([-0.2], [0.2])
 tvbM = 0.0
