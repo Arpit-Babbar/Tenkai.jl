@@ -211,7 +211,7 @@ function max_abs_eigen_value(eq::JinXin1D, u)
 end
 
 @inbounds @inline function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::JinXin1D, dir)
-    λ = λ = max(max_abs_eigen_value(eq, ual), max_abs_eigen_value(eq, uar))
+    λ = max(max_abs_eigen_value(eq, ual), max_abs_eigen_value(eq, uar)) # local wave speed
 
     return 0.5 * (Fl + Fr - λ * (Ur - Ul))
     # rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq.equations, dir)
