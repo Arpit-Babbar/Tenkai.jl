@@ -74,7 +74,7 @@ function TenkaicRK.get_cache_node_vars(aux, u1,
                                        problem::Problem{<:Real,
                                                         <:typeof(source_terms_stiff_burg_non_linear)},
                                        scheme,
-                                       eq, i, cell)
+                                       eq::Burg1D, i, cell)
     (; cache_homogeneous) = aux
     u1 = cache_homogeneous.u1
     # u1 = aux.cache_source.u1
@@ -82,7 +82,7 @@ function TenkaicRK.get_cache_node_vars(aux, u1,
     return u_node
 end
 
-function TenkaicRK.implicit_source_solve(lhs, eq, x, t, coefficient,
+function TenkaicRK.implicit_source_solve(lhs, eq::Burg1D, x, t, coefficient,
                                          source_terms::typeof(source_terms_stiff_burg_non_linear),
                                          u_node)
     if u_node[1] > 0.5 # The paper used 0.9

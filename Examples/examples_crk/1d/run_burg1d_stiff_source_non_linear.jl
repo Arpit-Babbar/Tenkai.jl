@@ -72,7 +72,7 @@ function TenkaicRK.get_cache_node_vars(aux, u1,
                                        problem::Problem{<:Real,
                                                         <:typeof(source_terms_stiff_burg_non_linear)},
                                        scheme,
-                                       eq, i, cell)
+                                       eq::Burg1D, i, cell)
     (; cache_homogeneous) = aux
     u1 = cache_homogeneous.u1
     # u1 = aux.cache_source.u1

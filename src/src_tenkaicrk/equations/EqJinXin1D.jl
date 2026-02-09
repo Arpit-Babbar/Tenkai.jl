@@ -35,12 +35,12 @@ using Tenkai.TenkaicRK: newton_solver
 
 import Tenkai.EqEuler1D: rho_p_indicator!, rusanov, max_abs_eigen_value
 
-(using Tenkai: PlotData, data_dir, get_filename, neumann, minmod,
-               get_node_vars,
-               nvariables, eachvariable,
-               add_to_node_vars!, subtract_from_node_vars!,
-               multiply_add_to_node_vars!, update_ghost_values_u1!,
-               debug_blend_limiter!)
+using Tenkai: PlotData, data_dir, get_filename, neumann, minmod,
+              get_node_vars,
+              nvariables, eachvariable,
+              add_to_node_vars!, subtract_from_node_vars!,
+              multiply_add_to_node_vars!, update_ghost_values_u1!,
+              debug_blend_limiter!, UsuallyIgnored
 
 import Tenkai.EqEuler1D: max_abs_eigen_value, get_density, get_pressure
 
@@ -111,9 +111,13 @@ function jin_xin_source(u, epsilon, x, t, eq::JinXin1D)
     return SVector(source_1..., source_2...)
 end
 
-function calc_source(aux_node, x, t, source_terms::typeof(jin_xin_source), eq::JinXin1D)
-    (u_node, epsilon_node) = aux_node
-    return jin_xin_source(u_node, epsilon_node, x, t, eq)
+function get_cache_node_vars(aux, u, problem, scheme, eq::JinXin1D,
+                             ignored_cell::UsuallyIgnored,
+                             i)
+    cell = ignored_cell.value
+    u_node = get_node_vars(u, eq, i)
+    epsilon_node = eq.epsilon_arr[cell]
+    return (u_node, epsilon_node)
 end
 
 function get_cache_node_vars(aux, u1, problem, scheme, eq::JinXin1D, i, cell)
@@ -458,8 +462,8 @@ function get_equation(equations::AbstractEquations{NDIMS, NVARS},
                       advection, advection_plus, advection_minus,
                       epsilon, nx; indicator_model = "gassner",
                       thresholds = (1e-12, 1e-4),
-                      jin_xin_dt_scaling = 0.5) where {NDIMS, NVARS}
-    name = "1D Jin-Xin equations"
+                      jin_xin_dt_scaling = 1.0) where {NDIMS, NVARS}
+    name = "1D shallow water equations"
     numfluxes = Dict("roe" => roe, "rusanov" => rusanov)
     initial_values = Dict()
 

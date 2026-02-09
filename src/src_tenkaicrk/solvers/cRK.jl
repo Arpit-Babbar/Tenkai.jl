@@ -6,7 +6,7 @@ using Tenkai: set_initial_condition!,
               post_process_soln,
               modal_smoothness_indicator, # KLUDGE - This shouldn't be here
               AbstractEquations, ssfr, BFluxType,
-              cRKSolver, AbstractDissipation
+              cRKSolver, AbstractDissipation, UsuallyIgnored
 using Tenkai: apply_limiter!
 using Tenkai
 using Tenkai: VolumeIntegralWeak
@@ -176,7 +176,8 @@ function get_cache_node_vars(aux, u1, problem, scheme, eq, indices...)
     return u_node
 end
 
-function get_cache_node_vars(aux, u1, problem, scheme, eq, ignored_value::UsuallyIgnored, indices...)
+function get_cache_node_vars(aux, u1, problem, scheme, eq, ignored_value::UsuallyIgnored,
+                             indices...)
     u_node = get_node_vars(u1, eq, indices...)
     return u_node
 end
