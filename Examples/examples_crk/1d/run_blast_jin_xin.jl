@@ -28,7 +28,8 @@ equation = EqJinXin.get_equation(equation_euler, advection_jin_xin, advection_ji
                                  advection_jin_xin_minus, epsilon_relaxation,
                                  nx;
                                  #    thresholds = (1.5e-1, 1e-1)
-                                 thresholds = (1.0e-12, 0.1e-6))
+                                 thresholds = (1.0e-12, 1e-7),
+                                 jin_xin_dt_scaling = 1.0)
 
 initial_value = EqJinXin.JinXinICBC(Eq.blast, equation)
 initial_value_ = initial_value

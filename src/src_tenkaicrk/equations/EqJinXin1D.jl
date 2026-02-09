@@ -51,6 +51,8 @@ import Tenkai.TenkaicRK: implicit_source_solve
 # The original system is u_t + f(u)_x = 0. The Jin-Xin relaxed system has variables (u,v).
 # The flux is (v, advection(u)). The source terms are (0, -(v-f(u)) / epsilon).
 
+# TODO - Remove TWO_NVAR so that the get_function equation does not have that complicated call
+# Wherever you need i in NVAR+1:TWO_NVAR, make it NVAR+i for i in 1:NVAR.
 struct JinXin1D{NDIMS, NVAR, TWO_NVAR, Equations <: AbstractEquations{NDIMS, NVAR},
                 Advection,
                 AdvectionPlus, AdvectionMinus,
@@ -65,6 +67,7 @@ struct JinXin1D{NDIMS, NVAR, TWO_NVAR, Equations <: AbstractEquations{NDIMS, NVA
     name::String
     initial_values::Dict{String, Function}
     nvar::Int
+    jin_xin_dt_scaling::RealT
     indicator_model::String
     numfluxes::Dict{String, Function}
 end
@@ -420,32 +423,33 @@ end
 #-------------------------------------------------------------------------------
 # Compute dt using cell average
 #-------------------------------------------------------------------------------
-function compute_time_step(eq_jin_xin::JinXin1D, problem, grid, aux, op, cfl, u1, ua)
+function compute_time_step(eq_jin_xin::JinXin1D, problem, grid, aux, op, cfl,
+                           u1, ua)
     @timeit aux.timer "Time step computation" begin
     #! format: noindent
+    @unpack jin_xin_dt_scaling = eq_jin_xin
     nx = grid.size
     dx = grid.dx
     jin_xin_adv = 0.0
     den = 0.0
     for i in 1:nx
-        sx = max_abs_eigen_value(eq_jin_xin.equations, ua[:, i])
+        ua_node = get_node_vars(ua, eq_jin_xin, i)
+        sx = max_abs_eigen_value(eq_jin_xin.equations, ua_node)
         jin_xin_adv = max(sx, jin_xin_adv)
         den = max(den, abs.(sx) / dx[i] + 1.0e-12)
     end
 
-    # Jin-Xin constant is made larger by this factor
-    dt_scaling = 1.0
-
-    dt = cfl * dt_scaling^2 / den
-    eq_jin_xin.advection_evolution[1] = jin_xin_adv / dt_scaling
+    dt = cfl * jin_xin_dt_scaling^2 / den
+    eq_jin_xin.advection_evolution[1] = jin_xin_adv / jin_xin_dt_scaling
     return dt, eq_jin_xin
-    end # Timer
+    end # timer
 end
 
 function get_equation(equations::AbstractEquations{NDIMS, NVARS},
                       advection, advection_plus, advection_minus,
                       epsilon, nx; indicator_model = "gassner",
-                      thresholds = (1e-12, 1e-4)) where {NDIMS, NVARS}
+                      thresholds = (1e-12, 1e-4),
+                      jin_xin_dt_scaling = 0.5) where {NDIMS, NVARS}
     name = "1D shallow water equations"
     numfluxes = Dict("roe" => roe, "rusanov" => rusanov)
     initial_values = Dict()
@@ -469,6 +473,7 @@ function get_equation(equations::AbstractEquations{NDIMS, NVARS},
                                                                                       name,
                                                                                       initial_values,
                                                                                       TWO_NVAR,
+                                                                                      jin_xin_dt_scaling,
                                                                                       indicator_model,
                                                                                       numfluxes)
 end
