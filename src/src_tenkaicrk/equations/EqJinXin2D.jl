@@ -140,7 +140,6 @@ function implicit_source_solve(lhs, eq_jin_xin::JinXin2D, x, t, coefficient,
     v2_var_new = (epsilon * v2_lhs + coefficient * g_new) / (epsilon + coefficient)
     sol_new = SVector(u_var_new..., v1_var_new..., v2_var_new...)
     source = jin_xin_source(sol_new, epsilon_node, x, t, eq_jin_xin)
-    @assert false sol_new, source, lhs, u_node
     return sol_new, source
 end
 
@@ -432,7 +431,7 @@ function compute_time_step(eq_jin_xin::JinXin2D, problem, grid, aux, op, cfl,
     jin_xin_adv1 = 0.0
     jin_xin_adv2 = 0.0
     den = 0.0
-    for element in CartesianIndices((0:(nx + 1), 0:(ny + 1)))
+    for element in CartesianIndices((1:nx, 1:ny))
         el_x, el_y = element[1], element[2]
         ua_node = get_node_vars(ua, eq_jin_xin, el_x, el_y)
         sx, sy = max_abs_eigen_value(eq_jin_xin.equations, ua_node, 1),
@@ -441,7 +440,7 @@ function compute_time_step(eq_jin_xin::JinXin2D, problem, grid, aux, op, cfl,
         jin_xin_adv2 = max(sy, jin_xin_adv2)
         den = max(den, abs(sx) / dx[el_x] + abs(sy) / dy[el_y] + 1.0e-12)
     end
-
+    
     dt = cfl * jin_xin_dt_scaling^2 / den
     eq_jin_xin.advection_evolution[1] = jin_xin_adv1 / jin_xin_dt_scaling
     eq_jin_xin.advection_evolution[2] = jin_xin_adv2 / jin_xin_dt_scaling
