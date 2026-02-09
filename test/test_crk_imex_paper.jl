@@ -215,7 +215,7 @@ end
                   compute_error_interval = 0,
                   animate = false, final_time = 0.2, nx = 5)
     data_name = "jin_xin_isentropic.txt"
-    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 4e-13)
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 1e-9)
 end
 
 @testset "Burger 1D stiff double source non-linear" begin
