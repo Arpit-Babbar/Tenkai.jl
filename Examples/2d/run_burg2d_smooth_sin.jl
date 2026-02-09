@@ -1,6 +1,5 @@
 using StaticArrays
 using Tenkai
-using Tenkai.TenkaicRK
 Eq = Tenkai.EqBurg2D
 
 #------------------------------------------------------------------------------
@@ -23,16 +22,16 @@ end
 boundary_condition = (periodic, periodic, periodic, periodic)
 final_time = 0.1
 
-degree = 3
-solver = cBPR343()
+degree = 1
+solver = cRK22()
 solution_points = "gl"
 correction_function = "radau"
 bound_limit = "no"
-bflux = extrapolate
+bflux = evaluate
 numerical_flux = Eq.rusanov
 
-nx = 20
-ny = 20
+nx = 100
+ny = 100
 bounds = ([-Inf], [Inf])
 cfl = 0.0
 save_iter_interval = 0

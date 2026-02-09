@@ -410,10 +410,6 @@ function apply_bound_limiter!(eq_jin_xin::JinXin2D, grid, scheme, param, op, ua,
     if scheme.bound_limit == "no"
         return nothing
     end
-    # equations = eq_jin_xin.equations
-    # nvar = nvariables(equations)
-    # u1 = @view u1_[1:nvar, :, :]
-    # ua = @view ua_[1:nvar, :, :]
     variables = (get_density, get_pressure)
     iteratively_apply_bound_limiter!(eq_jin_xin, grid, scheme, param, op, ua, u1, aux,
                                      variables)

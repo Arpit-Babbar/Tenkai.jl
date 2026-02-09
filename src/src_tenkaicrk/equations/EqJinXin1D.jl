@@ -19,7 +19,7 @@ using Accessors: @set
 import Tenkai.EqTenMoment1D
 using Tenkai.Basis
 
-import Tenkai: admissibility_tolerance, calc_source
+import Tenkai: admissibility_tolerance
 
 import Tenkai: flux, prim2con, prim2con!, con2prim, con2prim!,
                eigmatrix,
