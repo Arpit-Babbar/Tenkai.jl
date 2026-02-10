@@ -42,7 +42,8 @@ using Tenkai: PlotData, data_dir, get_filename, neumann, minmod,
               nvariables, eachvariable,
               add_to_node_vars!, subtract_from_node_vars!,
               multiply_add_to_node_vars!, update_ghost_values_u1!,
-              debug_blend_limiter!, UsuallyIgnored
+              debug_blend_limiter!, UsuallyIgnored, multiply_dimensionwise!,
+              correct_variable!
 
 # TODO - Have an abstract Jin-Xin as well.
 
@@ -270,6 +271,7 @@ function modal_smoothness_indicator_gassner(eq::JinXin2D, t, iter,
     @unpack cache = blend
     @unpack Pn2m = cache
 
+    @unpack epsilon_arr = eq
     epsilon_min, epsilon_max = eq.thresholds
 
     @threaded for element in CartesianIndices((1:nx, 1:ny))
@@ -393,7 +395,7 @@ function iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
     variable = first(variables)
     remaining_variables = Base.tail(variables)
 
-    correct_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
+    correct_variable!(eq, variable, op, aux, grid, u1, ua)
 
     # test_variable_bound_limiter!(variable, eq, grid, op, ua, u1)
     iteratively_apply_bound_limiter!(eq, grid, scheme, param, op, ua,
