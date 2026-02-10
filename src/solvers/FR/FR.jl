@@ -31,6 +31,13 @@ using ForwardDiff: Dual
 # Temporary hack
 using FastGaussQuadrature
 
+# Added to be ignored in the default case through multiple dispatch.
+# It is used when directly putting the value leads to the function doing undesired behaviour
+# Multiple dispatch is also used to access the value.
+struct UsuallyIgnored{IgnoredValue}
+    value::IgnoredValue
+end
+
 @enum BCType periodic dirichlet neumann reflect hllc_bc
 @enum BFluxType extrapolate evaluate
 @enum SolverType rkfr lwfr mdrk ssfr rktrixi # TODO - Is this only needed for D2 / D1?

@@ -21,6 +21,7 @@ include("equations/EqEulerReactive2DStepGrid.jl")
 include("equations/EqMHD2D.jl")
 include("equations/EqMultiIonMHD2D.jl")
 include("equations/EqSupBurg1D.jl")
+include("equations/EqJinXin2D.jl")
 
 include("solvers/RKFR1D_non_conservative.jl")
 include("solvers/RKFR2D_non_conservative.jl")

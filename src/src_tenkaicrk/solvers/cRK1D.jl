@@ -588,7 +588,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
         for i in 1:nd
             x_ = xc - 0.5 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
-            s_node = calc_source(u_node, x_, t, source_terms, eq)
+            aux_node = get_cache_node_vars(aux, u1, problem, scheme, eq, i, cell)
+            s_node = calc_source(aux_node, x_, t, source_terms, eq)
             set_node_vars!(S, 0.5 * s_node, eq, i)
             # Add source term contribution to u2
             multiply_add_to_node_vars!(u2, 0.5 * dt, s_node, eq, i)
@@ -596,7 +597,6 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             lhs = get_node_vars(u2, eq, i) # lhs in the implicit source solver
 
             # By default, it is just u_node but the user can use it to set something else here.
-            aux_node = get_cache_node_vars(aux, u1, problem, scheme, eq, i, cell)
 
             u2_node_implicit, s2_node = implicit_source_solve(lhs, eq, x_,
                                                               t + dt, # TOTHINK - Somehow t instead of t + dt
@@ -995,6 +995,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
     @inbounds for cell in Base.OneTo(nx) # Loop over cells
         dx = grid.dx[cell]
         xc = grid.xc[cell]
+        ignored_cell = UsuallyIgnored(cell)
         lamx = dt / dx
         u2 .= @view u1[:, :, cell]
         u3 .= @view u1[:, :, cell]
@@ -1025,7 +1026,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 
             lhs = get_node_vars(u3, eq, i) # lhs in the implicit source solver
             # aux_node = get_node_vars(u2_sec, eq, i)
-            aux_node = get_cache_node_vars(aux, u2_sec, problem, scheme, eq, i, 1)
+            aux_node = get_cache_node_vars(aux, u2_sec, problem, scheme, eq,
+                                           ignored_cell, i)
             u3_node, s3_node = implicit_source_solve(lhs, eq, x_, t + c2 * dt,
                                                      a22 * dt,
                                                      source_terms,
@@ -1060,7 +1062,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             guess_u4 = get_node_vars(u3, eq, i) # Initial guess in the implicit solver
             lhs = get_node_vars(u4, eq, i) # lhs in the implicit source solver
             # aux_node = get_node_vars(u3_sec, eq, i)
-            aux_node = get_cache_node_vars(aux, u3_sec, problem, scheme, eq, i, 1)
+            aux_node = get_cache_node_vars(aux, u3_sec, problem, scheme, eq,
+                                           ignored_cell, i)
             u4_node, s4_node = implicit_source_solve(lhs, eq, x_, t + c3 * dt,
                                                      a33 * dt,
                                                      source_terms,
@@ -1086,7 +1089,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             u_guess = get_node_vars(u4, eq, i) # Initial guess in the implicit solver
             lhs = get_node_vars(u5, eq, i) # lhs in the implicit source solver
             # aux_node = get_node_vars(u4_sec, eq, i)
-            aux_node = get_cache_node_vars(aux, u4_sec, problem, scheme, eq, i, 1)
+            aux_node = get_cache_node_vars(aux, u4_sec, problem, scheme, eq,
+                                           ignored_cell, i)
             u5_node, s5_node = implicit_source_solve(lhs, eq, x_, t + c4 * dt,
                                                      a44 * dt, source_terms,
                                                      aux_node)
