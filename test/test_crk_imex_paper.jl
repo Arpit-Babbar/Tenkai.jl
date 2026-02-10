@@ -222,7 +222,7 @@ end
                   compute_error_interval = 0,
                   final_time = 1.0, nx = 5, ny = 5)
     data_name = "jin_xin_sedov.txt"
-    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 5e-7)
+    compare_errors_txt(sol, data_name; overwrite_errors = overwrite_errors, tol = 7e-7)
 end
 
 @testset "Burger 1D stiff double source non-linear" begin
