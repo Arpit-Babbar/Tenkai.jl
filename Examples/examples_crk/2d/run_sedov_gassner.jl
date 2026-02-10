@@ -18,16 +18,16 @@ correction_function = "radau"
 numerical_flux = Eq.rusanov
 
 bound_limit = "yes"
-bflux = extrapolate
+bflux = evaluate
 final_time = 20.0
 
-nx = 16
+nx = 64
 ny = nx
 cfl = 0.0
 bounds = ([-Inf], [Inf]) # Not used in Euler
 tvbM = 0.0
 save_iter_interval = 0
-save_time_interval = 0.1 * final_time
+save_time_interval = 0.0
 animate_time_factor = 1 # Factor on save_iter_interval or save_time_interval
 compute_error_interval = 0
 
@@ -41,8 +41,8 @@ problem = Problem(domain,
                   initial_value,
                   boundary_value, boundary_condition,
                   final_time, exact_solution)
-blend = setup_limiter_blend(blend_type = fo_blend(equation),
-                            amax = 1.0,
+blend = setup_limiter_blend(blend_type = mh_blend(equation),
+                            amax = 0.5,
                             indicating_variables = Eq.rho_p_indicator!,
                             reconstruction_variables = conservative_reconstruction,
                             indicator_model = "gassner",
@@ -54,7 +54,7 @@ scheme = Scheme(solver, degree, solution_points, correction_function,
 param = Parameters(grid_size, cfl, bounds, save_iter_interval,
                    save_time_interval, compute_error_interval,
                    cfl_safety_factor = cfl_safety_factor,
-                   saveto = "output_blend_nx$nx")
+                   saveto = "none")
 #------------------------------------------------------------------------------
 sol = Tenkai.solve(equation, problem, scheme, param);
 
