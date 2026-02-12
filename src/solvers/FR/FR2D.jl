@@ -1552,7 +1552,7 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid, op, u1
         end
     else
         bc! = bottom[3]
-        bc!(op, grid, u1)
+        bc!(op, eq, grid, u1)
     end
 
     if top == dirichlet
