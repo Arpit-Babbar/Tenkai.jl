@@ -37,13 +37,19 @@ using Tenkai.TenkaicRK: newton_solver
 import Tenkai.EqEuler1D: rho_p_indicator!, rusanov, max_abs_eigen_value, get_density,
                          get_pressure
 
+import Tenkai.EqEuler2D: wall_double_mach_reflection_fb_ub!,
+                         wall_double_mach_reflection_ua!,
+                         wall_double_mach_reflection_u1!
+
+import Tenkai: update_ghost_values_lwfr!
+
 using Tenkai: PlotData, data_dir, get_filename, neumann, minmod,
               get_node_vars,
               nvariables, eachvariable,
               add_to_node_vars!, subtract_from_node_vars!,
               multiply_add_to_node_vars!, update_ghost_values_u1!,
               debug_blend_limiter!, UsuallyIgnored, multiply_dimensionwise!,
-              correct_variable!
+              correct_variable!, hllc_bc, update_ghost_values_fn_blend!
 
 # TODO - Have an abstract Jin-Xin as well.
 
@@ -96,6 +102,24 @@ end
 
 function flux(x, y, u, eq::JinXin2D)
     return flux(x, y, u, eq::JinXin2D, 1), flux(x, y, u, eq::JinXin2D, 2)
+end
+
+function flux_v_exact(x, y, u, eq::JinXin2D, orientation)
+    adv = eq.advection_evolution[orientation]
+    u_var_ = u_var(u, eq)
+    v_var_ = flux(x, y, u_var_, eq.equations, orientation)
+    if orientation == 1
+        return SVector(v_var_..., adv * u_var_..., zero(u_var_)...)
+    else # orientation == 2
+        return SVector(v_var_..., zero(u_var_)..., adv * u_var_...)
+    end
+end
+
+function set_v_node_vars!(u, v_node, eq::JinXin2D, indices...)
+    nvar = nvariables(eq.equations)
+    for v in eachvariable(eq.equations)
+        u[v + nvar, indices...] = v_node[v]
+    end
 end
 
 function jin_xin_source(u, epsilon, x, t, eq::JinXin2D)
@@ -168,6 +192,357 @@ function (jin_xin_bc::JinXinICBC)(x, y, t)
 end
 
 Tenkai.n_plotted_variables(eq_jin_xin::JinXin2D) = nvariables(eq_jin_xin.equations)
+
+function update_ghost_values_lwfr!(problem, scheme, eq::JinXin2D, grid, aux, op, cache, t,
+                                   dt,
+                                   scaling_factor = 1.0)
+    @timeit aux.timer "Update ghost values" begin
+    #! format: noindent
+    @unpack Fb, Ub, ua = cache
+    update_ghost_values_periodic!(eq, problem, Fb, Ub)
+
+    @unpack periodic_x, periodic_y = problem
+    if periodic_x && periodic_y
+        return nothing
+    end
+
+    nx, ny = grid.size
+    nvar = nvariables(eq)
+    @unpack degree, xg, wg = op
+    nd = degree + 1
+    @unpack dx, dy, xf, yf = grid
+    @unpack boundary_condition, boundary_value = problem
+    left, right, bottom, top = boundary_condition
+
+    refresh!(u) = fill!(u, zero(eltype(u)))
+
+    pre_allocated = cache.ghost_cache
+
+    # Julia bug occuring here. Below, we have unnecessarily named
+    # x1,y1, x2, y2,.... We should have been able to just call them x,y
+    # Otherwise we were getting a type instability and variables were
+    # called Core.Box. This issue is probably related to
+    # https://discourse.julialang.org/t/type-instability-of-nested-function/57007
+    # https://invenia.github.io/blog/2019/10/30/julialang-features-part-1/#an-aside-on-boxing
+    # https://github.com/JuliaLang/julia/issues/15276
+    # https://docs.julialang.org/en/v1/manual/performance-tips/#man-performance-captured-1
+
+    dt_scaled = scaling_factor * dt
+    wg_scaled = scaling_factor * wg
+
+    # For Dirichlet bc, use upwind flux at faces by assigning both physical
+    # and ghost cells through the bc.
+    if left == dirichlet
+        x1 = xf[1]
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                y1 = yf[j] + xg[k] * dy[j]
+                ub, fb = pre_allocated[Threads.threadid()]
+                refresh!.((ub, fb))
+                for l in Base.OneTo(nd)
+                    tq = t + xg[l] * dt_scaled
+                    ub_value = problem.boundary_value(x1, y1, tq)
+                    fb_value = flux(x1, y1, ub_value, eq, 1)
+                    multiply_add_to_node_vars!(ub, wg_scaled[l], ub_value, eq, 1)
+                    multiply_add_to_node_vars!(fb, wg_scaled[l], fb_value, eq, 1)
+                end
+                ub_node = get_node_vars(ub, eq, 1)
+                fb_node = get_node_vars(fb, eq, 1)
+                set_node_vars!(Ub, ub_node, eq, k, 2, 0, j)
+                set_node_vars!(Fb, fb_node, eq, k, 2, 0, j)
+
+                # # Put hllc flux values
+                # Ul = get_node_vars(Ub, eq, k, 2, 0, j)
+                # Fl = get_node_vars(Fb, eq, k, 2, 0, j)
+                # Ur = get_node_vars(Ub, eq, k, 1, 1, j)
+                # Fr = get_node_vars(Fb, eq, k, 1, 1, j)
+                # ual, uar = get_node_vars(ua, eq, 0, j), get_node_vars(ua, eq, 1, j)
+                # X = SVector{2}(x1, y1)
+                # Fn = hllc(X, ual, uar, Fl, Fr, Ul, Ur, eq, 1)
+                # set_node_vars!(Ub, ub_node, eq, k, 1, 1, j)
+                # set_node_vars!(Fb, Fn     , eq, k, 1, 1, j)
+
+                # Purely upwind at boundary
+                # if abs(y1) < 0.055
+                set_node_vars!(Ub, ub_node, eq, k, 1, 1, j)
+                set_node_vars!(Fb, fb_node, eq, k, 1, 1, j)
+                # end
+            end
+        end
+    elseif left in (neumann, reflect)
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                Ub_node = get_node_vars(Ub, eq, k, 1, 1, j)
+                Fb_node = get_node_vars(Fb, eq, k, 1, 1, j)
+                set_node_vars!(Ub, Ub_node, eq, k, 2, 0, j)
+                set_node_vars!(Fb, Fb_node, eq, k, 2, 0, j)
+                if left == reflect
+                    Ub[2, k, 2, 0, j] *= -1.0 # ρ*u1
+                    Ub_node = get_node_vars(Ub, eq, k, 2, 0, j)
+                    y = yf[j] + xg[k] * dy[j]
+                    flux_boundary = flux(xf[1], y, Ub_node, eq, 2)
+                    set_node_vars!(Fb, flux_boundary, eq, k, 2, 0, j)
+                end
+            end
+        end
+    else
+        println("Incorrect bc specified at left.")
+        @assert false
+    end
+
+    if right == dirichlet
+        x2 = xf[nx + 1]
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                y2 = yf[j] + xg[k] * dy[j]
+                ub, fb = pre_allocated[Threads.threadid()]
+                refresh!.((ub, fb))
+                for l in Base.OneTo(nd)
+                    tq = t + xg[l] * dt_scaled
+                    ubvalue = boundary_value(x2, y2, tq)
+                    fbvalue = flux(x2, y2, ubvalue, eq, 1)
+                    multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
+                    multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
+                end
+                ub_node = get_node_vars(ub, eq, 1)
+                fb_node = get_node_vars(fb, eq, 1)
+                set_node_vars!(Ub, ub_node, eq, k, 1, nx + 1, j)
+                set_node_vars!(Fb, fb_node, eq, k, 1, nx + 1, j)
+            end
+        end
+    elseif right in (reflect, neumann)
+        @threaded for j in 1:ny
+            for k in Base.OneTo(nd)
+                Ub_node = get_node_vars(Ub, eq, k, 2, nx, j)
+                Fb_node = get_node_vars(Fb, eq, k, 2, nx, j)
+                set_node_vars!(Ub, Ub_node, eq, k, 1, nx + 1, j)
+                set_node_vars!(Fb, Fb_node, eq, k, 1, nx + 1, j)
+
+                if right == reflect
+                    Ub[2, k, 1, nx + 1, j] *= -1.0 # ρ*u1
+                    # Fb[1, k, 1, nx + 1, j] *= -1.0 # ρ*u1
+                    # Fb[3, k, 1, nx + 1, j] *= -1.0 # ρ*u1*u2
+                    # Fb[4, k, 1, nx + 1, j] *= -1.0 # (ρ_e + p) * u1
+                    Ub_node = get_node_vars(Ub, eq, k, 1, nx + 1, j)
+                    y = yf[j] + xg[k] * dy[j]
+                    flux_boundary = flux(xf[nx + 1], y, Ub_node, eq, 1)
+                    set_node_vars!(Fb, flux_boundary, eq, k, 1, nx + 1, j)
+                end
+            end
+        end
+    else
+        println("Incorrect bc specified at right.")
+        @assert false
+    end
+
+    if bottom == dirichlet
+        y3 = yf[1]
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                x3 = xf[i] + xg[k] * dx[i]
+                ub, fb = pre_allocated[Threads.threadid()]
+                refresh!.((ub, fb))
+                for l in Base.OneTo(nd)
+                    tq = t + xg[l] * dt_scaled
+                    ubvalue = boundary_value(x3, y3, tq)
+                    fbvalue = flux(x3, y3, ubvalue, eq, 2)
+                    multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
+                    multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
+                end
+                ub_node = get_node_vars(ub, eq, 1)
+                fb_node = get_node_vars(fb, eq, 1)
+                set_node_vars!(Ub, ub_node, eq, k, 4, i, 0)
+                set_node_vars!(Fb, fb_node, eq, k, 4, i, 0)
+
+                # Purely upwind
+
+                # set_node_vars!(Ub, ub, eq, k, 3, i, 1)
+                # set_node_vars!(Fb, fb, eq, k, 3, i, 1)
+            end
+        end
+    elseif bottom == hllc_bc
+        y3 = yf[1]
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                x3 = xf[i] + xg[k] * dx[i]
+                ub, fb = pre_allocated[Threads.threadid()]
+                refresh!.((ub, fb))
+                for l in Base.OneTo(nd)
+                    tq = t + xg[l] * dt_scaled
+                    ubvalue = boundary_value(x3, y3, tq)
+                    fbvalue = flux(x3, y3, ubvalue, eq, 2)
+                    multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
+                    multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
+                end
+
+                ub_node = get_node_vars(ub, eq, 1)
+                fb_node = get_node_vars(fb, eq, 1)
+                set_node_vars!(Ub, ub_node, eq, k, 4, i, 0)
+                set_node_vars!(Fb, fb_node, eq, k, 4, i, 0)
+
+                Uu_node = get_node_vars(Ub, eq, k, 3, i, 1)
+                Fu_node = get_node_vars(Fb, eq, k, 3, i, 1)
+                Ud_node = get_node_vars(Ub, eq, k, 4, i, 0)
+                Fd_node = get_node_vars(Fb, eq, k, 4, i, 0)
+                uad, uau = get_node_vars(ua, eq, i, 0), get_node_vars(ua, eq, i, 1)
+
+                X = SVector{2}(x3, y3)
+                Fn = hllc(X, uad, uau, Fd_node, Fu_node, Ud_node, Uu_node, eq, 2)
+                set_node_vars!(Ub, ub_node, eq, k, 3, i, 1)
+                set_node_vars!(Fb, Fn, eq, k, 3, i, 1)
+                set_node_vars!(Fb, Fn, eq, k, 4, i, 0)
+
+                # Purely upwind
+
+                # set_node_vars!(Ub, ub, eq, k, 3, i, 1)
+                # set_node_vars!(Fb, fb, eq, k, 3, i, 1)
+            end
+        end
+    elseif bottom in (reflect, neumann)
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                Ub_node = get_node_vars(Ub, eq, k, 3, i, 1)
+                Fb_node = get_node_vars(Fb, eq, k, 3, i, 1)
+                set_node_vars!(Ub, Ub_node, eq, k, 4, i, 0)
+                set_node_vars!(Fb, Fb_node, eq, k, 4, i, 0)
+                if bottom == reflect
+                    Ub[3, k, 4, i, 0] *= -1.0 # ρ * vel_y
+                    ub_node = get_node_vars(Ub, eq, k, 4, i, 0)
+                    x = xf[i] + xg[k] * dx[i]
+                    flux_boundary = flux(x, yf[1], ub_node, eq, 2)
+                    set_node_vars!(Fb, flux_boundary, eq, k, 4, i, 0)
+                end
+            end
+        end
+    elseif periodic_y
+        nothing
+    else
+        @assert typeof(bottom) <: Tuple{Any, Any, Any}
+        bc! = bottom[1]
+        bc!(grid, eq, op, Fb, Ub, aux)
+    end
+
+    if top == dirichlet
+        y4 = yf[ny + 1]
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                x4 = xf[i] + xg[k] * dx[i]
+                ub, fb = pre_allocated[Threads.threadid()]
+                refresh!.((ub, fb))
+                for l in Base.OneTo(nd)
+                    tq = t + xg[l] * dt_scaled
+                    ubvalue = boundary_value(x4, y4, tq)
+                    fbvalue = flux(x4, y4, ubvalue, eq, 2)
+                    multiply_add_to_node_vars!(ub, wg_scaled[l], ubvalue, eq, 1)
+                    multiply_add_to_node_vars!(fb, wg_scaled[l], fbvalue, eq, 1)
+                end
+                ub_node = get_node_vars(ub, eq, 1)
+                fb_node = get_node_vars(fb, eq, 1)
+                set_node_vars!(Ub, ub_node, eq, k, 3, i, ny + 1)
+                set_node_vars!(Fb, fb_node, eq, k, 3, i, ny + 1)
+            end
+        end
+    elseif top in (reflect, neumann)
+        @threaded for i in 1:nx
+            for k in Base.OneTo(nd)
+                Ub_node = get_node_vars(Ub, eq, k, 4, i, ny)
+                Fb_node = get_node_vars(Fb, eq, k, 4, i, ny)
+                set_node_vars!(Ub, Ub_node, eq, k, 3, i, ny + 1)
+                set_node_vars!(Fb, Fb_node, eq, k, 3, i, ny + 1)
+                if top == reflect
+                    Ub[3, k, 3, i, ny + 1] *= -1.0 # ρ * vel_y
+                    Ub_node = get_node_vars(Ub, eq, k, 3, i, ny + 1)
+                    x = xf[i] + xg[k] * dx[i]
+                    flux_boundary = flux(x, yf[ny + 1], Ub_node, eq, 2)
+                    set_node_vars!(Fb, flux_boundary, eq, k, 3, i, ny + 1)
+                end
+            end
+        end
+    elseif periodic_y
+        nothing
+    else
+        @assert false "Incorrect bc specific at top"
+    end
+    if scheme.limiter.name == "blend"
+        update_ghost_values_fn_blend!(eq, problem, grid, aux)
+    end
+
+    return nothing
+    end # timer
+end
+
+function wall_double_mach_reflection_fb_ub!(grid, eq::JinXin2D, op, Fb, Ub, aux)
+    nvar = nvariables(eq)
+    @unpack degree, xg = op
+    @unpack dx, dy, xf = grid
+
+    nx = grid.size[1]
+    nd = degree + 1
+    nvar = nvariables(eq)
+
+    @threaded for i in 1:nx
+        for k in Base.OneTo(nd)
+            # Outflow upto [0,1/6]
+            # KLUDGE - Don't do this, it's stupid.
+            # This is only needed when handling non-linear
+            # kernels. LoopVectorization is the right way for this
+            Ub_node = get_node_vars(Ub, eq, k, 3, i, 1)
+            Fb_node = get_node_vars(Fb, eq, k, 3, i, 1)
+            set_node_vars!(Ub, Ub_node, eq, k, 4, i, 0)
+            set_node_vars!(Fb, Fb_node, eq, k, 4, i, 0)
+
+            x = xf[i] + xg[k] * dx[i]
+
+            # Solid wall after 1/6
+            if x >= 1.0 / 6.0
+                Ub[3, k, 4, i, 0] *= -1.0 # ρ * vel_y
+                Ub_node = get_node_vars(Ub, eq, k, 4, i, 0)
+                flux_boundary = flux_v_exact(x, 0.0, Ub_node, eq, 2)
+                set_node_vars!(Fb, flux_boundary, eq, k, 4, i, 0)
+            end
+        end
+    end
+end
+
+function wall_double_mach_reflection_ua!(grid, eq::JinXin2D, ua)
+    @unpack xf = grid
+
+    nx = grid.size[1]
+
+    for i in 1:nx
+        ua_node = get_node_vars(ua, eq, i, 1)
+        set_node_vars!(ua, ua_node, eq, i, 0)
+        x = xf[i]
+        if x >= 1.0 / 6.0
+            ua[3, i, 0] = -ua[3, i, 1]
+        end
+        u_var_node = u_var(ua_node, eq)
+        flux_ = flux(xf[i], 0.0, u_var_node, eq.equations, 2)
+        set_v_node_vars!(ua, flux_, eq, i, 0)
+    end
+end
+
+function wall_double_mach_reflection_u1!(op, eq::JinXin2D, grid, u1)
+    @unpack xf, dx = grid
+    nx, ny = grid.size
+    @unpack degree, xg = op
+    nd = degree + 1
+    u1[:, :, :, :, 0] .= @view u1[:, :, :, :, 1]
+    for i in 1:nx
+        for ix in 1:nd
+            x = xf[i] + ix * dx[i] * xg[ix]
+            if x >= 1.0 / 6.0
+                for jy in 1:nd
+                    u1[3, ix, jy, i, 0] *= -1.0
+                    u_node = get_node_vars(u1, eq, ix, jy, i, 0)
+                    u_var_node = u_var(u_node, eq)
+                    flux_ = flux(xf[i], 0.0, u_var_node, eq.equations, 2)
+                    set_v_node_vars!(u1, flux_, eq, ix, jy, i, 0)
+                end
+            end
+        end
+    end
+end
 
 function Tenkai.initialize_plot(eq_jin_xin::JinXin2D, op, grid, problem, scheme, timer, u1_,
                                 ua_)

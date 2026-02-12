@@ -768,7 +768,8 @@ function create_auxiliaries(eq, op, grid, problem, scheme, param, cache)
     aux = (; plot_data, blend,
            hierarchical,
            error_file, timer,
-           aux_cache) # named tuple;
+           aux_cache,
+           main_cache = cache) # named tuple;
     return aux
 end
 

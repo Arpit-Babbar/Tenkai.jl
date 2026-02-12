@@ -2048,8 +2048,8 @@ end
 ## Double Mach reflection
 
 # For Ub, Fb
-function wall_double_mach_reflection_fb_ub!(grid, eq, op, Fb, Ub, aux)
-    @unpack nvar = eq
+function wall_double_mach_reflection_fb_ub!(grid, eq::Euler2D, op, Fb, Ub, aux)
+    nvar = nvariables(eq)
     @unpack degree, xg = op
     @unpack dx, dy, xf = grid
 
@@ -2081,7 +2081,7 @@ function wall_double_mach_reflection_fb_ub!(grid, eq, op, Fb, Ub, aux)
     end
 end
 
-function wall_double_mach_reflection_ua!(grid, eq, ua)
+function wall_double_mach_reflection_ua!(grid, eq::Euler2D, ua)
     @unpack xf = grid
 
     nx = grid.size[1]
@@ -2096,7 +2096,7 @@ function wall_double_mach_reflection_ua!(grid, eq, ua)
     end
 end
 
-function wall_double_mach_reflection_u1!(op, grid, u1)
+function wall_double_mach_reflection_u1!(op, eq::Euler2D, grid, u1)
     @unpack xf, dx = grid
     nx, ny = grid.size
     @unpack degree, xg = op
