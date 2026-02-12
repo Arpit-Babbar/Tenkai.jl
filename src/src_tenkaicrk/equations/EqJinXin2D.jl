@@ -280,7 +280,7 @@ function update_ghost_values_lwfr!(problem, scheme, eq::JinXin2D, grid, aux, op,
                     Ub[2, k, 2, 0, j] *= -1.0 # ρ*u1
                     Ub_node = get_node_vars(Ub, eq, k, 2, 0, j)
                     y = yf[j] + xg[k] * dy[j]
-                    flux_boundary = flux(xf[1], y, Ub_node, eq, 2)
+                    flux_boundary = flux_v_exact(xf[1], y, Ub_node, eq, 2)
                     set_node_vars!(Fb, flux_boundary, eq, k, 2, 0, j)
                 end
             end
@@ -325,7 +325,7 @@ function update_ghost_values_lwfr!(problem, scheme, eq::JinXin2D, grid, aux, op,
                     # Fb[4, k, 1, nx + 1, j] *= -1.0 # (ρ_e + p) * u1
                     Ub_node = get_node_vars(Ub, eq, k, 1, nx + 1, j)
                     y = yf[j] + xg[k] * dy[j]
-                    flux_boundary = flux(xf[nx + 1], y, Ub_node, eq, 1)
+                    flux_boundary = flux_v_exact(xf[nx + 1], y, Ub_node, eq, 1)
                     set_node_vars!(Fb, flux_boundary, eq, k, 1, nx + 1, j)
                 end
             end
@@ -409,7 +409,7 @@ function update_ghost_values_lwfr!(problem, scheme, eq::JinXin2D, grid, aux, op,
                     Ub[3, k, 4, i, 0] *= -1.0 # ρ * vel_y
                     ub_node = get_node_vars(Ub, eq, k, 4, i, 0)
                     x = xf[i] + xg[k] * dx[i]
-                    flux_boundary = flux(x, yf[1], ub_node, eq, 2)
+                    flux_boundary = flux_v_exact(x, yf[1], ub_node, eq, 2)
                     set_node_vars!(Fb, flux_boundary, eq, k, 4, i, 0)
                 end
             end
@@ -453,7 +453,7 @@ function update_ghost_values_lwfr!(problem, scheme, eq::JinXin2D, grid, aux, op,
                     Ub[3, k, 3, i, ny + 1] *= -1.0 # ρ * vel_y
                     Ub_node = get_node_vars(Ub, eq, k, 3, i, ny + 1)
                     x = xf[i] + xg[k] * dx[i]
-                    flux_boundary = flux(x, yf[ny + 1], Ub_node, eq, 2)
+                    flux_boundary = flux_v_exact(x, yf[ny + 1], Ub_node, eq, 2)
                     set_node_vars!(Fb, flux_boundary, eq, k, 3, i, ny + 1)
                 end
             end
