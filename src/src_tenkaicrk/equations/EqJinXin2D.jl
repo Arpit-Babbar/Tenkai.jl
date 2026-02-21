@@ -88,9 +88,9 @@ function flux(x, y, u, eq::JinXin2D, orientation)
     u_var_ = u_var(u, eq)
     v_var_ = v_var(u, orientation, eq)
     if orientation == 1
-        return SVector(v_var_..., adv * u_var_..., zero(u_var_)...)
+        return SVector(v_var_..., adv^2 * u_var_..., zero(u_var_)...)
     else # orientation == 2
-        return SVector(v_var_..., zero(u_var_)..., adv * u_var_...)
+        return SVector(v_var_..., zero(u_var_)..., adv^2 * u_var_...)
     end
 end
 
@@ -442,8 +442,8 @@ function compute_time_step(eq_jin_xin::JinXin2D, problem, grid, aux, op, cfl,
     end
 
     dt = cfl * jin_xin_dt_scaling^2 / den
-    eq_jin_xin.advection_evolution[1] = jin_xin_adv1 / jin_xin_dt_scaling
-    eq_jin_xin.advection_evolution[2] = jin_xin_adv2 / jin_xin_dt_scaling
+    eq_jin_xin.advection_evolution[1] = jin_xin_adv1^2 / jin_xin_dt_scaling
+    eq_jin_xin.advection_evolution[2] = jin_xin_adv2^2 / jin_xin_dt_scaling
     return dt, eq_jin_xin
     end # timer
 end
