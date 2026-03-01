@@ -40,7 +40,7 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
     @unpack degree, bflux = scheme
     @unpack bflux_ind = bflux
     nvar = nvariables(eq)
-    nc_var = nvariables(non_conservative_equation(eq))
+    nc_var = nvar
     nd = degree + 1
     nx, ny = grid.size
     u1 = gArray(nvar, nd, nd, nx, ny)
