@@ -965,7 +965,7 @@ end
 @inline @inbounds function eroe(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler2D, dir::Integer)
     # @inline @inbounds function eroe(x, Ul, Ur, Fl, Fr, ual, uar, eq::Euler2D, dir::Integer)
 
-    @unpack γ = eq
+    @unpack γ, γ_minus_1 = eq
 
     # Compute dissipation quantities
 
