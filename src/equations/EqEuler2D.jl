@@ -7,7 +7,8 @@ module EqEuler2D
                 apply_tvb_limiter!, apply_bound_limiter!, initialize_plot,
                 blending_flux_factors, zhang_shu_flux_fix,
                 write_soln!, compute_time_step, post_process_soln,
-                update_ghost_values_rkfr!, update_ghost_values_lwfr!)
+                update_ghost_values_rkfr!, update_ghost_values_lwfr!,
+                compute_error)
 
 (using Tenkai: get_filename, minmod, @threaded,
                periodic, dirichlet, neumann, reflect,
@@ -25,6 +26,7 @@ using Tenkai.CartesianGrids: CartesianGrid2D, save_mesh_file
 using Tenkai: limit_variable_slope
 
 using Polyester
+using FLoops
 using StaticArrays
 using LoopVectorization
 using TimerOutputs
@@ -2199,6 +2201,86 @@ end
 #-------------------------------------------------------------------------------
 function Tenkai.initialize_plot(eq::Euler2D, op, grid, problem, scheme, timer, u1, ua)
     return nothing
+end
+
+function compute_error(problem, grid, eq::Euler2D, aux, op, u1, t)
+    @timeit aux.timer "Compute error" begin
+    #! format: noindent
+    @unpack error_file, aux_cache = aux
+    @unpack error_cache = aux_cache
+    xmin, xmax, ymin, ymax = grid.domain
+    @unpack xg = op
+    nd = length(xg)
+
+    refresh!(u) = fill!(u, zero(eltype(u)))
+
+    @unpack exact_solution = problem
+
+    @unpack w2d, arr_cache = error_cache
+
+    xq = xg
+
+    nq = length(xq)
+
+    nx, ny = grid.size
+    @unpack xc, yc, dx, dy = grid
+
+    l1_error, l2_error, energy, entropy = 0.0, 0.0, 0.0, 0.0
+    @inbounds @floop for element in CartesianIndices((1:nx, 1:ny))
+        # for element in CartesianIndices((1:nx, 1:ny))
+        el_x, el_y = element[1], element[2]
+        ue, un = arr_cache[Threads.threadid()]
+        for j in 1:nq, i in 1:nq
+            x = xc[el_x] - 0.5 * dx[el_x] + dx[el_x] * xq[i]
+            y = yc[el_y] - 0.5 * dy[el_y] + dy[el_y] * xq[j]
+            ue_node = exact_solution(x, y, t)
+            set_node_vars!(ue, ue_node, eq, i, j)
+        end
+        u1_ = @view u1[:, :, :, el_x, el_y]
+        refresh!(un)
+        for j in 1:nd, i in 1:nd
+            u_node = get_node_vars(u1_, eq, i, j)
+            set_node_vars!(un, u_node, eq, i, j)
+            # for jj in 1:nq, ii in 1:nq
+            #     # un = V*u*V', so that
+            #     # un[ii,jj] = ∑_ij V[ii,i]*u[i,j]*V[jj,j]
+            #     # multiply_add_to_node_vars!(un, V[ii, i] * V[jj, j], u_node, eq, ii,
+            #     #                            jj)
+            #     set_node_vars!(un, u_node, eq, ii, jj)
+            # end
+        end
+        l1 = l2 = e = ent = 0.0
+        for j in 1:nq, i in 1:nq
+            un_node = get_node_vars(un, eq, i, j)
+            ue_node = get_node_vars(ue, eq, i, j) # KLUDGE - allocated ue is not needed
+            for n in 1:1 # Only computing error in first conservative variable
+                du = abs(un_node[n] - ue_node[n])
+                density = get_density(eq, un_node)
+                pressure = get_pressure(eq, un_node)
+                entropy_node = log(pressure / density^eq.γ)
+                l1 += du * w2d[i, j]
+                l2 += du * du * w2d[i, j]
+                e += un_node[n]^2 * w2d[i, j]
+                ent += entropy_node * w2d[i, j]
+            end
+        end
+        l1 *= dx[el_x] * dy[el_y]
+        l2 *= dx[el_x] * dy[el_y]
+        e *= dx[el_x] * dy[el_y]
+        ent *= dx[el_x] * dy[el_y]
+        @reduce(l1_error+=l1, l2_error+=l2, energy+=e, entropy+=ent)
+        # l1_error += l1; l2_error += l2; energy += e
+    end
+    domain_size = (xmax - xmin) * (ymax - ymin)
+    l1_error = l1_error / domain_size
+    l2_error = sqrt(l2_error / domain_size)
+    energy = energy / domain_size
+    @printf(error_file, "%.16e %.16e %.16e %.16e\n", t, l1_error[1], l2_error[1],
+            energy[1])
+
+    return Dict("l1_error" => l1_error, "l2_error" => l2_error,
+                "energy" => energy, "entropy" => entropy)
+    end # timer
 end
 
 function write_poly(eq::Euler2D, grid, op, u1, fcount)
