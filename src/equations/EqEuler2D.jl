@@ -2203,7 +2203,7 @@ function Tenkai.initialize_plot(eq::Euler2D, op, grid, problem, scheme, timer, u
     return nothing
 end
 
-function compute_error(problem, grid, eq::Euler2D, aux, op, u1, t)
+function compute_error(problem, grid::CartesianGrid2D, eq::Euler2D, aux, op, u1, t)
     @timeit aux.timer "Compute error" begin
     #! format: noindent
     @unpack error_file, aux_cache = aux
@@ -2255,9 +2255,10 @@ function compute_error(problem, grid, eq::Euler2D, aux, op, u1, t)
             ue_node = get_node_vars(ue, eq, i, j) # KLUDGE - allocated ue is not needed
             for n in 1:1 # Only computing error in first conservative variable
                 du = abs(un_node[n] - ue_node[n])
-                density = get_density(eq, un_node)
+                rho = get_density(eq, un_node)
                 pressure = get_pressure(eq, un_node)
-                entropy_node = log(pressure / density^eq.γ)
+                specific_entropy = log(pressure / rho^eq.γ)
+                entropy_node = -rho * specific_entropy / (eq.γ - 1.0)
                 l1 += du * w2d[i, j]
                 l2 += du * du * w2d[i, j]
                 e += un_node[n]^2 * w2d[i, j]
