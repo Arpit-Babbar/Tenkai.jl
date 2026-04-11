@@ -20,6 +20,8 @@ using Tenkai: newton_solver_tenkai, sum_node_vars_1d, find_theta
                 write_soln!, compute_time_step, post_process_soln,
                 correct_variable_bound_limiter!, limit_variable_slope)
 
+import Tenkai.EqEuler1D: primitive_indicator!
+
 using Tenkai: eachvariable, PlotData, get_filename
 
 using MuladdMacro
@@ -400,6 +402,16 @@ end
         un[1, ix] *= p # ρ * p
     end
     n_ind_var = 1
+    return n_ind_var
+end
+
+@inbounds @inline function primitive_indicator!(un, eq::TenMoment1D)
+    for ix in 1:size(un, 2) # loop over dofs and faces
+        u_node = get_node_vars(un, eq, ix)
+        prim = con2prim(eq, u_node)
+        set_node_vars!(un, prim, eq, ix)
+    end
+    n_ind_var = nvariables(eq)
     return n_ind_var
 end
 

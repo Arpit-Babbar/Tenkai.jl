@@ -679,7 +679,7 @@ function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
     #! format: noindent
     @unpack xc, dx = grid
     nx = grid.size
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     @unpack Vl, Vr, xg = op
     nd = length(xg)
     @unpack limiter = scheme
