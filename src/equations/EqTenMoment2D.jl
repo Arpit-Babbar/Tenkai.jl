@@ -21,6 +21,8 @@ import Tenkai: flux, prim2con, con2prim, limit_slope, zhang_shu_flux_fix,
                write_soln!, compute_time_step, post_process_soln,
                eigmatrix, correct_variable!, limit_variable_slope
 
+import Tenkai.EqEuler2D: primitive_indicator!
+
 using Tenkai: eachvariable, PlotData, get_filename, find_theta, admissibility_tolerance
 
 using MuladdMacro
@@ -987,6 +989,18 @@ end
         un[1, ix] *= p # ρ * p
     end
     n_ind_var = 1
+    return n_ind_var
+end
+
+@inbounds @inline function primitive_indicator!(un, eq::TenMoment2D)
+    @unpack γ_minus_1 = eq # Is this inefficient?
+    nd_p2 = size(un, 2)
+    for iy in 1:nd_p2, ix in 1:nd_p2 # loop over dofs and faces
+        un_node = get_node_vars(un, eq, ix, iy)
+        un_node_prim = con2prim(eq, un_node)
+        set_node_vars!(un, un_node_prim, eq, ix, iy)
+    end
+    n_ind_var = nvar
     return n_ind_var
 end
 

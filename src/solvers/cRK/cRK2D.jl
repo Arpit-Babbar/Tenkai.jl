@@ -24,26 +24,33 @@ function get_cfl(eq::AbstractEquations{2}, scheme::Scheme{<:cRKSolver}, param)
     end
 end
 
-function setup_arrays(grid, scheme::Scheme{<:cRKSolver}, eq::AbstractEquations{2})
-    RealT = eltype(grid.xc)
+# TODO - Add RealT here!
+function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
+                      eq::AbstractEquations{2})
     function gArray(nvar, nx, ny)
-        OffsetArray(zeros(RealT, nvar, nx + 2, ny + 2),
+        OffsetArray(zeros(nvar, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 0, 0))
     end
     function gArray(nvar, n1, n2, nx, ny)
-        OffsetArray(zeros(RealT, nvar, n1, n2, nx + 2, ny + 2),
+        OffsetArray(zeros(nvar, n1, n2, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 1, 1, 0, 0))
     end
+
     # Allocate memory
     @unpack degree, bflux = scheme
     @unpack bflux_ind = bflux
     nvar = nvariables(eq)
+    nc_var = nvar
     nd = degree + 1
     nx, ny = grid.size
     u1 = gArray(nvar, nd, nd, nx, ny)
     ua = gArray(nvar, nx, ny)
     res = gArray(nvar, nd, nd, nx, ny)
+    Bb = OffsetArray(zeros(nvar, nc_var, nd, 4, nx + 2, ny + 2),
+                     OffsetArrays.Origin(1, 1, 1, 1, 0, 0))
     Fb = gArray(nvar, nd, 4, nx, ny)
+    # TODO - Can Fnum be equal to Fb?
+    Fnum = gArray(nvar, nd, 4, nx, ny) # Numerical fluxes at faces of each element
     Ub = gArray(nvar, nd, 4, nx, ny)
     u1_b = copy(Ub)
     ub_N = gArray(nvar, nd, 4, nx, ny) # The final stage of cRK before communication
@@ -51,9 +58,9 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver}, eq::AbstractEquations{2
     # Cell residual cache
 
     nt = Threads.nthreads()
-    cell_array_sizes = Dict(0 => 0, 1 => 11, 2 => 12, 3 => 15, 4 => 16)
-    big_eval_data_sizes = Dict(0 => 0, 1 => 12, 2 => 32, 3 => 40, 4 => 56)
-    small_eval_data_sizes = Dict(0 => 0, 1 => 4, 2 => 4, 3 => 4, 4 => 4)
+    cell_array_sizes = Dict(0 => 11, 1 => 11, 2 => 12, 3 => 15, 4 => 16)
+    big_eval_data_sizes = Dict(0 => 12, 1 => 32, 2 => 40, 3 => 56, 4 => 56)
+    small_eval_data_sizes = Dict(0 => 4, 1 => 4, 2 => 4, 3 => 4, 4 => 4)
     if bflux_ind == extrapolate
         cell_array_size = cell_array_sizes[degree]
         big_eval_data_size = 2
@@ -80,26 +87,26 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver}, eq::AbstractEquations{2
         SVector{nt}([alloc(constructor, cache_size) for _ in Base.OneTo(nt)])
     end
 
-    RealT = eltype(grid.xc)
-    MArr = MArray{Tuple{nvariables(eq), nd, nd}, RealT}
+    MArr = MArray{Tuple{nvariables(eq), nd, nd}, Float64}
     cell_arrays = alloc_for_threads(MArr, cell_array_size)
 
-    MEval = MArray{Tuple{nvariables(eq), nd}, RealT}
+    MEval = MArray{Tuple{nvariables(eq), nd}, Float64}
     eval_data_big = alloc_for_threads(MEval, big_eval_data_size)
 
-    MEval_small = MArray{Tuple{nvariables(eq), 1}, RealT}
+    MEval_small = MArray{Tuple{nvariables(eq), 1}, Float64}
     eval_data_small = alloc_for_threads(MEval_small, small_eval_data_size)
 
     eval_data = (; eval_data_big, eval_data_small)
 
     # Ghost values cache
 
-    Marr = MArray{Tuple{nvariables(eq), 1}, RealT}
+    Marr = MArray{Tuple{nvariables(eq), 1}, Float64}
 
     ghost_cache = alloc_for_threads(Marr, 2)
 
     # KLUDGE - Rename this to LWFR cache
-    cache = (; u1, ua, ub_N, res, Fb, Ub, u1_b, eval_data, cell_arrays, ghost_cache)
+    cache = (; u1, ua, ub_N, res, Fb, Fnum, Ub, Bb, u1_b, eval_data, cell_arrays,
+             ghost_cache)
     return cache
 end
 
