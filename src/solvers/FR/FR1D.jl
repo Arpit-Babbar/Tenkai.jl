@@ -2314,7 +2314,7 @@ function Blend(eq::AbstractEquations{1}, op, grid,
     alpha0 = copy(alpha)
     a0 = convert(RealT, 1.0 / 3.0)
     a1 = 1 - 2 * a0              # smoothing coefficients
-    idata = zeros(RealT, nx + 1)                          # t, alpha[1:nx]
+    idata = zeros(RealT, nx)                          # t, alpha[1:nx]
     lamx = OffsetArray(zeros(RealT, nx + 2),
                        OffsetArrays.Origin(0))   # alpha[i] * dt/dx[i]
     xxf = OffsetArray(zeros(RealT, nd + 1),
