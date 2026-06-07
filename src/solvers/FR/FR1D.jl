@@ -1408,7 +1408,7 @@ function debug_blend_limiter!(eq::AbstractEquations{1}, grid, problem, scheme,
     space_time_alpha = blend.space_time_alpha
     time_levels = blend.time_levels_anim # all time levels (rename)
     @unpack alpha, E = blend
-    @unpack nvar = eq
+    nvar = nvariables(eq)
     nx = grid.size
     nd = op.degree + 1
     @unpack p_ua, p_u1 = plot_data
