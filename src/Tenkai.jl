@@ -88,6 +88,7 @@ characteristic_reconstruction = (;
 
 include("$rkfr_dir/RKFR.jl")
 include("$rkfr_dir/RKFR1D.jl")
+include("$rkfr_dir/RKFR1D_gpu.jl")
 include("$rkfr_dir/RKFR2D.jl")
 
 # ( # RKFR API exported

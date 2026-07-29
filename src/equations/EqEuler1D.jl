@@ -16,6 +16,10 @@ using Trixi: Trixi
 
 using Tenkai
 using Tenkai.Basis
+using Tenkai: to_device
+using KernelAbstractions: KernelAbstractions, @kernel, @index, @Const
+using GPUArraysCore: AbstractGPUArray
+using OffsetArrays: OffsetArray
 
 import Tenkai: admissibility_tolerance
 
@@ -216,6 +220,28 @@ function compute_time_step(eq::Euler1D, problem, grid, aux, op, cfl, u1, ua)
         den = max(den, smax / dx[i])
     end
     dt = cfl / den
+    return dt, eq
+end
+
+@kernel function euler1d_wave_speed_kernel!(speeds, @Const(ua), eq)
+    cell = @index(Global)
+    rho, v, p = con2prim(eq, get_node_vars(ua, eq, cell))
+    speeds[cell] = abs(v) + sqrt(eq.γ * p / rho)
+end
+
+# `grid.dx` is transferred to device fresh every call here -- correct but
+# not optimal (a small host->device copy every timestep); worth caching
+# once optimization work starts on this kernel.
+function compute_time_step(eq::Euler1D, problem, grid, aux, op, cfl,
+                           u1::OffsetArray{<:Any, <:Any, <:AbstractGPUArray}, ua)
+    nx = grid.size
+    RealT = eltype(u1)
+    backend = KernelAbstractions.get_backend(parent(u1))
+    speeds = KernelAbstractions.zeros(backend, RealT, nx)
+    euler1d_wave_speed_kernel!(backend)(speeds, ua, eq; ndrange = nx)
+    KernelAbstractions.synchronize(backend)
+    dx_d = to_device(backend, collect(grid.dx[1:nx]))
+    dt = cfl / maximum(speeds ./ dx_d)
     return dt, eq
 end
 

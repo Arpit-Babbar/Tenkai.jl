@@ -316,7 +316,8 @@ end
 # sol_pts = gl, gll
 # N       = degree
 #-------------------------------------------------------------------------------
-function fr_operators(N, sol_pts, cor_fun)
+function fr_operators(N, sol_pts, cor_fun,
+                      ::Type{RealT} = Float64) where {RealT <: Real}
     println("Setting up differentiation operators")
     @printf("   Degree     = %d\n", N)
     @printf("   Sol points = %s\n", sol_pts)
@@ -373,6 +374,18 @@ function fr_operators(N, sol_pts, cor_fun)
     end
 
     wg_inv = one(T) ./ wg
+
+    # Everything above is computed in Float64 regardless of `RealT` (the
+    # underlying quadrature/root-finding is more accurate that way); this is
+    # the one place it's rounded to RealT. Needed for GPU: Metal kernels
+    # can't contain a Float64 anywhere, even a captured constant, so if the
+    # solve itself is Float32 these operator tables must be too.
+    to_realt(x::SVector{N}) where {N} = SVector{N, RealT}(x)
+    to_realt(x::SMatrix{N, M}) where {N, M} = SMatrix{N, M, RealT}(x)
+    xg, wg, wg_inv, Vl, Vr, bl, br = map(to_realt, (xg, wg, wg_inv, Vl, Vr, bl, br))
+    Dm, DmT, bV, D1, D1T, Dsplit, Vgll = map(to_realt,
+                                             (Dm, DmT, bV, D1, D1T, Dsplit,
+                                              Vgll))
 
     op = (; degree = N, xg, wg, wg_inv, Vl, Vr, bl, br, Dm, DmT, bV, D1, D1T, Dsplit,
           Vgll)

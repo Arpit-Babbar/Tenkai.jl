@@ -10,6 +10,7 @@ using .BenchHarness
 
 include("bench_reference_matmul.jl")
 include("bench_euler1d_flux.jl")
+include("bench_rkfr1d_residual.jl")
 # More bench_*.jl files are included here as each solver tree is GPU-ported.
 
 function git_sha()
@@ -31,6 +32,7 @@ function main()
     results = BenchResult[]
     append!(results, run_reference_benchmarks(; backend))
     append!(results, run_euler1d_flux_benchmarks(; backend))
+    append!(results, run_rkfr1d_residual_benchmarks(; backend))
     # More `run_*_benchmarks(; backend)` calls are appended here as each
     # solver tree is GPU-ported.
 

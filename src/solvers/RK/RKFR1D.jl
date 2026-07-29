@@ -53,7 +53,14 @@ function setup_arrays_rkfr(grid, scheme, eq::AbstractEquations{1};
     Fb = gArray(nvar, 2, nx)
     ub = gArray(nvar, 2, nx)
 
-    cache = (; u0, u1, ua, res, Fb, ub, backend)
+    # Device-resident copies of the grid geometry the GPU kernels read;
+    # `grid` itself has no notion of `backend` (it's shared with every other
+    # solver tree), so this can't just be `grid.xc` etc.
+    xc_d = to_device(backend, grid.xc)
+    dx_d = to_device(backend, collect(grid.dx[1:nx]))
+    xf_d = to_device(backend, grid.xf)
+
+    cache = (; u0, u1, ua, res, Fb, ub, backend, xc_d, dx_d, xf_d)
     return cache
 end
 

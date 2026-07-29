@@ -22,6 +22,22 @@ using Trixi: AbstractVolumeIntegral, VolumeIntegralWeakForm
 @muladd begin
 #! format: noindent
 
+# OffsetArray-wrapped GPU arrays don't `.=`/`copyto!` correctly as a whole
+# (falls back to scalar host indexing under Metal -- verified directly, not
+# assumed); operate on the raw parent array instead. Harmless for CPU too --
+# parent of a CPU-backed OffsetArray is just a plain Array, and this is
+# exactly what axpy!/axpby! computed anyway. `eltype(y)(a)` converts the
+# coefficient to whatever RealT `y` actually is (Float32 for a GPU/Float32
+# solve), regardless of what literal type the caller passes.
+rk_copy!(dst, src) = copyto!(parent(dst), parent(src))
+rk_sub!(y, x) = (parent(y) .-= parent(x); nothing)                    # y -= x
+rk_sub!(y, a, x) = (parent(y) .-= eltype(y)(a) .* parent(x); nothing) # y -= a*x
+function rk_combine!(y, a, x1, b, x2) # y = a*x1 + b*x2
+    parent(y) .= eltype(y)(a) .* parent(x1) .+ eltype(y)(b) .* parent(x2)
+    return nothing
+end
+rk_axpyz!(z, a, x, y) = (parent(z) .= eltype(z)(a) .* parent(x) .+ parent(y); nothing) # z = a*x+y
+
 abstract type AbstractRKSolver end
 
 struct RKFR{VolumeIntegral <: AbstractVolumeIntegral} <: AbstractRKSolver
@@ -46,8 +62,15 @@ function compute_cell_residual_rkfr! end
 function update_ghost_values_rkfr! end
 
 #------------------------------------------------------------------------------
+# `cache.backend isa CPU` runs the classic, unchanged, all-limiters CPU path
+# below. Any other backend dispatches to `compute_residual_rkfr_gpu!`
+# (RKFR1D_gpu.jl), which only supports `limiter = "none"` so far -- see
+# docs/GPU.md.
 function compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, t,
                                 dt, iter, fcount, cache, u1, Fb, ub, ua, res)
+    if !(cache.backend isa KernelAbstractions.CPU)
+        return compute_residual_rkfr_gpu!(eq, grid, op, problem, scheme, t, dt, cache)
+    end
     pre_process_limiter!(eq, t, iter, fcount, dt, grid, problem, scheme, param,
                          aux, op, u1, ua)
     compute_cell_residual_rkfr!(eq, grid, op, problem, scheme, aux, t, dt, u1,
@@ -114,7 +137,7 @@ function apply_rk11!(eq, problem, param, grid, op, scheme, aux, t, dt, cache,
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpy!(-1.0, res, u1)         # u1 = u1 - res
+    rk_sub!(u1, res)              # u1 = u1 - res
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     return nothing
@@ -198,15 +221,15 @@ function apply_ssprk22!(eq, problem, param, grid, op, scheme, aux,
     ts = t
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpy!(-1.0, res, u1)         # u1 = u1 - res
+    rk_sub!(u1, res)             # u1 = u1 - res
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 2
     ts = t + dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpy!(-1.0, res, u1)         # u1 = u1 - res
-    axpby!(0.5, u0, 0.5, u1)    # u1 = u0 + u1
+    rk_sub!(u1, res)             # u1 = u1 - res
+    rk_combine!(u1, 0.5, u0, 0.5, u1) # u1 = u0 + u1
     return nothing
 end
 
@@ -219,35 +242,25 @@ function apply_ssprk33!(eq, problem, param, grid, op, scheme, aux,
     ts = t
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpy!(-1.0, res, u1)                     # u1 = u1 - res
+    rk_sub!(u1, res)                         # u1 = u1 - res
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 2
     ts = t + dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpy!(-1.0, res, u1)                     # u1 = u1 - res
-    axpby!(0.75, u0, 0.25, u1)              # u1 = (3/4)u0 + (1/4)u1
+    rk_sub!(u1, res)                         # u1 = u1 - res
+    rk_combine!(u1, 0.75, u0, 0.25, u1)      # u1 = (3/4)u0 + (1/4)u1
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 3
     ts = t + 0.5 * dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpy!(-1.0, res, u1)                     # u1 = u1 - res
-    axpby!(1.0 / 3.0, u0, 2.0 / 3.0, u1)        # u1 = (1/3)u0 + (2/3)u1
+    rk_sub!(u1, res)                         # u1 = u1 - res
+    rk_combine!(u1, 1 / 3, u0, 2 / 3, u1)    # u1 = (1/3)u0 + (2/3)u1
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
-    return nothing
-end
-
-#------------------------------------------------------------------------------
-# z = a*x + y
-#------------------------------------------------------------------------------
-function axpyz!(a, x, y, z)
-    @tturbo for i in eachindex(z)
-        z[i] = a * x[i] + y[i]
-    end
     return nothing
 end
 
@@ -260,29 +273,29 @@ function apply_ssprk43!(eq, problem, param, grid, op, scheme, aux,
     ts = t
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpy!(-0.5, res, u1)                     # u1 = u1 - res
+    rk_sub!(u1, 0.5, res)                    # u1 = u1 - res
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 2
     ts = t + 0.5 * dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpy!(-0.5, res, u1)                     # u1 = u1 - res
+    rk_sub!(u1, 0.5, res)                    # u1 = u1 - res
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 3
     ts = t + dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpy!(-0.5, res, u1)                     # u1 = u1 - res
-    axpby!(2 / 3, u0, 1 / 3, u1)                 # u1 = 2/3*u0 + 1/3*u1
+    rk_sub!(u1, 0.5, res)                    # u1 = u1 - res
+    rk_combine!(u1, 2 / 3, u0, 1 / 3, u1)    # u1 = 2/3*u0 + 1/3*u1
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 4
     ts = t + 0.5 * dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpy!(-0.5, res, u1)                    # u1 = u1 - res
+    rk_sub!(u1, 0.5, res)                    # u1 = u1 - res
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     return nothing
@@ -298,31 +311,31 @@ function apply_rk4!(eq, problem, param, grid, op, scheme, aux, t,
     ts = t
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpyz!(-0.5, res, u0, u1)       # u1   = u0 - 0.5*r1
-    axpy!(-1.0 / 6.0, res, utmp)      # utmp = utmp - (1/6)*r1
+    rk_axpyz!(u1, -0.5, res, u0)   # u1   = u0 - 0.5*r1
+    rk_sub!(utmp, 1 / 6, res)      # utmp = utmp - (1/6)*r1
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 2
     ts = t + 0.5 * dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpyz!(-0.5, res, u0, u1)       # u1   = u0 - 0.5*r1
-    axpy!(-1.0 / 3.0, res, utmp)      # utmp = utmp - (1/3)*r1
+    rk_axpyz!(u1, -0.5, res, u0)   # u1   = u0 - 0.5*r1
+    rk_sub!(utmp, 1 / 3, res)      # utmp = utmp - (1/3)*r1
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 3
     ts = t + 0.5 * dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpyz!(-1.0, res, u0, u1)       # u1   = u0 - r1
-    axpy!(-1.0 / 3.0, res, utmp)      # utmp = utmp - (1/3)*r1
+    rk_axpyz!(u1, -1, res, u0)     # u1   = u0 - r1
+    rk_sub!(utmp, 1 / 3, res)      # utmp = utmp - (1/3)*r1
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 4
     ts = t + dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpyz!(-1.0 / 6.0, res, utmp, u1) # u1   = utmp - (1/6)*r1
+    rk_axpyz!(u1, -1 / 6, res, utmp) # u1   = utmp - (1/6)*r1
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     return nothing
@@ -383,8 +396,11 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
     # Apply limiter to handle discontinuities of the initial solution
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
 
-    # Initialize counters
-    t = 0.0
+    # Initialize counters. `t` is RealT-typed (not a bare 0.0) since it
+    # accumulates via `t += dt` and later feeds `dt = final_time - t` --
+    # if it started Float64 that comparison would silently promote `dt`
+    # back to Float64 on the last step, reaching a GPU kernel.
+    t = zero(eltype(u1))
     fcount, iter = 0, 0
     @unpack final_time = problem
 
@@ -392,7 +408,10 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
     if cfl > 0.0
         @printf("CFL: specified value = %f\n", cfl)
     else
-        cfl = get_cfl(eq, scheme, param)
+        # get_cfl always returns Float64 regardless of RealT; cfl below
+        # flows into dt, which reaches GPU kernels and can't carry a
+        # Float64 there even transiently.
+        cfl = eltype(u1)(get_cfl(eq, scheme, param))
         @printf("CFL: based on stability = %f\n", cfl)
     end
 
@@ -404,7 +423,7 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
         println("Using DifferentialEquations")
         p = (eq, problem, scheme, param, cfl, grid, aux, op, cache, Fb, ub, ua,
              res)
-        copyto!(u0, u1)
+        rk_copy!(u0, u1)
         tspan = (0.0, final_time)
         odeprob = ODEProblem(compute_residual_rkfr!, u0, tspan, p)
         dt, eq = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
@@ -430,15 +449,15 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
 
     # Save initial solution to file
     fcount = write_soln!("sol", fcount, iter, t, 0.0, eq, grid, problem, param, op,
-                         ua, u1, aux)
+                         to_host(ua), to_host(u1), aux)
 
     # Compute initial error norm
-    error_norm = compute_error(problem, grid, eq, aux, op, u1, t)
+    error_norm = compute_error(problem, grid, eq, aux, op, to_host(u1), t)
     println("Starting time stepping")
     while t < final_time
         dt, eq = compute_time_step(eq, problem, grid, aux, op, cfl, u1, ua)
         dt = adjust_time_step(problem, param, t, dt, aux)
-        copyto!(u0, u1) # u0 = u1
+        rk_copy!(u0, u1) # u0 = u1
         update_solution_rkfr!(eq, problem, param, grid, op, scheme, aux, t, dt, cache,
                               u0, u1, Fb, ub, ua, res)
         compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
@@ -448,17 +467,17 @@ function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
         if save_solution(problem, param, t, iter)
             fcount = write_soln!("sol", fcount, iter, t, dt, eq, grid, problem, param,
                                  op,
-                                 ua, u1, aux)
+                                 to_host(ua), to_host(u1), aux)
         end
         if (compute_error_interval > 0 &&
             mod(iter, compute_error_interval) == 0)
-            error_norm = compute_error(problem, grid, eq, aux, op, u1, t)
+            error_norm = compute_error(problem, grid, eq, aux, op, to_host(u1), t)
         end
     end
-    error_norm = compute_error(problem, grid, eq, aux, op, u1, t)
+    error_norm = compute_error(problem, grid, eq, aux, op, to_host(u1), t)
     post_process_soln(eq, aux, problem, param, scheme)
-    return Dict("u" => u1, "ua" => ua, "errors" => error_norm, "aux" => aux,
-                "plot_data" => aux.plot_data, "grid" => grid,
+    return Dict("u" => to_host(u1), "ua" => to_host(ua), "errors" => error_norm,
+                "aux" => aux, "plot_data" => aux.plot_data, "grid" => grid,
                 "op" => op, "scheme" => scheme)
 end
 end # muladd

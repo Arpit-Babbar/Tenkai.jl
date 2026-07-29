@@ -767,7 +767,10 @@ function create_auxiliaries(eq, op, grid, problem, scheme, param, cache)
     # Setup plotting
     @unpack u1, ua = cache
     timer = TimerOutput()
-    plot_data = initialize_plot(eq, op, grid, problem, scheme, timer, u1, ua)
+    # `initialize_plot` isn't GPU-ported (plotting only, not part of the
+    # numerical solve); give it host copies.
+    plot_data = initialize_plot(eq, op, grid, problem, scheme, timer, to_host(u1),
+                                to_host(ua))
     # Setup blending limiter
     blend = Tenkai.Blend(eq, op, grid, problem, scheme, param, plot_data)
     hierarchical = Tenkai.Hierarchical(eq, op, grid, problem, scheme, param,
@@ -1133,9 +1136,11 @@ function solve(equation, problem, scheme, param;
                backend = KernelAbstractions.CPU(),
                # 1D/2D Cartesian grid
                grid = make_cartesian_grid(problem, param.grid_size),
-               # fr operators like differentiation matrix, correction functions
+               # fr operators like differentiation matrix, correction functions.
+               # RealT matches the grid's, so these are Float32 whenever the
+               # solve itself is (required for Metal -- see fr_operators).
                op = fr_operators(scheme.degree, scheme.solution_points,
-                                 scheme.correction_function),
+                                 scheme.correction_function, eltype(grid.xc)),
                # cache for storing solution and other arrays
                cache = (; setup_arrays(grid, scheme, equation; backend)...,
                         trixi_ode = tenkai2trixiode(scheme.solver, equation, problem,

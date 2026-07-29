@@ -16,6 +16,7 @@ const METAL_OK = Metal.functional()
         @info "Metal is not functional on this machine; skipping GPU tests." Metal.functional()
     else
         include("test_euler1d_flux.jl")
+        include("test_rkfr1d_solve.jl")
         # More files are added here phase-by-phase as solver trees are
         # GPU-ported; see docs/GPU.md for the current checklist.
     end
