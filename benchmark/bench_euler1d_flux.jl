@@ -37,7 +37,8 @@ end
 
 function cpu_flux!(out, u)
     for i in 1:size(u, 2)
-        set_node_vars!(out, Tenkai.EqEuler1D.flux(0.0f0, get_node_vars(u, EQ, i), EQ), EQ, i)
+        set_node_vars!(out, Tenkai.EqEuler1D.flux(0.0f0, get_node_vars(u, EQ, i), EQ), EQ,
+                       i)
     end
 end
 
@@ -55,14 +56,16 @@ function run_euler1d_flux_benchmarks(; backend = Metal.MetalBackend(),
     results = BenchResult[]
     report!(name, n, run_cpu!, run_gpu!) = begin
         r = bench_pair("euler1d_$name", n; setup_cpu = admissible_state,
-                       setup_gpu = n -> MtlArray(admissible_state(n)), run_cpu!, run_gpu!, backend)
+                       setup_gpu = n -> MtlArray(admissible_state(n)), run_cpu!, run_gpu!,
+                       backend)
         push!(results, r)
         println(r.name, " n=", r.size, " speedup=", round(r.speedup, digits = 2), "x")
     end
 
     for n in sizes
         report!("flux", n, u -> cpu_flux!(similar(u), u),
-                (u, backend) -> flux_kernel!(backend)(similar(u), u, EQ; ndrange = size(u, 2)))
+                (u, backend) -> flux_kernel!(backend)(similar(u), u, EQ;
+                                                      ndrange = size(u, 2)))
     end
 
     for (name, f) in (("rusanov", Tenkai.EqEuler1D.rusanov), ("roe", Tenkai.EqEuler1D.roe),
