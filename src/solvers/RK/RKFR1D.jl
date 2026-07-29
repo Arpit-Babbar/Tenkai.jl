@@ -28,13 +28,8 @@ using ..Tenkai: update_ghost_values_periodic!
 #! format: noindent
 
 #------------------------------------------------------------------------------
-# `backend` is a KernelAbstractions.jl backend (default `CPU()`). Passing a
-# GPU backend (e.g. `Tenkai.gpu_backend(:metal)`) allocates every solution
-# array directly on-device via `KernelAbstractions.zeros`, so downstream
-# kernels can dispatch on the array's backend (`KernelAbstractions.get_backend`)
-# with no further plumbing. `OffsetArray` wraps the device array unchanged --
-# indexing offsets are resolved on the host side of dispatch, not in kernel
-# bodies.
+# `backend` allocates arrays directly on-device via `KernelAbstractions.zeros`
+# so downstream kernels can dispatch on the array's own backend.
 function setup_arrays_rkfr(grid, scheme, eq::AbstractEquations{1};
                            backend = KernelAbstractions.CPU())
     RealT = eltype(grid.xc)

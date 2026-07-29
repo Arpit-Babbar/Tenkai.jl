@@ -1,7 +1,5 @@
-# Shared CPU-vs-GPU benchmarking harness used by every `bench_*.jl` file in
-# this directory. See docs/GPU.md for the overall benchmarking methodology
-# (why timings synchronize inside the timed region, why there are two
-# different "ceilings", etc).
+# Shared CPU-vs-GPU benchmarking harness for every bench_*.jl file here. See
+# docs/GPU.md for the ceiling methodology.
 module BenchHarness
 
 using BenchmarkTools
@@ -12,14 +10,8 @@ using Dates
 
 export BenchResult, bench_pair, to_markdown, save_results
 
-"""
-    BenchResult
-
-One row of a CPU-vs-GPU comparison for kernel `name` at problem `size`:
-minimum wall time on each side (nanoseconds), the resulting `speedup`, and
--- when available -- the reference `ceiling` speedup this kernel is being
-optimized toward, and what fraction of it was achieved.
-"""
+# One row: min wall time on each side, the resulting speedup, and -- when
+# available -- the reference ceiling speedup and fraction of it achieved.
 struct BenchResult
     name::String
     size::Int
@@ -30,21 +22,11 @@ struct BenchResult
     frac_of_ceiling::Union{Float64, Nothing}
 end
 
-"""
-    bench_pair(name, size; setup_cpu, setup_gpu, run_cpu!, run_gpu!, backend,
-               ceiling = nothing, samples = 30)
-
-Benchmark `run_cpu!(setup_cpu(size))` against `run_gpu!(setup_gpu(size),
-backend)`. `setup_cpu`/`setup_gpu` allocate state ONCE (excluded from
-timing, since a real solve keeps arrays resident rather than
-reallocating/transferring every step); `run_cpu!`/`run_gpu!` perform the
-actual timed operation.
-
-Critically, `KernelAbstractions.synchronize(backend)` is called *inside* the
-timed GPU region: without it, BenchmarkTools only measures asynchronous
-kernel-launch overhead (microseconds) rather than the kernel's real
-execution time, making every GPU kernel look implausibly fast.
-"""
+# Benchmarks run_cpu!(setup_cpu(size)) vs run_gpu!(setup_gpu(size), backend).
+# setup_* allocates once, outside the timed region (a real solve keeps
+# arrays resident, not reallocated per step). `synchronize` is called
+# *inside* the GPU-timed region -- without it, BenchmarkTools only measures
+# async kernel-launch overhead, not real execution time.
 function bench_pair(name, size; setup_cpu, setup_gpu, run_cpu!, run_gpu!, backend,
                     ceiling = nothing, samples = 30)
     cpu_state = setup_cpu(size)
@@ -66,26 +48,22 @@ end
 
 function to_markdown(results::Vector{BenchResult})
     io = IOBuffer()
-    println(io, "| kernel | size | CPU (ms) | GPU (ms) | speedup | ceiling | % of ceiling |")
+    println(io,
+            "| kernel | size | CPU (ms) | GPU (ms) | speedup | ceiling | % of ceiling |")
     println(io, "|---|---:|---:|---:|---:|---:|---:|")
     for r in results
         ceil_str = r.ceiling === nothing ? "-" : @sprintf("%.1fx", r.ceiling)
         frac_str = r.frac_of_ceiling === nothing ? "-" :
-                   @sprintf("%.0f%%", 100 * r.frac_of_ceiling)
+                   @sprintf("%.0f%%", 100*r.frac_of_ceiling)
         @printf(io, "| %s | %d | %.3f | %.3f | %.2fx | %s | %s |\n",
-                r.name, r.size, r.cpu_ns / 1e6, r.gpu_ns / 1e6, r.speedup,
+                r.name, r.size, r.cpu_ns/1e6, r.gpu_ns/1e6, r.speedup,
                 ceil_str, frac_str)
     end
     return String(take!(io))
 end
 
-"""
-    save_results(results, path; sha = nothing)
-
-Write `results` as JSON to `path`, tagged with the current git SHA (so
-historical results are traceable to the code that produced them) and a
-timestamp. Never hand-edit these files -- regenerate with `runbenchmarks.jl`.
-"""
+# Writes `results` as JSON, tagged with git SHA and timestamp. Never
+# hand-edit these files -- regenerate with runbenchmarks.jl.
 function save_results(results::Vector{BenchResult}, path; sha = nothing)
     payload = [(; name = r.name, size = r.size, cpu_ns = r.cpu_ns, gpu_ns = r.gpu_ns,
                 speedup = r.speedup, ceiling = r.ceiling,

@@ -720,11 +720,8 @@ function admissibility_tolerance(eq::AbstractEquations)
     return 0.0
 end
 
-# Used only for the "Solving <name> using <solver>" log line. Falls back to
-# the type name so equation structs don't need to carry a `name` field
-# purely for this (see the note on `Euler1D` in EqEuler1D.jl for why that
-# matters for GPU kernels); override for a specific type if a prettier name
-# is wanted.
+# For the "Solving <name> using <solver>" log line, so equation structs
+# don't need a `name` field just for this. Override for a prettier name.
 equation_name(eq::AbstractEquations) = string(nameof(typeof(eq)))
 
 #-------------------------------------------------------------------------------
@@ -1131,11 +1128,8 @@ tenkai2trixiode(solver, equation, problem, scheme, param) = ()
 # simulation at the time of the crash.
 #-------------------------------------------------------------------------------
 function solve(equation, problem, scheme, param;
-               # KernelAbstractions.jl backend on which solution arrays live and
-               # GPU-ported kernels execute; defaults to plain CPU arrays/loops so
-               # every existing use of `solve` is unaffected. Pass e.g.
-               # `backend = Tenkai.gpu_backend(:metal)` (after `using Metal`) to
-               # opt into GPU acceleration for whichever solver/kernels support it.
+               # KernelAbstractions.jl backend for solution arrays/kernels; e.g.
+               # `Tenkai.gpu_backend(:metal)` after `using Metal` (docs/GPU.md).
                backend = KernelAbstractions.CPU(),
                # 1D/2D Cartesian grid
                grid = make_cartesian_grid(problem, param.grid_size),

@@ -1,23 +1,9 @@
-# Reference "ceiling" benchmarks: how fast can this hardware go on the
-# shapes that actually occur in Tenkai's hot loops, on CPU (BLAS) vs GPU
-# (Metal)? GPU-ported kernels elsewhere in `benchmark/` are optimized toward
-# these numbers rather than an arbitrary target -- see docs/GPU.md.
-#
-# Two ceilings are reported, deliberately:
-#
-#   * `matmul_ceiling` -- the per-cell D1-contraction in
-#     `compute_cell_residual_rkfr!` (`res[:, iix, cell] += D1[iix, ix] *
-#     flux[:, ix, cell]` summed over `ix`) is, across all cells at once, a
-#     batched GEMM: `D1 (nd x nd) * B (nd x nvar*ncells)`. Timing that exact
-#     shape on CPU BLAS vs Metal gives a fair "how fast could this
-#     arithmetic go" number.
-#   * `bandwidth_ceiling` -- Tenkai's polynomial degree `nd` is small
-#     (typically 3-6), so most kernels here move far more bytes than they do
-#     FLOPs: they're memory-bound, not compute-bound. matmul is a compute-
-#     bound benchmark, so for small `nd` it sets an unreachably optimistic
-#     target. Achieved-bandwidth-vs-peak is the more honest ceiling for
-#     those kernels, and is reported alongside so each phase can cite the
-#     correct one instead of being judged against the wrong number.
+# Reference "ceiling" benchmarks that GPU kernels elsewhere are optimized
+# toward (docs/GPU.md). Two, deliberately: `matmul_ceiling` times the exact
+# batched-GEMM shape of Tenkai's per-cell D1-contraction (CPU BLAS vs Metal);
+# `bandwidth_ceiling` covers the memory-bound case matmul can't represent,
+# since Tenkai's polynomial degree (nd=3-6) is usually too small to be
+# compute-bound.
 
 using LinearAlgebra
 using Metal
@@ -25,20 +11,14 @@ using KernelAbstractions
 using Printf
 using BenchmarkTools
 
-# Guarded: this file is `include`d both standalone and from runbenchmarks.jl
-# (which already includes harness.jl itself) -- including it twice would
-# redefine `module BenchHarness` and print spurious "replacing module"
-# warnings.
+# Guarded: included both standalone and from runbenchmarks.jl (which already
+# includes harness.jl), and including it twice redefines `module
+# BenchHarness`.
 isdefined(@__MODULE__, :BenchHarness) || include("harness.jl")
 using .BenchHarness
 
-"""
-    matmul_ceiling(nd, ncells, nvar; backend, dtype = Float32, samples = 50)
-
-CPU-BLAS-`mul!` vs Metal-`mul!` speedup for `D1 (nd x nd) * B (nd x
-nvar*ncells)`, i.e. the true batched-GEMM shape of Tenkai's per-cell
-D1-contraction.
-"""
+# CPU-BLAS-mul! vs Metal-mul! for D1 (nd x nd) * B (nd x nvar*ncells), the
+# batched-GEMM shape of Tenkai's per-cell D1-contraction.
 function matmul_ceiling(nd, ncells, nvar; backend, dtype = Float32, samples = 50)
     D1_cpu = rand(dtype, nd, nd)
     B_cpu = rand(dtype, nd, nvar * ncells)
@@ -59,14 +39,7 @@ function matmul_ceiling(nd, ncells, nvar; backend, dtype = Float32, samples = 50
     return (; nd, ncells, nvar, cpu_ns, gpu_ns, speedup = cpu_ns / gpu_ns)
 end
 
-"""
-    bandwidth_ceiling(n; backend, dtype = Float32, samples = 50)
-
-Achieved Metal memory bandwidth (GB/s) for a large elementwise `y = 2x + y`
-kernel (2 reads + 1 write per element), reported against a rough peak
-estimate so memory-bound kernels have a meaningful target distinct from
-`matmul_ceiling`.
-"""
+# Achieved Metal bandwidth (GB/s) for y = 2x + y (2 reads + 1 write/elem).
 function bandwidth_ceiling(n; backend, dtype = Float32, samples = 50)
     x_gpu = Metal.ones(dtype, n)
     y_gpu = Metal.ones(dtype, n)
@@ -96,12 +69,8 @@ function run_reference_benchmarks(; backend = Metal.MetalBackend())
         @printf("matmul  nd=%d ncells=%-7d speedup=%.2fx\n", nd, ncells, m.speedup)
     end
 
-    # Bandwidth results are deliberately not folded into `results`: BenchResult
-    # is shaped for CPU-vs-GPU speedup comparisons (its `speedup` column has
-    # units of "x", not "GB/s"), and forcing a bandwidth number through that
-    # field would mislabel the markdown table. They're printed here for the
-    # person running the benchmark; if per-run bandwidth tracking is needed
-    # later, give it its own small result type instead of overloading this one.
+    # Not folded into `results`: BenchResult's `speedup` column is unitless
+    # "x", not GB/s -- printed only, to avoid mislabeling the markdown table.
     for n in (10^5, 10^6, 10^7, 10^8)
         b = bandwidth_ceiling(n; backend)
         @printf("bandwidth n=%-9d %.1f GB/s\n", n, b.gbps)

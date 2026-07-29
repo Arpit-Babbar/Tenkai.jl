@@ -1,11 +1,6 @@
-# Run every benchmark in this directory and regenerate:
-#   - benchmark/results/<git-sha>.json   (raw data, one file per run)
-#   - benchmark/results/latest.md        (markdown table, included into docs/GPU.md)
-#
-# Usage (from the repo root):
+# Regenerates benchmark/results/<git-sha>.json and latest.md. Usage:
 #   julia --project=benchmark benchmark/runbenchmarks.jl
-#
-# Never hand-edit files under benchmark/results/ -- regenerate them here.
+# Never hand-edit files under benchmark/results/.
 
 using Metal
 using Dates
@@ -14,9 +9,8 @@ include("harness.jl")
 using .BenchHarness
 
 include("bench_reference_matmul.jl")
-# Per-kernel benchmark files (bench_cell_residual.jl, bench_face_residual.jl,
-# bench_rk_stage.jl, ...) are `include`d here as each is added; none exist
-# yet in Phase 0.
+include("bench_euler1d_flux.jl")
+# More bench_*.jl files are included here as each solver tree is GPU-ported.
 
 function git_sha()
     try
@@ -36,8 +30,9 @@ function main()
 
     results = BenchResult[]
     append!(results, run_reference_benchmarks(; backend))
-    # Per-kernel `run_*_benchmarks(; backend)` calls are appended here as
-    # each phase adds its own bench_*.jl file.
+    append!(results, run_euler1d_flux_benchmarks(; backend))
+    # More `run_*_benchmarks(; backend)` calls are appended here as each
+    # solver tree is GPU-ported.
 
     sha = git_sha()
     results_dir = joinpath(@__DIR__, "results")

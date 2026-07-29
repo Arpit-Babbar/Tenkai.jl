@@ -57,8 +57,7 @@ if TENKAI_TEST == "crk_imex_paper" || TENKAI_TEST == "all"
     include("test_crk_imex_paper.jl")
 end
 
-# GPU tests are opt-in (not part of "all") since they require a functional
-# Metal-capable device; see docs/GPU.md.
-if TENKAI_TEST == "gpu"
-    include("gpu/runtests.jl")
-end
+# GPU tests are NOT run through this file/`Pkg.test()`: Metal.jl is
+# macOS-only and lives in test/gpu/Project.toml, not here, so it doesn't get
+# force-installed on every CI platform. Run them with:
+#   julia --project=test/gpu test/gpu/runtests.jl

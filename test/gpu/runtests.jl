@@ -1,12 +1,8 @@
 # GPU correctness tests: every ported kernel is checked against its existing
-# CPU implementation. Skips cleanly (with an @info, not a failure) on any
-# machine without a functional Metal device, so `TENKAI_TEST=gpu` stays safe
-# to run in ordinary CI.
-#
-# Kernels are compared in Float32 (Metal has no Float64) against randomized
-# *admissible* states -- see docs/GPU.md for why tolerances here (~1e-5) are
-# far looser than the Float64 regression suite's 1e-14, and why admissible
-# (rather than arbitrary) random states are required.
+# CPU implementation, in Float32 (Metal has no Float64) at rtol~1e-5 rather
+# than the Float64 regression suite's 1e-14. Skips (not fails) without a
+# functional Metal device. Run with:
+#   julia --project=test/gpu test/gpu/runtests.jl
 
 using Test
 using Tenkai

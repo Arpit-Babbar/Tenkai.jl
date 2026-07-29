@@ -41,19 +41,9 @@ using MuladdMacro
 @muladd begin
 #! format: noindent
 
-#-------------------------------------------------------------------------------
-# `nvar`/`name`/`initial_values`/`numfluxes` used to live on this struct, but
-# none of them actually needed to: `nvar` duplicates the `NVAR` type
-# parameter already carried by `AbstractEquations{1, 3}` (use `nvariables(eq)`
-# instead); `numfluxes` was never read anywhere (`ParseCommandLine` -- the
-# only place that could have consulted it -- is a no-op stub); and
-# `initial_values` is already a module-level `Dict` in this file (see below)
-# that the struct field only ever aliased, so callers can use that directly.
-# Dropping them makes `Euler1D` itself `isbits` (both `γ` and a plain,
-# non-closure `hll_speeds` function are `isbits`), which means it can be
-# passed straight into a `KernelAbstractions.@kernel` with no separate
-# device-side type or `Adapt.adapt_structure` needed.
-#-------------------------------------------------------------------------------
+# `nvar`/`name`/`initial_values`/`numfluxes` used to live here but were dead
+# weight (see docs/GPU.md); dropping them makes this isbits, so it passes
+# into a @kernel unchanged.
 struct Euler1D{RealT <: Real, HLLSpeeds <: Function} <: AbstractEquations{1, 3}
     γ::RealT
     hll_speeds::HLLSpeeds
@@ -81,11 +71,9 @@ end
 
 @inbounds @inline flux(U, eq::Euler1D) = flux(one(typeof(eq.γ)), U, eq)
 
-# NOTE: fprime/prim2con!/con2prim!/get_pressure/eigmatrix below are host-only
-# (not called from any @kernel yet) and still have bare Float64 literals
-# (1.0, 0.5, ...). If one of these is ever needed on the GPU path, it needs
-# the same RealT-generic sweep applied to flux/con2prim/prim2con/rusanov/
-# roe/hll_speeds_toro/hllc above first -- see the note on Euler1D.
+# fprime/prim2con!/con2prim!/get_pressure/eigmatrix below are host-only and
+# still have bare Float64 literals -- sweep them (see docs/GPU.md) before
+# calling from a @kernel.
 
 # The matrix fprime(U)
 function fprime(eq::Euler1D, x, U)
@@ -492,10 +480,10 @@ function roe(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler1D, dir)
     F1 = half * (Fl[1] + Fr[1]) - half * (α1 * l1 + α2 * l2 + α3 * l3)
     F2 = half * (Fl[2] + Fr[2]) -
          half * (α1 * l1 * (u - c) + α2 * l2 * u
-                + α3 * l3 * (u + c))
+                 + α3 * l3 * (u + c))
     F3 = half * (Fl[3] + Fr[3]) -
          half * (α1 * l1 * (H - u * c) + half * α2 * l2 * u * u
-                + α3 * l3 * (H + u * c))
+                 + α3 * l3 * (H + u * c))
 
     Fn = SVector(F1, F2, F3)
     return Fn
