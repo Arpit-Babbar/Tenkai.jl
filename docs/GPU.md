@@ -6,6 +6,14 @@ currently targeting Metal (Apple Silicon). Opt-in and additive: `solve`
 defaults to `backend = KernelAbstractions.CPU()`, so every existing code
 path is unchanged unless a user passes a different backend.
 
+**Status: no solve is GPU-accelerated yet.** So far this covers the
+infrastructure (backend plumbing, benchmark harness) and makes `Euler1D`'s
+`flux`/`rusanov`/`roe`/`hllc` `@kernel`-safe and benchmarked in isolation --
+`solve(...; backend = Tenkai.gpu_backend(:metal))` on an RK/Euler1D problem
+still runs entirely on the CPU today, since the cell-residual, face-residual,
+and RK-stepping kernels that would actually use `backend` don't exist yet.
+See the roadmap below.
+
 ## Why KernelAbstractions + a Metal extension
 
 Kernels are written once, backend-agnostic, as `@kernel` functions in
