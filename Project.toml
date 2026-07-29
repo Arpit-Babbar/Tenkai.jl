@@ -5,9 +5,6 @@ version = "0.1.0"
 
 [deps]
 Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
-Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-Atomix = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
-BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 DiffEqCallbacks = "459566f4-90b8-5000-8ac3-15dfb0a30def"
 ElasticArrays = "fdbdab4c-e67f-52f5-8c3f-e7b388dad3d4"
@@ -51,9 +48,6 @@ TenkaiMetalExt = "Metal"
 
 [compat]
 Accessors = "0.1.36"
-Adapt = "4"
-Atomix = "1"
-BenchmarkTools = "1.8"
 DelimitedFiles = "1.9"
 DiffEqCallbacks = "4.9"
 ElasticArrays = "1.2"

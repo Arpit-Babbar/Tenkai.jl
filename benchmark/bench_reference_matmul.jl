@@ -23,8 +23,13 @@ using LinearAlgebra
 using Metal
 using KernelAbstractions
 using Printf
+using BenchmarkTools
 
-include("harness.jl")
+# Guarded: this file is `include`d both standalone and from runbenchmarks.jl
+# (which already includes harness.jl itself) -- including it twice would
+# redefine `module BenchHarness` and print spurious "replacing module"
+# warnings.
+isdefined(@__MODULE__, :BenchHarness) || include("harness.jl")
 using .BenchHarness
 
 """
@@ -91,6 +96,12 @@ function run_reference_benchmarks(; backend = Metal.MetalBackend())
         @printf("matmul  nd=%d ncells=%-7d speedup=%.2fx\n", nd, ncells, m.speedup)
     end
 
+    # Bandwidth results are deliberately not folded into `results`: BenchResult
+    # is shaped for CPU-vs-GPU speedup comparisons (its `speedup` column has
+    # units of "x", not "GB/s"), and forcing a bandwidth number through that
+    # field would mislabel the markdown table. They're printed here for the
+    # person running the benchmark; if per-run bandwidth tracking is needed
+    # later, give it its own small result type instead of overloading this one.
     for n in (10^5, 10^6, 10^7, 10^8)
         b = bandwidth_ceiling(n; backend)
         @printf("bandwidth n=%-9d %.1f GB/s\n", n, b.gbps)

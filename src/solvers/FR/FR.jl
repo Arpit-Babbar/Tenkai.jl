@@ -735,11 +735,13 @@ function setup_arrays(grid, scheme, equation; backend = KernelAbstractions.CPU()
     if solver == "lwfr"
         # TODO: thread `backend` through once the LW tree is GPU-ported (see
         # docs/GPU.md roadmap); for now it always allocates plain CPU arrays.
+        warn_if_gpu_backend_ignored((; backend), "The LW solver tree")
         return setup_arrays_lwfr(grid, scheme, equation)
     elseif solver == "rkfr" || solver isa AbstractRKSolver
         return setup_arrays_rkfr(grid, scheme, equation; backend)
     elseif solver == "mdrk"
         # TODO: thread `backend` through once the MDRK tree is GPU-ported.
+        warn_if_gpu_backend_ignored((; backend), "The MDRK solver tree")
         return setup_arrays_mdrk(grid, scheme, equation)
     else
         @assert false "Incorrect solver"

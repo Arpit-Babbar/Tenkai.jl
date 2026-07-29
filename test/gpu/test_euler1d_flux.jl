@@ -111,9 +111,13 @@ using KernelAbstractions
             KernelAbstractions.synchronize(backend)
             @test isapprox(Array(out_gpu), out_cpu; rtol = 1.0f-5)
 
-            # Determinism: rerun and require bitwise-identical output. This
-            # is what would actually catch a race condition (e.g. a
-            # scatter-vs-gather bug) rather than a one-off lucky pass.
+            # Determinism: rerun and require bitwise-identical output. These
+            # particular kernels are pure gathers (each thread only ever
+            # writes its own output slot), so there's no scatter/write
+            # conflict possible here regardless -- this check is a cheap
+            # sanity net now and becomes a genuine race detector once
+            # scatter-shaped kernels (e.g. the face-residual gather in a
+            # later phase) reuse this same test pattern.
             out_gpu2 = MtlArray(zeros(Float32, nvar, n))
             kernel(backend)(out_gpu2, u_gpu, eq; ndrange = n)
             KernelAbstractions.synchronize(backend)

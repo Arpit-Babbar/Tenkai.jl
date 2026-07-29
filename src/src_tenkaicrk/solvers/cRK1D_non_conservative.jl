@@ -6,6 +6,7 @@ using Tenkai: cRKSolver, True, False, sum_node_vars_1d
 
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
                       eq::AbstractNonConservativeEquations{1}; kwargs...)
+    warn_if_gpu_backend_ignored(kwargs, "The src_tenkaicrk non-conservative cRK solver")
     gArray(nvar, nx) = OffsetArray(zeros(nvar, nx + 2),
                                    OffsetArrays.Origin(1, 0))
     function gArray(nvar, n1, nx)

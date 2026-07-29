@@ -40,3 +40,24 @@ function gpu_backend(::Val{T}) where {T}
     error("No GPU backend available for `:$T`. Load the corresponding vendor " *
           "package to activate it (e.g. `using Metal` for `:metal`).")
 end
+
+"""
+    warn_if_gpu_backend_ignored(kwargs, context::String)
+
+Only the conservative 1D/2D RK solver tree honors a non-CPU `backend` so far
+(see docs/GPU.md for what's ported). Every other `setup_arrays`/
+`setup_arrays_rkfr` method accepts `backend` only through a `kwargs...`
+catch-all (needed so Julia's keyword-call dispatch can still reach them, see
+the note in `setup_arrays`) and otherwise ignores it, allocating plain CPU
+arrays. Without this check that's a silent no-op: `solve(...; backend =
+Tenkai.gpu_backend(:metal))` would appear to succeed while quietly running
+entirely on the CPU. Call this from each such fallback method.
+"""
+function warn_if_gpu_backend_ignored(kwargs, context::String)
+    backend = get(kwargs, :backend, CPU())
+    if !(backend isa CPU)
+        @warn "$context does not support the GPU backend $(typeof(backend)) yet; " *
+              "falling back to plain CPU arrays. See docs/GPU.md for what's ported." backend
+    end
+    return nothing
+end

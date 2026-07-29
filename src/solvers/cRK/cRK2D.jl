@@ -27,6 +27,7 @@ end
 # TODO - Add RealT here!
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
                       eq::AbstractEquations{2}; kwargs...)
+    warn_if_gpu_backend_ignored(kwargs, "The cRK solver tree")
     function gArray(nvar, nx, ny)
         OffsetArray(zeros(nvar, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 0, 0))

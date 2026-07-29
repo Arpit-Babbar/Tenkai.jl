@@ -26,6 +26,7 @@ using Tenkai: refresh!
 
 function setup_arrays(grid, scheme::Scheme{<:cSSP2IMEX433},
                       eq::AbstractEquations{1}; kwargs...)
+    warn_if_gpu_backend_ignored(kwargs, "The src_tenkaicrk cSSP2IMEX433 solver")
     gArray(nvar, nx) = OffsetArray(zeros(nvar, nx + 2),
                                    OffsetArrays.Origin(1, 0))
     function gArray(nvar, n1, nx)

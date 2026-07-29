@@ -13,6 +13,7 @@ import ..Tenkai: setup_arrays_rkfr,
 # TODO - This is not needed either, right?
 function setup_arrays_rkfr(grid, scheme, eq::AbstractNonConservativeEquations{2};
                            kwargs...)
+    warn_if_gpu_backend_ignored(kwargs, "The src_tenkaicrk non-conservative RKFR 2D solver")
     function gArray(nvar, nx, ny)
         OffsetArray(zeros(nvar, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 0, 0))

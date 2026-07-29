@@ -25,6 +25,7 @@ import Tenkai: compute_cell_residual_mdrk_1!, compute_cell_residual_mdrk_2!,
 
 function setup_arrays(grid, scheme::Scheme{<:MDRKEnzymeTower},
                       eq::AbstractEquations{2}; kwargs...)
+    warn_if_gpu_backend_ignored(kwargs, "The MDRK (Enzyme AD) solver tree")
     function gArray(nvar, nx, ny)
         OffsetArray(zeros(RealT, nvar, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 0, 0))

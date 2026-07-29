@@ -81,6 +81,12 @@ end
 
 @inbounds @inline flux(U, eq::Euler1D) = flux(one(typeof(eq.γ)), U, eq)
 
+# NOTE: fprime/prim2con!/con2prim!/get_pressure/eigmatrix below are host-only
+# (not called from any @kernel yet) and still have bare Float64 literals
+# (1.0, 0.5, ...). If one of these is ever needed on the GPU path, it needs
+# the same RealT-generic sweep applied to flux/con2prim/prim2con/rusanov/
+# roe/hll_speeds_toro/hllc above first -- see the note on Euler1D.
+
 # The matrix fprime(U)
 function fprime(eq::Euler1D, x, U)
     @unpack γ = eq

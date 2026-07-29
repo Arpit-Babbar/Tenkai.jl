@@ -161,6 +161,7 @@ end
 
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
                       eq::AbstractEquations{1}; kwargs...)
+    warn_if_gpu_backend_ignored(kwargs, "The cRK solver tree")
     RealT = eltype(grid.xc)
     gArray(nvar, nx) = OffsetArray(zeros(RealT, nvar, nx + 2),
                                    OffsetArrays.Origin(1, 0))
@@ -213,6 +214,7 @@ end
 
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver, <:DCSX},
                       eq::AbstractEquations{1}; kwargs...)
+    warn_if_gpu_backend_ignored(kwargs, "The cRK (DCSX) solver tree")
     RealT = eltype(grid.xc)
     gArray(nvar, nx) = OffsetArray(zeros(RealT, nvar, nx + 2),
                                    OffsetArrays.Origin(1, 0))
