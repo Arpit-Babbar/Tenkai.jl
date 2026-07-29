@@ -41,13 +41,22 @@ using MuladdMacro
 @muladd begin
 #! format: noindent
 
+#-------------------------------------------------------------------------------
+# `nvar`/`name`/`initial_values`/`numfluxes` used to live on this struct, but
+# none of them actually needed to: `nvar` duplicates the `NVAR` type
+# parameter already carried by `AbstractEquations{1, 3}` (use `nvariables(eq)`
+# instead); `numfluxes` was never read anywhere (`ParseCommandLine` -- the
+# only place that could have consulted it -- is a no-op stub); and
+# `initial_values` is already a module-level `Dict` in this file (see below)
+# that the struct field only ever aliased, so callers can use that directly.
+# Dropping them makes `Euler1D` itself `isbits` (both `γ` and a plain,
+# non-closure `hll_speeds` function are `isbits`), which means it can be
+# passed straight into a `KernelAbstractions.@kernel` with no separate
+# device-side type or `Adapt.adapt_structure` needed.
+#-------------------------------------------------------------------------------
 struct Euler1D{RealT <: Real, HLLSpeeds <: Function} <: AbstractEquations{1, 3}
     γ::RealT
     hll_speeds::HLLSpeeds
-    nvar::Int64
-    name::String
-    initial_values::Dict{String, Function}
-    numfluxes::Dict{String, Function}
 end
 
 function tenkai2trixiequation(equation::EqEuler1D.Euler1D)
@@ -59,9 +68,10 @@ end
 #-------------------------------------------------------------------------------
 
 @inbounds @inline function flux(x, U, eq::Euler1D)
+    RealT = typeof(eq.γ)
     rho, rho_v1, rho_e = U
     v1 = rho_v1 / rho
-    p = (eq.γ - 1) * (rho_e - 0.5 * rho_v1 * v1)
+    p = (eq.γ - one(RealT)) * (rho_e - RealT(0.5) * rho_v1 * v1)
     # Ignore orientation since it is always "1" in 1D
     f1 = rho_v1
     f2 = rho_v1 * v1 + p
@@ -69,7 +79,7 @@ end
     return SVector(f1, f2, f3)
 end
 
-@inbounds @inline flux(U, eq::Euler1D) = flux(1.0, U, eq)
+@inbounds @inline flux(U, eq::Euler1D) = flux(one(typeof(eq.γ)), U, eq)
 
 # The matrix fprime(U)
 function fprime(eq::Euler1D, x, U)
@@ -90,9 +100,10 @@ end
 
 # function converting primitive variables to PDE variables
 function prim2con(eq::Euler1D, prim) # primitive, gas constant
-    @unpack γ = eq
+    RealT = typeof(eq.γ)
+    γ = eq.γ
     U = SVector(prim[1], prim[1] * prim[2],
-                prim[3] / (γ - 1.0) + 0.5 * prim[1] * prim[2]^2)
+                prim[3] / (γ - one(RealT)) + RealT(0.5) * prim[1] * prim[2]^2)
     #           ρ    ,     ρ*u     ,        p/(γ-1.0) +     ρ*u^2/2.0
     return U
 end
@@ -106,8 +117,10 @@ end
 
 # function converting pde variables to primitive variables
 @inbounds @inline function con2prim(eq::Euler1D, U)
-    @unpack γ = eq
-    primitives = SVector(U[1], U[2] / U[1], (γ - 1.0) * (U[3] - 0.5 * U[2]^2 / U[1]))
+    RealT = typeof(eq.γ)
+    γ = eq.γ
+    primitives = SVector(U[1], U[2] / U[1],
+                         (γ - one(RealT)) * (U[3] - RealT(0.5) * U[2]^2 / U[1]))
     #                   [ρ ,   u        , p]
     return primitives
 end
@@ -396,16 +409,18 @@ function chandrashekar!(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler1D, dir, F)
 end
 
 @inbounds @inline function rusanov(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler1D, dir)
-    @unpack γ = eq
+    RealT = typeof(eq.γ)
+    half = RealT(0.5)
+    γ = eq.γ
     rho_ll, rho_v1_ll, rho_e_ll = ual
     rho_rr, rho_v1_rr, rho_e_rr = uar
     v1_ll = rho_v1_ll / rho_ll
     v_mag_ll = abs(v1_ll)
-    p_ll = (γ - 1) * (rho_e_ll - 1 / 2 * rho_ll * v_mag_ll^2)
+    p_ll = (γ - one(RealT)) * (rho_e_ll - half * rho_ll * v_mag_ll^2)
     c_ll = sqrt(γ * p_ll / rho_ll)
     v1_rr = rho_v1_rr / rho_rr
     v_mag_rr = abs(v1_rr)
-    p_rr = (γ - 1) * (rho_e_rr - 1 / 2 * rho_rr * v_mag_rr^2)
+    p_rr = (γ - one(RealT)) * (rho_e_rr - half * rho_rr * v_mag_rr^2)
     c_rr = sqrt(γ * p_rr / rho_rr)
     # ρl, ul, pl = con2prim(eq, ual)
     # ρr, ur, pr = con2prim(eq, uar)
@@ -413,9 +428,9 @@ end
     # λ = maximum(abs.([ul, ul-cl, ul+cl, ur, ur-cr, ur+cr])) # local wave speed
 
     λ = max(abs(v1_ll) + c_ll, abs(v1_rr) + c_rr) # local wave speed
-    f1 = 0.5 * (Fl[1] + Fr[1]) - 0.5 * λ * (Ur[1] - Ul[1])
-    f2 = 0.5 * (Fl[2] + Fr[2]) - 0.5 * λ * (Ur[2] - Ul[2])
-    f3 = 0.5 * (Fl[3] + Fr[3]) - 0.5 * λ * (Ur[3] - Ul[3])
+    f1 = half * (Fl[1] + Fr[1]) - half * λ * (Ur[1] - Ul[1])
+    f2 = half * (Fl[2] + Fr[2]) - half * λ * (Ur[2] - Ul[2])
+    f3 = half * (Fl[3] + Fr[3]) - half * λ * (Ur[3] - Ul[3])
     return SVector(f1, f2, f3)
 end
 
@@ -448,30 +463,32 @@ end
 
 # Roe's flux
 function roe(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler1D, dir)
+    RealT = typeof(eq.γ)
+    half = RealT(0.5)
     γ = eq.γ
     ρl, ul, pl = con2prim(eq, ual)
     ρr, ur, pr = con2prim(eq, uar)
     sρl, sρr = sqrt(ρl), sqrt(ρr)            # pre-compute for efficiency
-    Hl, Hr = γ * pl / ((γ - 1.0) * ρl) + 0.5 * ul^2,
-             γ * pr / ((γ - 1.0) * ρr) + 0.5 * ur^2 # enthl
+    Hl, Hr = γ * pl / ((γ - one(RealT)) * ρl) + half * ul^2,
+             γ * pr / ((γ - one(RealT)) * ρr) + half * ur^2 # enthl
     u = (sρl * ul + sρr * ur) / (sρl + sρr)      # roe avg velocity
     H = (sρl * Hl + sρr * Hr) / (sρl + sρr)      # roe avg enthalpy
-    c = sqrt((γ - 1.0) * (H - 0.5 * u * u))        # sound speed
+    c = sqrt((γ - one(RealT)) * (H - half * u * u))        # sound speed
     # Computing R |L| inv(R) ΔU efficiently
     dU1, dU2, dU3 = Ur[1] - Ul[1], Ur[2] - Ul[2], Ur[3] - Ul[3]
-    α2 = (γ - 1.0) / c^2 * ((H - u * u) * dU1 + u * dU2 - dU3)
-    α1 = 1.0 / (2.0 * c) * ((u + c) * dU1 - dU2 - c * α2)
+    α2 = (γ - one(RealT)) / c^2 * ((H - u * u) * dU1 + u * dU2 - dU3)
+    α1 = one(RealT) / (2 * c) * ((u + c) * dU1 - dU2 - c * α2)
     α3 = dU1 - α1 - α2
     l1, l2, l3 = abs(u - c), abs(u), abs(u + c)
     # Eigenvectors are as follows, but we don't store them to avoid allocations
     # r1,r2,r3 = [1.0, u-c, H-u*c ], [1.0, u, 0.5*u^2 ], [1.0, u+c, H+u*c ]
     # Flux is F = 0.5*(Fl+Fr) - 0.5(∑αi*li*ri)
-    F1 = 0.5 * (Fl[1] + Fr[1]) - 0.5 * (α1 * l1 + α2 * l2 + α3 * l3)
-    F2 = 0.5 * (Fl[2] + Fr[2]) -
-         0.5 * (α1 * l1 * (u - c) + α2 * l2 * u
+    F1 = half * (Fl[1] + Fr[1]) - half * (α1 * l1 + α2 * l2 + α3 * l3)
+    F2 = half * (Fl[2] + Fr[2]) -
+         half * (α1 * l1 * (u - c) + α2 * l2 * u
                 + α3 * l3 * (u + c))
-    F3 = 0.5 * (Fl[3] + Fr[3]) -
-         0.5 * (α1 * l1 * (H - u * c) + 0.5 * α2 * l2 * u * u
+    F3 = half * (Fl[3] + Fr[3]) -
+         half * (α1 * l1 * (H - u * c) + half * α2 * l2 * u * u
                 + α3 * l3 * (H + u * c))
 
     Fn = SVector(F1, F2, F3)
@@ -518,24 +535,28 @@ end
 
 # HLL/HLLC Wave speed estimates from Toro2009, DOI : 10.1007/b79761
 function hll_speeds_toro(ual, uar, eq)
+    RealT = typeof(eq.γ)
+    half = RealT(0.5)
     γ = eq.γ
     ρl, ul, pl = con2prim(eq, ual)
     ρr, ur, pr = con2prim(eq, uar)
     cl, cr = sqrt(γ * pl / ρl), sqrt(γ * pr / ρr) # Sound speed
-    ρa = 0.5 * (ρl + ρr) # Average density
-    ca = 0.5 * (cl + cr)
-    pstar = 0.5 * (pl + pr) - 0.5 * (ur - ul) * ρa * ca
+    ρa = half * (ρl + ρr) # Average density
+    ca = half * (cl + cr)
+    pstar = half * (pl + pr) - half * (ur - ul) * ρa * ca
     # vstar = 0.5*(ur + ul) - 0.5*(pr - pl)/(ρa*ca)
     if pstar < pr
-        qr = 1.0
+        qr = one(RealT)
     else
-        qr = sqrt(1.0 + ((γ + 1.0) / (2.0 * γ)) * (pstar / pr - 1.0))
+        qr = sqrt(one(RealT) +
+                  ((γ + one(RealT)) / (2 * γ)) * (pstar / pr - one(RealT)))
     end
 
     if pstar < pl
-        ql = 1.0
+        ql = one(RealT)
     else
-        ql = sqrt(1.0 + ((γ + 1.0) / (2.0 * γ)) * (pstar / pl - 1.0))
+        ql = sqrt(one(RealT) +
+                  ((γ + one(RealT)) / (2 * γ)) * (pstar / pl - one(RealT)))
     end
 
     sl = ul - cl * ql
@@ -544,7 +565,7 @@ function hll_speeds_toro(ual, uar, eq)
 end
 
 function hll!(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler1D, dir, F)
-    nvar = eq.nvar
+    nvar = nvariables(eq)
     sl, sr = eq.hll_speeds(ual, uar, eq)
     if sl > 0
         for n in 1:nvar
@@ -564,7 +585,7 @@ end
 
 function hllc!(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler1D, dir, F)
     # Compute speeds using ual, uar
-    nvar = eq.nvar
+    nvar = nvariables(eq)
     sl, sr = eq.hll_speeds(ual, uar, eq)
     # Supersonic cases
     if sl > 0.0
@@ -610,13 +631,14 @@ function hllc!(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler1D, dir, F)
 end
 
 function hllc(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler1D, dir)
+    RealT = typeof(eq.γ)
     # Compute speeds using ual, uar
     sl, sr = hll_speeds_toro(ual, uar, eq)
     # Supersonic cases
-    if sl > 0.0
+    if sl > zero(RealT)
         f1, f2, f3 = Fl[1], Fl[2], Fl[3]
         return SVector(f1, f2, f3)
-    elseif sr < 0.0
+    elseif sr < zero(RealT)
         f1, f2, f3 = Fr[1], Fr[2], Fr[3]
         return SVector(f1, f2, f3)
     end
@@ -633,7 +655,7 @@ function hllc(x, ual, uar, Fl, Fr, Ul, Ur, eq::Euler1D, dir)
     us = (ar2 - al2) / (ar1 - al1)
     ps = (ar2 * al1 - al2 * ar1) / (ar1 - al1)
     # Compute flux
-    if us > 0.0
+    if us > zero(RealT)
         dsl = sl - us
         rsl = al1 / dsl
         Esl = (ps * us + al3) / dsl
@@ -965,7 +987,7 @@ function Tenkai.initialize_plot(eq::Euler1D, op, grid, problem, scheme, timer, u
     xu = LinRange(0.0, 1.0, nu)
     Vu = Vandermonde_lag(xg, xu)
     xf = grid.xf
-    nvar = eq.nvar
+    nvar = nvariables(eq)
     # Create plot objects to be later collected as subplots
 
     # Creating a subplot for title
@@ -1041,7 +1063,7 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::Euler1D, grid
     nu = max(nd, 2)
     xu = LinRange(0.0, 1.0, nu)
     Vu = Vandermonde_lag(xg, xu)
-    nvar = eq.nvar
+    nvar = nvariables(eq)
     @unpack save_time_interval, save_iter_interval, animate = param
     avg_file = open("$avg_filename.txt", "w")
     plot_type = Float64
@@ -1051,7 +1073,7 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::Euler1D, grid
         @views con2prim!(eq, ua[:, i], up_) # store primitve form in up_
         @printf(avg_file, "%e %e %e %e\n", xc[i], up_[1], up_[2], up_[3])
         # TOTHINK - Check efficiency of printf
-        for n in 1:(eq.nvar)
+        for n in 1:(nvariables(eq))
             p_ua[n + 1][1][:y][i] = @views up_[n]    # Update y-series
             ylims[n][1] = min(ylims[n][1], up_[n]) # Compute ymin
             ylims[n][2] = max(ylims[n][2], up_[n]) # Compute ymax
@@ -1181,11 +1203,12 @@ function Tenkai.post_process_soln(eq::Euler1D, aux, problem, param, scheme)
     @timeit timer "Write solution" begin
     #! format: noindent
     println("Post processing solution")
-    nvar = eq.nvar
+    nvar = nvariables(eq)
     @unpack plot_data = aux
     @unpack p_ua, p_u1, anim_ua, anim_u1 = plot_data
     @unpack animate, saveto = param
-    initial_values = eq.initial_values
+    # `initial_values` here is the module-level Dict defined above (this
+    # struct no longer carries its own copy; see the note on `Euler1D`).
     if problem.initial_value in values(initial_values) # Using ready made tests
         initial_value_string, = [a
                                  for (a, b) in initial_values
@@ -1249,19 +1272,13 @@ function Tenkai.post_process_soln(eq::Euler1D, aux, problem, param, scheme)
 end
 
 function get_equation(γ; hll_wave_speeds = "toro")
-    name = "1d Euler Equations"
-    numfluxes = Dict("rusanov" => rusanov, "roe" => roe, "eroe" => eroe,
-                     "hll" => hll!, "hllc" => hllc!, "chandrashekar" => chandrashekar!)
-    nvar = 3
     if hll_wave_speeds == "toro"
         hll_speeds = hll_speeds_toro
     else
         println("Wave speed not implemented!")
         @assert false
     end
-    return Euler1D(γ,
-                   hll_speeds, nvar,
-                   name, initial_values, numfluxes)
+    return Euler1D(γ, hll_speeds)
 end
 end # @muladd
 
