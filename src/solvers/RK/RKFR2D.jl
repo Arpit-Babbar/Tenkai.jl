@@ -30,14 +30,17 @@ using ..Equations: AbstractEquations, nvariables, eachvariable
 #! format: noindent
 
 #------------------------------------------------------------------------------
-function setup_arrays_rkfr(grid, scheme, eq::AbstractEquations{2})
+# See the 1D method (RKFR1D.jl) for the `backend` keyword's role.
+function setup_arrays_rkfr(grid, scheme, eq::AbstractEquations{2};
+                           backend = KernelAbstractions.CPU())
     RealT = eltype(grid.xc)
     function gArray(nvar, nx, ny)
-        OffsetArray(zeros(RealT, nvar, nx + 2, ny + 2),
+        OffsetArray(KernelAbstractions.zeros(backend, RealT, nvar, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 0, 0))
     end
     function gArray(nvar, n1, n2, nx, ny)
-        OffsetArray(zeros(RealT, nvar, n1, n2, nx + 2, ny + 2),
+        OffsetArray(KernelAbstractions.zeros(backend, RealT, nvar, n1, n2, nx + 2,
+                                             ny + 2),
                     OffsetArrays.Origin(1, 1, 1, 0, 0))
     end
     # Allocate memory
@@ -52,7 +55,7 @@ function setup_arrays_rkfr(grid, scheme, eq::AbstractEquations{2})
     Fb = gArray(nvar, nd, 4, nx, ny)
     ub = gArray(nvar, nd, 4, nx, ny) # u restricted to boundary
 
-    cache = (; u0, u1, ua, res, Fb, ub)
+    cache = (; u0, u1, ua, res, Fb, ub, backend)
     return cache
 end
 

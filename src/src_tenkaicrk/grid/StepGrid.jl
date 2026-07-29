@@ -211,7 +211,8 @@ function isnearcorners(el_x, el_y, grid::StepGrid)
     end
 end
 
-function setup_arrays(grid::StepGrid, scheme::Scheme{<:cRKSolver}, eq::AbstractEquations{2})
+function setup_arrays(grid::StepGrid, scheme::Scheme{<:cRKSolver}, eq::AbstractEquations{2};
+                      kwargs...)
     gArray(nvar, nx, ny) = OffsetArray(zeros(nvar, nx + 2, ny + 2),
                                        OffsetArrays.Origin(1, 0, 0))
     gArray(nvar, n1, n2, nx, ny) = OffsetArray(zeros(nvar, n1, n2, nx + 2, ny + 2),

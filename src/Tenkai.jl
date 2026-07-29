@@ -34,6 +34,8 @@ export nvariables, eachvariable, AbstractEquations
 
 using .Basis: Vandermonde_lag
 
+include("$src_dir/gpu/GPUCommon.jl")
+
 include("$fr_dir/FR.jl")
 
 (export

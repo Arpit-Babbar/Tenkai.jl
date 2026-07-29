@@ -720,16 +720,26 @@ function admissibility_tolerance(eq::AbstractEquations)
     return 0.0
 end
 
+# Used only for the "Solving <name> using <solver>" log line. Falls back to
+# the type name so equation structs don't need to carry a `name` field
+# purely for this (see the note on `Euler1D` in EqEuler1D.jl for why that
+# matters for GPU kernels); override for a specific type if a prettier name
+# is wanted.
+equation_name(eq::AbstractEquations) = string(nameof(typeof(eq)))
+
 #-------------------------------------------------------------------------------
 # Set up arrays
 #------------------------------------------------------------------------------
-function setup_arrays(grid, scheme, equation)
+function setup_arrays(grid, scheme, equation; backend = KernelAbstractions.CPU())
     @unpack solver = scheme
     if solver == "lwfr"
+        # TODO: thread `backend` through once the LW tree is GPU-ported (see
+        # docs/GPU.md roadmap); for now it always allocates plain CPU arrays.
         return setup_arrays_lwfr(grid, scheme, equation)
     elseif solver == "rkfr" || solver isa AbstractRKSolver
-        return setup_arrays_rkfr(grid, scheme, equation)
+        return setup_arrays_rkfr(grid, scheme, equation; backend)
     elseif solver == "mdrk"
+        # TODO: thread `backend` through once the MDRK tree is GPU-ported.
         return setup_arrays_mdrk(grid, scheme, equation)
     else
         @assert false "Incorrect solver"
@@ -1119,13 +1129,19 @@ tenkai2trixiode(solver, equation, problem, scheme, param) = ()
 # simulation at the time of the crash.
 #-------------------------------------------------------------------------------
 function solve(equation, problem, scheme, param;
+               # KernelAbstractions.jl backend on which solution arrays live and
+               # GPU-ported kernels execute; defaults to plain CPU arrays/loops so
+               # every existing use of `solve` is unaffected. Pass e.g.
+               # `backend = Tenkai.gpu_backend(:metal)` (after `using Metal`) to
+               # opt into GPU acceleration for whichever solver/kernels support it.
+               backend = KernelAbstractions.CPU(),
                # 1D/2D Cartesian grid
                grid = make_cartesian_grid(problem, param.grid_size),
                # fr operators like differentiation matrix, correction functions
                op = fr_operators(scheme.degree, scheme.solution_points,
                                  scheme.correction_function),
                # cache for storing solution and other arrays
-               cache = (; setup_arrays(grid, scheme, equation)...,
+               cache = (; setup_arrays(grid, scheme, equation; backend)...,
                         trixi_ode = tenkai2trixiode(scheme.solver, equation, problem,
                                                     scheme, param)),
                # auxiliary objects like plot data, blending limiter, etc.

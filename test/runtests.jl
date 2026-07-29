@@ -56,3 +56,9 @@ end
 if TENKAI_TEST == "crk_imex_paper" || TENKAI_TEST == "all"
     include("test_crk_imex_paper.jl")
 end
+
+# GPU tests are opt-in (not part of "all") since they require a functional
+# Metal-capable device; see docs/GPU.md.
+if TENKAI_TEST == "gpu"
+    include("gpu/runtests.jl")
+end

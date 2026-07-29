@@ -5,7 +5,7 @@ import Tenkai: compute_face_residual!, compute_cell_residual_cRK!, get_blended_f
 using Tenkai: cRKSolver, True, False, sum_node_vars_1d
 
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
-                      eq::AbstractNonConservativeEquations{1})
+                      eq::AbstractNonConservativeEquations{1}; kwargs...)
     gArray(nvar, nx) = OffsetArray(zeros(nvar, nx + 2),
                                    OffsetArrays.Origin(1, 0))
     function gArray(nvar, n1, nx)

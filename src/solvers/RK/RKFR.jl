@@ -367,7 +367,7 @@ end
 
 #------------------------------------------------------------------------------
 function solve_rkfr(eq, problem, scheme, param, grid, op, aux, cache)
-    println("Solving ", eq.name, " using RKFR")
+    println("Solving ", equation_name(eq), " using RKFR")
 
     @unpack cfl, grid_size, compute_error_interval = param
     @unpack solution_points, degree, correction_function = scheme

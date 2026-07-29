@@ -9,7 +9,8 @@ import ..Tenkai: setup_arrays_rkfr,
 @muladd begin
 #! format: noindent
 
-function setup_arrays_rkfr(grid, scheme, eq::AbstractNonConservativeEquations{1})
+function setup_arrays_rkfr(grid, scheme, eq::AbstractNonConservativeEquations{1};
+                           kwargs...)
     function gArray(nvar, nx)
         OffsetArray(zeros(Float64, nvar, nx + 2),
                     OffsetArrays.Origin(1, 0))

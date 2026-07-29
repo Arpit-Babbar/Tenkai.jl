@@ -28,14 +28,22 @@ using ..Tenkai: update_ghost_values_periodic!
 #! format: noindent
 
 #------------------------------------------------------------------------------
-function setup_arrays_rkfr(grid, scheme, eq::AbstractEquations{1})
+# `backend` is a KernelAbstractions.jl backend (default `CPU()`). Passing a
+# GPU backend (e.g. `Tenkai.gpu_backend(:metal)`) allocates every solution
+# array directly on-device via `KernelAbstractions.zeros`, so downstream
+# kernels can dispatch on the array's backend (`KernelAbstractions.get_backend`)
+# with no further plumbing. `OffsetArray` wraps the device array unchanged --
+# indexing offsets are resolved on the host side of dispatch, not in kernel
+# bodies.
+function setup_arrays_rkfr(grid, scheme, eq::AbstractEquations{1};
+                           backend = KernelAbstractions.CPU())
     RealT = eltype(grid.xc)
     function gArray(nvar, nx)
-        OffsetArray(zeros(RealT, nvar, nx + 2),
+        OffsetArray(KernelAbstractions.zeros(backend, RealT, nvar, nx + 2),
                     OffsetArrays.Origin(1, 0))
     end
     function gArray(nvar, n1, nx)
-        OffsetArray(zeros(RealT, nvar, n1, nx + 2),
+        OffsetArray(KernelAbstractions.zeros(backend, RealT, nvar, n1, nx + 2),
                     OffsetArrays.Origin(1, 1, 0))
     end
     # Allocate memory
@@ -50,7 +58,7 @@ function setup_arrays_rkfr(grid, scheme, eq::AbstractEquations{1})
     Fb = gArray(nvar, 2, nx)
     ub = gArray(nvar, 2, nx)
 
-    cache = (; u0, u1, ua, res, Fb, ub)
+    cache = (; u0, u1, ua, res, Fb, ub, backend)
     return cache
 end
 

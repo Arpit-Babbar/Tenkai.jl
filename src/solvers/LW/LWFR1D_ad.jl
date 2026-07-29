@@ -1,7 +1,8 @@
 @muladd begin
 #! format: noindent
 
-function setup_arrays(grid, scheme::Scheme{<:LWEnzymeTower}, eq::AbstractEquations{1})
+function setup_arrays(grid, scheme::Scheme{<:LWEnzymeTower}, eq::AbstractEquations{1};
+                      kwargs...)
     gArray(nvar, nx) = OffsetArray(zeros(RealT, nvar, nx + 2),
                                    OffsetArrays.Origin(1, 0))
     function gArray(nvar, n1, nx)

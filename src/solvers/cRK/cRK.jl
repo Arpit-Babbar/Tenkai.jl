@@ -88,7 +88,7 @@ end
 # N = degree of solution space
 #-------------------------------------------------------------------------------
 function solve_ssfr(eq, problem, scheme::Scheme{<:cRKSolver}, param, grid, op, aux, cache)
-    println("Solving ", eq.name, " using a cRK scheme")
+    println("Solving ", equation_name(eq), " using a cRK scheme")
 
     @unpack final_time = problem
     @unpack grid_size, cfl, compute_error_interval = param

@@ -192,7 +192,7 @@ end
 # N = degree of solution space
 #-------------------------------------------------------------------------------
 function solve_ssfr(eq, problem, scheme, param, grid, op, aux, cache)
-    println("Solving ", eq.name, " using LWFR")
+    println("Solving ", equation_name(eq), " using LWFR")
 
     @unpack final_time = problem
     @unpack grid_size, cfl, compute_error_interval = param

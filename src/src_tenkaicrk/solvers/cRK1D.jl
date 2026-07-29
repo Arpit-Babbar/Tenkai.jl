@@ -25,7 +25,7 @@ using Tenkai.Equations: nvariables, eachvariable
 using Tenkai: refresh!
 
 function setup_arrays(grid, scheme::Scheme{<:cSSP2IMEX433},
-                      eq::AbstractEquations{1})
+                      eq::AbstractEquations{1}; kwargs...)
     gArray(nvar, nx) = OffsetArray(zeros(nvar, nx + 2),
                                    OffsetArrays.Origin(1, 0))
     function gArray(nvar, n1, nx)

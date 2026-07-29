@@ -160,7 +160,7 @@ function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44},
 end
 
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
-                      eq::AbstractEquations{1})
+                      eq::AbstractEquations{1}; kwargs...)
     RealT = eltype(grid.xc)
     gArray(nvar, nx) = OffsetArray(zeros(RealT, nvar, nx + 2),
                                    OffsetArrays.Origin(1, 0))
@@ -212,7 +212,7 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
 end
 
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver, <:DCSX},
-                      eq::AbstractEquations{1})
+                      eq::AbstractEquations{1}; kwargs...)
     RealT = eltype(grid.xc)
     gArray(nvar, nx) = OffsetArray(zeros(RealT, nvar, nx + 2),
                                    OffsetArrays.Origin(1, 0))

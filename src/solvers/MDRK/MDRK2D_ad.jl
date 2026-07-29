@@ -24,7 +24,7 @@ import Tenkai: compute_cell_residual_mdrk_1!, compute_cell_residual_mdrk_2!,
 #! format: noindent
 
 function setup_arrays(grid, scheme::Scheme{<:MDRKEnzymeTower},
-                      eq::AbstractEquations{2})
+                      eq::AbstractEquations{2}; kwargs...)
     function gArray(nvar, nx, ny)
         OffsetArray(zeros(RealT, nvar, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 0, 0))

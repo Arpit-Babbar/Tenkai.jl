@@ -204,7 +204,8 @@ function construct_taylor_arrays(ArrayType, degree::Val{N}) where {N}
     return cache
 end
 
-function setup_arrays(grid, scheme::Scheme{<:LWTDEltWise}, eq::AbstractEquations{2})
+function setup_arrays(grid, scheme::Scheme{<:LWTDEltWise}, eq::AbstractEquations{2};
+                      kwargs...)
     function gArray(nvar, nx, ny)
         OffsetArray(zeros(nvar, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 0, 0))
