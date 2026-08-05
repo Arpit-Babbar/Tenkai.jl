@@ -862,6 +862,15 @@ function source_term_explicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_
     end
 end
 
+@inline update_implicit_stages!(::Tuple{}, ::Tuple{}, s_node, dt, eq, i, j) = nothing
+@inline function update_implicit_stages!(u_tuples_out, A_rk_tuple, s_node, dt, eq, i, j)
+    multiply_add_to_node_vars!(first(u_tuples_out), first(A_rk_tuple) * dt, s_node, eq, i,
+                               j)
+    update_implicit_stages!(Base.tail(u_tuples_out), Base.tail(A_rk_tuple), s_node, dt, eq,
+                            i, j)
+    return nothing
+end
+
 function source_term_implicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_rk_coeff,
                                u_in, op, local_grid, problem, scheme, implicit_solver,
                                source_terms, aux, eq::AbstractEquations{2})
@@ -881,10 +890,7 @@ function source_term_implicit!(u_tuples_out, F_G_U_S, A_rk_tuple, b_rk_coeff, c_
                                                         A_rk_tuple[1] * dt,
                                                         source_terms,
                                                         aux_node, implicit_solver)
-        for i_u in eachindex(u_tuples_out)
-            multiply_add_to_node_vars!(u_tuples_out[i_u], A_rk_tuple[i_u] * dt, s_node, eq,
-                                       i, j)
-        end
+        update_implicit_stages!(u_tuples_out, A_rk_tuple, s_node, dt, eq, i, j)
         multiply_add_to_node_vars!(S, b_rk_coeff, s_node, eq, i, j)
     end
 end
@@ -2040,7 +2046,7 @@ function compute_cell_residual_cRK!(eq::AbstractNonConservativeEquations, grid, 
                   local_grid, eq)
         noncons_flux_der!(volume_integral, (u4,), r1, (tA_rk[4][3],), tb_rk[3], u3, op,
                           local_grid, eq)
-        source_term_implicit!((u4,), F_G_U_S, (A_rk[4][4]), b_rk[4],
+        source_term_implicit!((u4,), F_G_U_S, (A_rk[4][4],), b_rk[4],
                               c_rk[4], u3, op,
                               local_grid,
                               problem, scheme, implicit_solver, source_terms, aux, eq)

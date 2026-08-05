@@ -346,7 +346,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
         flux_der!(volume_integral, r1, (u4,), F_G_U_S, (tA_rk[4][3],), tb_rk[3], u3,
                   op,
                   local_grid, eq)
-        source_term_implicit!((u4,), F_G_U_S, (A_rk[4][4]), b_rk[4],
+        source_term_implicit!((u4,), F_G_U_S, (A_rk[4][4],), b_rk[4],
                               c_rk[4], u3, op,
                               local_grid,
                               problem, scheme, implicit_solver, source_terms, aux,

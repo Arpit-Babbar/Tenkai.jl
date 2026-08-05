@@ -63,16 +63,13 @@ struct JinXin2D{NDIMS, NVAR, THREE_NVAR, Equations <: AbstractEquations{NDIMS, N
     indicator_model::String
 end
 
-function v_var(u, index, eq::JinXin2D)
-    nvar = nvariables(eq.equations)
-    v = SVector((u[i + index * nvar] for i in (1):nvar)...)
-    return v
+function v_var(u, index, eq::JinXin2D{NDIMS, NVAR}) where {NDIMS, NVAR}
+    offset = index * NVAR
+    return SVector(ntuple(i -> u[i + offset], Val(NVAR)))
 end
 
-function u_var(u, eq::JinXin2D)
-    nvar = nvariables(eq.equations)
-    u_ = SVector((u[i] for i in 1:nvar)...)
-    return u_
+function u_var(u, eq::JinXin2D{NDIMS, NVAR}) where {NDIMS, NVAR}
+    return SVector(ntuple(i -> u[i], Val(NVAR)))
 end
 
 function get_density(eq_jin_xin::JinXin2D, u)
@@ -87,10 +84,11 @@ function flux(x, y, u, eq::JinXin2D, orientation)
     adv = eq.advection_evolution[orientation]
     u_var_ = u_var(u, eq)
     v_var_ = v_var(u, orientation, eq)
+    zero_u = zero(u_var_)
     if orientation == 1
-        return SVector(v_var_..., adv^2 * u_var_..., zero(u_var_)...)
+        return vcat(v_var_, adv^2 * u_var_, zero_u)
     else # orientation == 2
-        return SVector(v_var_..., zero(u_var_)..., adv^2 * u_var_...)
+        return vcat(v_var_, zero_u, adv^2 * u_var_)
     end
 end
 
@@ -107,7 +105,7 @@ function jin_xin_source(u, epsilon, x, t, eq::JinXin2D)
     source_1 = zero(u_var_)
     source_2 = -(v1_var - flux(x[1], x[2], u_var_, equations, 1)) / epsilon
     source_3 = -(v2_var - flux(x[1], x[2], u_var_, equations, 2)) / epsilon
-    return SVector(source_1..., source_2..., source_3...)
+    return vcat(source_1, source_2, source_3)
 end
 
 function get_cache_node_vars(aux, u1, problem, scheme, eq::JinXin2D,
@@ -131,7 +129,8 @@ end
 # equation is lhs + coefficient * s(u^{n+1}) = u^{n+1}
 function implicit_source_solve(lhs, eq_jin_xin::JinXin2D, x, t, coefficient,
                                source_terms::typeof(jin_xin_source),
-                               aux_node, implicit_solver = nothing)
+                               aux_node,
+                               implicit_solver::ImplicitSolver = nothing) where {ImplicitSolver}
     (u_node, epsilon_node) = aux_node
     equations = eq_jin_xin.equations
     u_var_new = u_var(lhs, eq_jin_xin) # Since there is no source term for this part
@@ -140,7 +139,7 @@ function implicit_source_solve(lhs, eq_jin_xin::JinXin2D, x, t, coefficient,
     epsilon = epsilon_node
     v1_var_new = (epsilon * v1_lhs + coefficient * f_new) / (epsilon + coefficient)
     v2_var_new = (epsilon * v2_lhs + coefficient * g_new) / (epsilon + coefficient)
-    sol_new = SVector(u_var_new..., v1_var_new..., v2_var_new...)
+    sol_new = vcat(u_var_new, v1_var_new, v2_var_new)
     source = jin_xin_source(sol_new, epsilon_node, x, t, eq_jin_xin)
     return sol_new, source
 end
@@ -442,8 +441,8 @@ function compute_time_step(eq_jin_xin::JinXin2D, problem, grid, aux, op, cfl,
     end
 
     dt = cfl * jin_xin_dt_scaling^2 / den
-    eq_jin_xin.advection_evolution[1] = jin_xin_adv1^2 / jin_xin_dt_scaling
-    eq_jin_xin.advection_evolution[2] = jin_xin_adv2^2 / jin_xin_dt_scaling
+    eq_jin_xin.advection_evolution[1] = jin_xin_adv1 / jin_xin_dt_scaling
+    eq_jin_xin.advection_evolution[2] = jin_xin_adv2 / jin_xin_dt_scaling
     return dt, eq_jin_xin
     end # timer
 end
