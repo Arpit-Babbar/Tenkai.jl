@@ -1412,43 +1412,43 @@ function debug_blend_limiter!(eq::AbstractEquations{1}, grid, problem, scheme,
     nx = grid.size
     nd = op.degree + 1
     @unpack p_ua, p_u1 = plot_data
-    for n in 0:(nvar - 1)
-        # Loop is needed as a temporary hack to fix plotly bug with offset arrays
-        for i in 1:nx
-            p_ua[end - n][end][:y][i] = alpha[i]
-            p_u1[end - n][i][:y] .= alpha[i] # exact.(p[1][2][:x])
-        end
-    end
-    if nvar == 1
-        ua_min, ua_max = minimum(ua), maximum(ua)
-        d_ua = ua_max - ua_min
-        for i in 1:nx
-            p_ua[1][end][:y][i] = ua_min + (alpha[i]) * d_ua
-            p_u1[1][i][:y] .= ua_min + (alpha[i]) * d_ua
-        end
-    end
-    if nvariables(eq) > 1 # KLUDGE - Create a p
-        ua_min = fill(1e20, nvar)
-        ua_max = fill(-1e20, nvar)
-        for i in 1:nx
-            @views up = con2prim(eq, ua[:, i])
-            for n in 1:nvar
-                ua_min[n] = min(ua_min[n], up[n])
-                ua_max[n] = max(ua_max[n], up[n])
-            end
-        end
-        for n in 1:nvar
-            if nd == 2
-                d_ua = ua_max[n] - ua_min[n]
-            else
-                d_ua = ua_max[n] - ua_min[n]
-            end
-            for i in 1:nx
-                p_ua[n + 1][end][:y][i] = ua_min[n] + (alpha[i]) * d_ua
-                p_u1[n + 1][i][:y] .= ua_min[n] + (alpha[i]) * d_ua
-            end
-        end
-    end
+    # for n in 0:(nvar - 1)
+    #     # Loop is needed as a temporary hack to fix plotly bug with offset arrays
+    #     for i in 1:nx
+    #         p_ua[end - n][end][:y][i] = alpha[i]
+    #         p_u1[end - n][i][:y] .= alpha[i] # exact.(p[1][2][:x])
+    #     end
+    # end
+    # if nvar == 1
+    #     ua_min, ua_max = minimum(ua), maximum(ua)
+    #     d_ua = ua_max - ua_min
+    #     for i in 1:nx
+    #         p_ua[1][end][:y][i] = ua_min + (alpha[i]) * d_ua
+    #         p_u1[1][i][:y] .= ua_min + (alpha[i]) * d_ua
+    #     end
+    # end
+    # if nvariables(eq) > 1 # KLUDGE - Create a p
+    #     ua_min = fill(1e20, nvar)
+    #     ua_max = fill(-1e20, nvar)
+    #     for i in 1:nx
+    #         @views up = con2prim(eq, ua[:, i])
+    #         for n in 1:nvar
+    #             ua_min[n] = min(ua_min[n], up[n])
+    #             ua_max[n] = max(ua_max[n], up[n])
+    #         end
+    #     end
+    #     for n in 1:nvar
+    #         if nd == 2
+    #             d_ua = ua_max[n] - ua_min[n]
+    #         else
+    #             d_ua = ua_max[n] - ua_min[n]
+    #         end
+    #         for i in 1:nx
+    #             p_ua[n + 1][end][:y][i] = ua_min[n] + (alpha[i]) * d_ua
+    #             p_u1[n + 1][i][:y] .= ua_min[n] + (alpha[i]) * d_ua
+    #         end
+    #     end
+    # end
 
     # Save energy and alpha data to output
     if save_solution(problem, param, t, iter) == true || t < 1e-12 ||
