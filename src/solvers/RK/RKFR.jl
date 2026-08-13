@@ -67,7 +67,7 @@ function compute_residual_rkfr!(du, u, p, t)
     iter, fcount = 0, 0 # Dummy fillers, RK doesn't support alpha output
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, t, dt,
                            iter, fcount, cache, u, Fb, ub, ua, res)
-    @turbo du .= res
+    turbo_copy!(du, res)
     return nothing
 end
 

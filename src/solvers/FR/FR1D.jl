@@ -1727,7 +1727,7 @@ end
 
     # Get solution points
     xe[0] = xf - dx * (1.0 - xg[nd])     # Last solution point of left cell
-    @turbo xe[1:nd] .= xf .+ dx * xg        # Solution points on cell
+    turbo_copy!(@view(xe[1:nd]), xf .+ dx * xg)  # Solution points on cell
     xe[nd + 1] = xf + dx * (1.0 + xg[1]) # First solution point on right cell
 
     # Force cell-centred approach
@@ -1742,9 +1742,9 @@ end
     ue = blend.ue          # u extended to faces
     unph = blend.unph      # u at time n+1/2
     @views begin
-        @turbo ue[:, 1:nd] .= u1[:, :, cell]    # values from current cell
-        @turbo ue[:, 0] .= u1[:, nd, cell - 1]    # value from left neighbour cells
-        @turbo ue[:, nd + 1] .= u1[:, 1, cell + 1]  # value from right neighbour cells
+        turbo_copy!(ue[:, 1:nd], u1[:, :, cell])  # values from current cell
+        turbo_copy!(ue[:, 0], u1[:, nd, cell - 1])  # value from left neighbour cells
+        turbo_copy!(ue[:, nd + 1], u1[:, 1, cell + 1])  # value from right neighbour cells
     end
 
     # @views ue[:,0] = u1[:,:,i] * Vl    # value from left neighbour cells
@@ -2410,30 +2410,37 @@ function compute_error(problem, grid, eq::AbstractEquations{1}, aux, op, u1, t)
 
     @unpack exact_solution = problem
 
+    # The error norm is evaluated in at least `Float64`: a `Float32` run should
+    # still have its error measured accurately, while a higher precision run
+    # needs the norm in its own arithmetic or the measurement floors at
+    # `eps(Float64)` long before the scheme does.
+    error_type = promote_type(eltype(u1), Float64)
+
     nq = nd + 10    # number of quadrature points in each direction
-    xq, wq = weights_and_points(nq, "gl")
+    xq, wq = weights_and_points(nq, "gl", error_type)
 
     V = Vandermonde_lag(xg, xq) # matrix evaluating at `xq`
     # using values at solution points `xg`
     nx = grid.size
     xc = grid.xc
     dx = grid.dx
-    error_type = Float64
     l1_error, l2_error, linf_error, energy = (zero(error_type) for _ in 1:4)
     for i in 1:nx
         un, ue = zeros(error_type, nq), zeros(error_type, nq) # exact solution
-        x = xc[i] - 0.5 * dx[i] .+ dx[i] * xq
+        x = xc[i] - 0.5f0 * dx[i] .+ dx[i] * xq
         for i in 1:nq
             ue[i] = exact_solution(x[i], t)[1] # Error only for first variable
         end
         @views mul!(un, V, u1[1, :, i])
         du = abs.(un - ue)
         linf = maximum(du)
-        l1 = dx[i] * BLAS.dot(nq, du, 1, wq, 1)
+        # `BLAS.dot` is not used here because it only supports `Float32` and
+        # `Float64`; `dot` works for any arithmetic.
+        l1 = dx[i] * dot(du, wq)
         @. du = du * du
-        l2 = dx[i] * BLAS.dot(nq, du, 1, wq, 1)
+        l2 = dx[i] * dot(du, wq)
         @. du = un * un
-        e = dx[i] * BLAS.dot(nq, du, 1, wq, 1)
+        e = dx[i] * dot(du, wq)
         l1_error += l1
         l2_error += l2
         linf_error = max(linf, linf_error)
@@ -2443,7 +2450,10 @@ function compute_error(problem, grid, eq::AbstractEquations{1}, aux, op, u1, t)
     l1_error = l1_error / domain_size
     l2_error = sqrt(l2_error / domain_size)
     energy = energy / domain_size
-    @printf(error_file, "%.16e %.16e %.16e %.16e\n", t, l1_error, l2_error, energy)
+    # `@printf` only knows the standard floating point types, so the errors are
+    # written out as `Float64`. The returned values keep their full precision.
+    @printf(error_file, "%.16e %.16e %.16e %.16e\n", Float64(t), Float64(l1_error),
+            Float64(l2_error), Float64(energy))
     RealT = typeof(l1_error)
     return Dict{String, RealT}("l1_error" => l1_error, "l2_error" => l2_error,
                                "linf_error" => linf_error, "energy" => energy)

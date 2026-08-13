@@ -24,15 +24,16 @@ function get_cfl(eq::AbstractEquations{2}, scheme::Scheme{<:cRKSolver}, param)
     end
 end
 
-# TODO - Add RealT here!
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
                       eq::AbstractEquations{2})
+    # The arithmetic of the simulation, taken from the grid
+    RealT = eltype(grid.xc)
     function gArray(nvar, nx, ny)
-        OffsetArray(zeros(nvar, nx + 2, ny + 2),
+        OffsetArray(zeros(RealT, nvar, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 0, 0))
     end
     function gArray(nvar, n1, n2, nx, ny)
-        OffsetArray(zeros(nvar, n1, n2, nx + 2, ny + 2),
+        OffsetArray(zeros(RealT, nvar, n1, n2, nx + 2, ny + 2),
                     OffsetArrays.Origin(1, 1, 1, 0, 0))
     end
 
@@ -46,7 +47,7 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
     u1 = gArray(nvar, nd, nd, nx, ny)
     ua = gArray(nvar, nx, ny)
     res = gArray(nvar, nd, nd, nx, ny)
-    Bb = OffsetArray(zeros(nvar, nc_var, nd, 4, nx + 2, ny + 2),
+    Bb = OffsetArray(zeros(RealT, nvar, nc_var, nd, 4, nx + 2, ny + 2),
                      OffsetArrays.Origin(1, 1, 1, 1, 0, 0))
     Fb = gArray(nvar, nd, 4, nx, ny)
     # TODO - Can Fnum be equal to Fb?
@@ -87,20 +88,20 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
         SVector{nt}([alloc(constructor, cache_size) for _ in Base.OneTo(nt)])
     end
 
-    MArr = MArray{Tuple{nvariables(eq), nd, nd}, Float64}
+    MArr = MArray{Tuple{nvariables(eq), nd, nd}, RealT}
     cell_arrays = alloc_for_threads(MArr, cell_array_size)
 
-    MEval = MArray{Tuple{nvariables(eq), nd}, Float64}
+    MEval = MArray{Tuple{nvariables(eq), nd}, RealT}
     eval_data_big = alloc_for_threads(MEval, big_eval_data_size)
 
-    MEval_small = MArray{Tuple{nvariables(eq), 1}, Float64}
+    MEval_small = MArray{Tuple{nvariables(eq), 1}, RealT}
     eval_data_small = alloc_for_threads(MEval_small, small_eval_data_size)
 
     eval_data = (; eval_data_big, eval_data_small)
 
     # Ghost values cache
 
-    Marr = MArray{Tuple{nvariables(eq), 1}, Float64}
+    Marr = MArray{Tuple{nvariables(eq), 1}, RealT}
 
     ghost_cache = alloc_for_threads(Marr, 2)
 
@@ -270,6 +271,7 @@ end
 
 function eval_bflux!(eq::AbstractEquations{2}, scheme::Scheme{<:cRK44}, grid,
                      cell_data, eval_data, xg, Vl, Vr, F, G, Fb, aux)
+    RealT = eltype(xg)
     nvar = nvariables(eq)
     nd = length(xg)
     refresh!(u) = fill!(u, zero(eltype(u)))
@@ -360,17 +362,25 @@ function eval_bflux!(eq::AbstractEquations{2}, scheme::Scheme{<:cRK44}, grid,
 
         # KLUDGE - Indices order needs to be changed, or something else
         # needs to be done to avoid cache misses
-        multiply_add_to_node_vars!(Fb, 1.0 / 6.0, fl, 1.0 / 3.0, f2l, eq, i, 1)
-        multiply_add_to_node_vars!(Fb, 1.0 / 3.0, f3l, 1.0 / 6.0, f4l, eq, i, 1)
+        multiply_add_to_node_vars!(Fb, (one(RealT) / 6), fl, (one(RealT) / 3), f2l, eq,
+                                   i, 1)
+        multiply_add_to_node_vars!(Fb, (one(RealT) / 3), f3l, (one(RealT) / 6), f4l, eq,
+                                   i, 1)
 
-        multiply_add_to_node_vars!(Fb, 1.0 / 6.0, fr, 1.0 / 3.0, f2r, eq, i, 2)
-        multiply_add_to_node_vars!(Fb, 1.0 / 3.0, f3r, 1.0 / 6.0, f4r, eq, i, 2)
+        multiply_add_to_node_vars!(Fb, (one(RealT) / 6), fr, (one(RealT) / 3), f2r, eq,
+                                   i, 2)
+        multiply_add_to_node_vars!(Fb, (one(RealT) / 3), f3r, (one(RealT) / 6), f4r, eq,
+                                   i, 2)
 
-        multiply_add_to_node_vars!(Fb, 1.0 / 6.0, gd, 1.0 / 3.0, g2d, eq, i, 3)
-        multiply_add_to_node_vars!(Fb, 1.0 / 3.0, g3d, 1.0 / 6.0, g4d, eq, i, 3)
+        multiply_add_to_node_vars!(Fb, (one(RealT) / 6), gd, (one(RealT) / 3), g2d, eq,
+                                   i, 3)
+        multiply_add_to_node_vars!(Fb, (one(RealT) / 3), g3d, (one(RealT) / 6), g4d, eq,
+                                   i, 3)
 
-        multiply_add_to_node_vars!(Fb, 1.0 / 6.0, gu, 1.0 / 3.0, g2u, eq, i, 4)
-        multiply_add_to_node_vars!(Fb, 1.0 / 3.0, g3u, 1.0 / 6.0, g4u, eq, i, 4)
+        multiply_add_to_node_vars!(Fb, (one(RealT) / 6), gu, (one(RealT) / 3), g2u, eq,
+                                   i, 4)
+        multiply_add_to_node_vars!(Fb, (one(RealT) / 3), g3u, (one(RealT) / 6), g4u, eq,
+                                   i, 4)
     end
 end
 

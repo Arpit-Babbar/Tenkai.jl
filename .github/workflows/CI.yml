@@ -32,6 +32,7 @@ jobs:
         tenkai_test:
             - part_1
             - crk_imex_paper
+            - arbitrary_precision
         include: # TODO - This repetition should be avoidable
             - os: macOS-latest
               arch: aarch64

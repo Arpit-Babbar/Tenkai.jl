@@ -1,7 +1,14 @@
 [deps]
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+DoubleFloats = "497a8b3b-efae-58df-a0af-a86822472b78"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MultiFloats = "bdf0d083-296b-4888-a5b6-7498122e68a5"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TrixiBase = "9a0f1c46-06d5-4909-a5a3-ce25d3fa3284"
+
+[compat]
+DoubleFloats = "1.4"
+MultiFloats = "2, 3"
