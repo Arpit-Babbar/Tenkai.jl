@@ -24,9 +24,14 @@ function Legendre(n, x)
     elseif n == 1
         value = x
     else
-        value = ((2 * n - 1) / n * x * Legendre(n - 1, x)
+        # The recurrence coefficients are formed in the arithmetic of `x`.
+        # Written as `(2 * n - 1) / n`, with `n` an integer, they would be
+        # evaluated in `Float64` and would destroy the extra digits of a wider
+        # number type such as `Float64x2`. For `Float64` this is exactly the
+        # same computation as before.
+        value = (oftype(x, 2 * n - 1) / n * x * Legendre(n - 1, x)
                  -
-                 (n - 1) / n * Legendre(n - 2, x))
+                 oftype(x, n - 1) / n * Legendre(n - 2, x))
     end
 
     return value
@@ -50,18 +55,122 @@ end
 # Normalize Legendre polynomials to unit L2 norm in [0,1]
 #-------------------------------------------------------------------------------
 function nLegendre(n, x)
-    value = sqrt(2 * n + 1) * Legendre(n, x)
+    # `sqrt` is taken in the arithmetic of `x` so that the normalization does
+    # not limit the accuracy to `Float64`.
+    value = sqrt(oftype(x, 2 * n + 1)) * Legendre(n, x)
     return value
+end
+
+#-------------------------------------------------------------------------------
+# Legendre polynomial P_n and its first two derivatives at x, evaluated with a
+# non-recursive three term recurrence in the arithmetic of `x`.
+# Used to compute Gauss quadrature nodes in arbitrary precision.
+#-------------------------------------------------------------------------------
+function legendre_derivatives(n, x::RealT) where {RealT <: Real}
+    if n == 0
+        return one(RealT), zero(RealT), zero(RealT)
+    end
+    p_prev, p = one(RealT), x
+    for k in 2:n
+        p_prev, p = p, ((2 * k - 1) * x * p - (k - 1) * p_prev) / k
+    end
+    # (1 - x^2) P_n' = n * (P_{n-1} - x * P_n)
+    one_minus_x2 = (one(RealT) - x) * (one(RealT) + x)
+    dp = n * (p_prev - x * p) / one_minus_x2
+    # Legendre's differential equation, (1 - x^2) P'' - 2 x P' + n (n+1) P = 0
+    ddp = (2 * x * dp - n * (n + 1) * p) / one_minus_x2
+    return p, dp, ddp
+end
+
+#-------------------------------------------------------------------------------
+# Newton refinement of a quadrature node, starting from a `Float64` guess.
+# Each iteration doubles the number of correct digits, so a handful of steps
+# suffice for any double-double or quad-double type. The iteration is stopped
+# once the correction no longer decreases, which is the best that can be done
+# in the working precision.
+#-------------------------------------------------------------------------------
+function refine_node(f_and_df, x0::RealT) where {RealT <: Real}
+    x = x0
+    # Any upper bound on the first correction works here; the `Float64` initial
+    # guess is already accurate to about 1e-16.
+    dx_prev = one(RealT)
+    for _ in 1:100
+        f, df = f_and_df(x)
+        dx = f / df
+        x -= dx
+        abs_dx = abs(dx)
+        # Stop as soon as we stop making progress; `iszero` catches exact
+        # convergence (e.g. the node x = 0 of odd rules).
+        if iszero(abs_dx) || abs_dx >= dx_prev
+            break
+        end
+        dx_prev = abs_dx
+    end
+    return x
+end
+
+#-------------------------------------------------------------------------------
+# Is `RealT` wider than the `Float64` rules of FastGaussQuadrature? If not, the
+# `Float64` nodes are already correct to the last bit of `RealT` and refining
+# them in the narrower arithmetic could only make them worse.
+#-------------------------------------------------------------------------------
+needs_refinement(RealT::Type{<:Real}) = eps(RealT) < eps(Float64)
+
+#-------------------------------------------------------------------------------
+# Gauss-Legendre nodes and weights on [-1,1] in arbitrary precision.
+# The `Float64` nodes of FastGaussQuadrature are used as initial guesses.
+#-------------------------------------------------------------------------------
+function gauss_legendre_nodes(n, RealT::Type{<:Real})
+    x64, w64 = gausslegendre(n)
+    needs_refinement(RealT) || return Vector{RealT}(x64), Vector{RealT}(w64)
+    x = Vector{RealT}(x64)
+    w = Vector{RealT}(w64)
+    for i in 1:n
+        x[i] = refine_node(x0 -> begin
+                               p, dp, _ = legendre_derivatives(n, x0)
+                               (p, dp)
+                           end, x[i])
+        _, dp, _ = legendre_derivatives(n, x[i])
+        # w_i = 2 / ((1 - x_i^2) * P_n'(x_i)^2)
+        w[i] = 2 / ((one(RealT) - x[i]) * (one(RealT) + x[i]) * dp * dp)
+    end
+    return x, w
+end
+
+#-------------------------------------------------------------------------------
+# Gauss-Lobatto nodes and weights on [-1,1] in arbitrary precision.
+# The interior nodes are the roots of P_{n-1}', the end points are +-1.
+#-------------------------------------------------------------------------------
+function gauss_lobatto_nodes(n, RealT::Type{<:Real})
+    @assert n>=2 "Gauss-Lobatto quadrature needs at least 2 points"
+    x64, w64 = gausslobatto(n)
+    needs_refinement(RealT) || return Vector{RealT}(x64), Vector{RealT}(w64)
+    x = Vector{RealT}(x64)
+    w = Vector{RealT}(w64)
+    m = n - 1
+    x[1], x[n] = -one(RealT), one(RealT)
+    for i in 2:(n - 1)
+        x[i] = refine_node(x0 -> begin
+                               _, dp, ddp = legendre_derivatives(m, x0)
+                               (dp, ddp)
+                           end, x[i])
+    end
+    for i in 1:n
+        p, _, _ = legendre_derivatives(m, x[i])
+        # w_i = 2 / (n * (n-1) * P_{n-1}(x_i)^2)
+        w[i] = 2 / (n * m * p * p)
+    end
+    return x, w
 end
 
 #-------------------------------------------------------------------------------
 # Return n points and weights for the interval [0,1]
 #-------------------------------------------------------------------------------
-function weights_and_points(n, type)
+function weights_and_points(n, type, RealT::Type{<:Real} = Float64)
     if type == "gl"
-        x, w = gausslegendre(n)
+        x, w = gauss_legendre_nodes(n, RealT)
     elseif type == "gll"
-        x, w = gausslobatto(n)
+        x, w = gauss_lobatto_nodes(n, RealT)
     else
         println("Unknown solution points")
         @assert false
@@ -149,7 +258,8 @@ function nodal2modal_krivodonova(xg)
     k = nd - 1  # highest degree Legendre polynomial
 
     nq = k + 1             # quadrature points for projection
-    x, w = gausslegendre(nq) # x,w correspond to [-1,1]
+    # x,w correspond to [-1,1]
+    x, w = gauss_legendre_nodes(nq, eltype(xg))
 
     Vleg = Vandermonde_leg_krivodonova(k, x)
 
@@ -185,7 +295,7 @@ function nodal2modal(xg)
     k = nd - 1  # highest degree Legendre polynomial
 
     nq = k + 1 # quadrature points for projection
-    x, w = weights_and_points(nq, "gl")
+    x, w = weights_and_points(nq, "gl", eltype(xg))
 
     Vleg = Vandermonde_leg(k, x)
     Vlag = Vandermonde_lag(xg, x)
@@ -316,14 +426,15 @@ end
 # sol_pts = gl, gll
 # N       = degree
 #-------------------------------------------------------------------------------
-function fr_operators(N, sol_pts, cor_fun)
+function fr_operators(N, sol_pts, cor_fun, RealT::Type{<:Real} = Float64)
     println("Setting up differentiation operators")
     @printf("   Degree     = %d\n", N)
     @printf("   Sol points = %s\n", sol_pts)
     @printf("   Cor fun    = %s\n", cor_fun)
+    println("   Real type  = $RealT")
 
     nd = N + 1 # number of dofs
-    xg, wg = weights_and_points(nd, sol_pts)
+    xg, wg = weights_and_points(nd, sol_pts, RealT)
 
     # Required to evaluate solution at face
     T = eltype(xg)
@@ -365,7 +476,7 @@ function fr_operators(N, sol_pts, cor_fun)
 
     # Vandermonde matrix to convert to gll points, used by bounds limiter
     if nd > 1
-        xgll, wgll = weights_and_points(nd, "gll")
+        xgll, wgll = weights_and_points(nd, "gll", RealT)
         Vgll = Vandermonde_lag(xg, xgll)
     else # GLL points not defined for nd=1, so we put identity matrix then
         Vgll = Matrix(one(T) * I, nd, nd)

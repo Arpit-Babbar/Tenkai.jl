@@ -56,3 +56,7 @@ end
 if TENKAI_TEST == "crk_imex_paper" || TENKAI_TEST == "all"
     include("test_crk_imex_paper.jl")
 end
+
+if TENKAI_TEST == "arbitrary_precision" || TENKAI_TEST == "all"
+    include("test_arbitrary_precision.jl")
+end

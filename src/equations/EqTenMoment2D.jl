@@ -1576,7 +1576,7 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::TenMoment2D, 
     @unpack xc, yc = grid
     filename = get_filename("output/avg", ndigits, fcount)
     # filename = string("output/", filename)
-    vtk = vtk_grid(filename, xc, yc)
+    vtk = vtk_grid(filename, Tenkai.to_output(xc), Tenkai.to_output(yc))
     xy = [[xc[i], yc[j]] for i in 1:nx, j in 1:ny]
     # KLUDGE - Do it efficiently
     prim = @views copy(ua[:, 1:nx, 1:ny])
@@ -1590,28 +1590,28 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::TenMoment2D, 
     P11_arr = prim[4, 1:nx, 1:ny]
     P12_arr = prim[5, 1:nx, 1:ny]
     P22_arr = prim[6, 1:nx, 1:ny]
-    vtk["sol"] = density_arr
-    vtk["rho"] = density_arr
-    vtk["vx"] = velx_arr
-    vtk["vy"] = vely_arr
-    vtk["P11"] = P11_arr
-    vtk["P12"] = P12_arr
-    vtk["P22"] = P22_arr
+    vtk["sol"] = Tenkai.to_output(density_arr)
+    vtk["rho"] = Tenkai.to_output(density_arr)
+    vtk["vx"] = Tenkai.to_output(velx_arr)
+    vtk["vy"] = Tenkai.to_output(vely_arr)
+    vtk["P11"] = Tenkai.to_output(P11_arr)
+    vtk["P12"] = Tenkai.to_output(P12_arr)
+    vtk["P22"] = Tenkai.to_output(P22_arr)
     for j in 1:ny, i in 1:nx
         prim[:, i, j] .= con2prim(eq, exact_data[i, j])
     end
-    @views vtk["Exact rho"] = prim[1, 1:nx, 1:ny]
-    @views vtk["Exact vx"] = prim[2, 1:nx, 1:ny]
-    @views vtk["Exact vy"] = prim[3, 1:nx, 1:ny]
-    @views vtk["Exact P11"] = prim[4, 1:nx, 1:ny]
-    @views vtk["Exact P12"] = prim[5, 1:nx, 1:ny]
-    @views vtk["Exact P22"] = prim[6, 1:nx, 1:ny]
+    @views vtk["Exact rho"] = Tenkai.to_output(prim[1, 1:nx, 1:ny])
+    @views vtk["Exact vx"] = Tenkai.to_output(prim[2, 1:nx, 1:ny])
+    @views vtk["Exact vy"] = Tenkai.to_output(prim[3, 1:nx, 1:ny])
+    @views vtk["Exact P11"] = Tenkai.to_output(prim[4, 1:nx, 1:ny])
+    @views vtk["Exact P12"] = Tenkai.to_output(prim[5, 1:nx, 1:ny])
+    @views vtk["Exact P22"] = Tenkai.to_output(prim[6, 1:nx, 1:ny])
     # @views vtk["Exact Density"] = exact_data[1:nx,1:ny][1]
     # @views vtk["Exact Velocity_x"] = exact_data[1:nx,1:ny][2]
     # @views vtk["Exact Velocity_y"] = exact_data[1:nx,1:ny][3]
     # @views vtk["Exact Pressure"] = exact_data[1:nx,1:ny][4]
     vtk["CYCLE"] = iter
-    vtk["TIME"] = time
+    vtk["TIME"] = Tenkai.to_output(time)
     out = vtk_save(vtk)
     println("Wrote file ", out[1])
     write_poly(eq, grid, op, u1, fcount)

@@ -26,6 +26,24 @@ struct CartesianGrid2D{RealT <: Real}
     dy::OffsetVector{RealT, Vector{RealT}}      # cell size along y
 end
 
+# `n + 1` equally spaced points from `xmin` to `xmax`. Used for the faces of a
+# uniform grid, and, with the appropriate end points, for its cell centres.
+#
+# This is `LinRange` / `Base.lerpi` with one difference: `lerpi` always builds
+# the interpolation parameter `j / d` in `Float64`, because `j` and `d` are
+# integers. That is fine up to `Float64`, but it caps the grid of a higher
+# precision run at `Float64` accuracy, and with it the accuracy of the whole
+# simulation. Converting afterwards (`RealT(j / d)`) cannot recover the lost
+# digits, so the parameter is formed here in the wider of `RealT` and `Float64`.
+# For `Float32` and `Float64` that reproduces `LinRange` bit for bit.
+function uniform_points(xmin::RealT, xmax::RealT, n) where {RealT <: Real}
+    T = promote_type(RealT, Float64)
+    a, b = T(xmin), T(xmax)
+    d = T(max(n, 1))  # `n == 0` is a single point, as for `LinRange(a, b, 1)`
+    return RealT[RealT((1 - T(i - 1) / d) * a + (T(i - 1) / d) * b)
+                 for i in 1:(n + 1)]
+end
+
 # 1D/2D Uniform Cartesian grid
 function make_cartesian_grid(problem, size::Int64)
     @unpack domain = problem
@@ -34,13 +52,13 @@ function make_cartesian_grid(problem, size::Int64)
     nx = size
     dx1 = (xmax - xmin) / nx
     RealT = typeof(dx1)
-    xc = collect(LinRange(xmin + 0.5f0 * dx1, xmax - 0.5f0 * dx1, nx))
+    xf = uniform_points(xmin, xmax, nx)
+    xc = uniform_points(xmin + dx1 / 2, xmax - dx1 / 2, nx - 1)
     @printf("   Grid size = %d \n", nx)
     @printf("   xmin,xmax = %e, %e\n", xmin, xmax)
     @printf("   dx        = %e\n", dx1)
     dx = OffsetArray(zeros(RealT, nx + 2), OffsetArrays.Origin(0))
     dx .= dx1
-    xf = collect(LinRange(xmin, xmax, nx + 1))
     return CartesianGrid1D(domain, size, xc, xf, dx)
 end
 
@@ -52,8 +70,10 @@ function make_cartesian_grid(problem, size::Vector{Int64})
     dx1 = (xmax - xmin) / nx
     dy1 = (ymax - ymin) / ny
     RealT = typeof(dx1)
-    xc = collect(LinRange(xmin + 0.5f0 * dx1, xmax - 0.5f0 * dx1, nx))
-    yc = collect(LinRange(ymin + 0.5f0 * dy1, ymax - 0.5f0 * dy1, ny))
+    xf = uniform_points(xmin, xmax, nx)
+    yf = uniform_points(ymin, ymax, ny)
+    xc = uniform_points(xmin + dx1 / 2, xmax - dx1 / 2, nx - 1)
+    yc = uniform_points(ymin + dy1 / 2, ymax - dy1 / 2, ny - 1)
     @printf("   Grid size = %d x %d\n", nx, ny)
     @printf("   xmin,xmax = %e, %e\n", xmin, xmax)
     @printf("   ymin,ymax = %e, %e\n", ymin, ymax)
@@ -62,8 +82,6 @@ function make_cartesian_grid(problem, size::Vector{Int64})
     dy = OffsetArray(zeros(RealT, ny + 2), OffsetArrays.Origin(0))
     dx .= dx1
     dy .= dy1
-    xf = collect(LinRange(xmin, xmax, nx + 1))
-    yf = collect(LinRange(ymin, ymax, ny + 1))
     return CartesianGrid2D(domain, size, xc, yc, xf, yf, dx, dy)
 end
 
@@ -91,10 +109,12 @@ function save_mesh_file(mesh::CartesianGrid2D, output_directory)
         attributes(file)["mesh_type"] = "StructuredMesh" # For Trixi2Vtk
         attributes(file)["ndims"] = 2
         attributes(file)["size"] = mesh.size
-        attributes(file)["xmin"] = xmin
-        attributes(file)["xmax"] = xmax
-        attributes(file)["ymin"] = ymin
-        attributes(file)["ymax"] = ymax
+        # HDF5 only understands the standard floating point types, so the
+        # mesh extents are written out as `Float64`.
+        attributes(file)["xmin"] = Float64(xmin)
+        attributes(file)["xmax"] = Float64(xmax)
+        attributes(file)["ymin"] = Float64(ymin)
+        attributes(file)["ymax"] = Float64(ymax)
         attributes(file)["mapping"] = mapping_as_string
     end
 

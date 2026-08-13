@@ -1034,7 +1034,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
         un, um, tmp = cache.nodal_modal[Threads.threadid()]
         # Continuous extension to faces
         u = @view u1[:, :, :, el_x, el_y]
-        @turbo un .= u
+        turbo_copy!(un, u)
 
         # Copying is needed because we replace these with variables actually
         # used for indicators like primitives or rho*p, etc.
@@ -1121,7 +1121,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
 
     # Smoothening of alpha
     if smooth_alpha == true
-        @turbo alpha_temp .= alpha
+        turbo_copy!(alpha_temp, alpha)
         for j in 1:ny, i in 1:nx
             alpha[i, j] = max(smooth_factor * alpha_temp[i - 1, j],
                               smooth_factor * alpha_temp[i, j - 1],
@@ -1142,7 +1142,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
 
     if limiter.pure_fv == true
         @assert scheme.limiter.name == "blend"
-        @turbo alpha .= one(eltype(alpha))
+        turbo_copy!(alpha, one(eltype(alpha)))
     end
 
     # KLUDGE - Should this be in apply_limiter! function?
@@ -1182,10 +1182,10 @@ function debug_blend_limiter!(eq::AbstractEquations{2}, grid, problem, scheme,
        final_time - t < 1e-10
         ndigits = 3 # KLUDGE - Add option to change
         filename = get_filename("output/alpha", ndigits, fcount)
-        vtk_alpha = vtk_grid(filename, grid.xc, grid.yc)
-        vtk_alpha["alpha"] = alpha_
+        vtk_alpha = vtk_grid(filename, to_output(grid.xc), to_output(grid.yc))
+        vtk_alpha["alpha"] = to_output(alpha_)
         vtk_alpha["CYCLE"] = iter
-        vtk_alpha["TIME"] = t
+        vtk_alpha["TIME"] = to_output(t)
         vtk_alpha["Total activations"] = total_activations
         out = vtk_save(vtk_alpha)
         println("Wrote file ", out[1])
@@ -1194,7 +1194,8 @@ function debug_blend_limiter!(eq::AbstractEquations{2}, grid, problem, scheme,
 
             max_filename = "output/alpha_max"
             alpha_max = @view blend.cache.alpha_max[1:nx, 1:ny]
-            vtk_alpha_max = vtk_grid(max_filename, grid.xc, grid.yc)
+            vtk_alpha_max = vtk_grid(max_filename, to_output(grid.xc),
+                                     to_output(grid.yc))
             vtk_alpha_max["alpha_max"] = alpha_max
             vtk_alpha_max["CYCLE"] = iter
             vtk_alpha_max["TIME"] = t
@@ -1416,8 +1417,8 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid, op, u1
     @unpack xg = op
     nvar = size(u1, 1)
     @views if problem.periodic_x
-        @turbo u1[:, :, :, 0, 1:ny] .= u1[:, :, :, nx, 1:ny]
-        @turbo u1[:, :, :, nx + 1, 1:ny] .= u1[:, :, :, 1, 1:ny]
+        turbo_copy!((u1[:, :, :, 0, 1:ny]), (u1[:, :, :, nx, 1:ny]))
+        turbo_copy!((u1[:, :, :, nx + 1, 1:ny]), (u1[:, :, :, 1, 1:ny]))
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 0:0, 1:ny)),
         #         u1, CartesianIndices((1:nvar, 1:nd, 1:nd, nx:nx, 1:ny)))
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, nx+1:nx+1, 1:ny)),
@@ -1425,8 +1426,8 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid, op, u1
     end
 
     @views if problem.periodic_y
-        @turbo u1[:, :, :, 1:nx, 0] .= u1[:, :, :, 1:nx, ny]
-        @turbo u1[:, :, :, 1:nx, ny + 1] .= u1[:, :, :, 1:nx, 1]
+        turbo_copy!((u1[:, :, :, 1:nx, 0]), (u1[:, :, :, 1:nx, ny]))
+        turbo_copy!((u1[:, :, :, 1:nx, ny + 1]), (u1[:, :, :, 1:nx, 1]))
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 1:nx, 0:0)),
         #         u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 1:nx, ny:ny)))
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 1:nx, ny+1:ny+1)),
@@ -1435,10 +1436,10 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid, op, u1
 
     @views if problem.periodic_x && problem.periodic_y
         # Corners
-        @turbo u1[:, :, :, 0, 0] .= u1[:, :, :, nx, 0]
-        @turbo u1[:, :, :, nx + 1, 0] .= u1[:, :, :, 1, 0]
-        @turbo u1[:, :, :, 0, ny + 1] .= u1[:, :, :, nx, ny + 1]
-        @turbo u1[:, :, :, nx + 1, ny + 1] .= u1[:, :, :, 1, ny + 1]
+        turbo_copy!((u1[:, :, :, 0, 0]), (u1[:, :, :, nx, 0]))
+        turbo_copy!((u1[:, :, :, nx + 1, 0]), (u1[:, :, :, 1, 0]))
+        turbo_copy!((u1[:, :, :, 0, ny + 1]), (u1[:, :, :, nx, ny + 1]))
+        turbo_copy!((u1[:, :, :, nx + 1, ny + 1]), (u1[:, :, :, 1, ny + 1]))
 
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 0:0, 0:0)),
         #         u1, CartesianIndices((1:nvar, 1:nd, 1:nd, nx:nx, 0:0)))
@@ -1598,10 +1599,10 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid, op, u1
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, nx+1:nx+1, ny+1:ny+1)),
         #         u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 1:1, ny+1:ny+1)))
 
-        @turbo u1[:, :, :, 0, 0] .= u1[:, :, :, nx, 0]
-        @turbo u1[:, :, :, nx + 1, 0] .= u1[:, :, :, 1, 0]
-        @turbo u1[:, :, :, 0, ny + 1] .= u1[:, :, :, nx, ny + 1]
-        @turbo u1[:, :, :, nx + 1, ny + 1] .= u1[:, :, :, 1, ny + 1]
+        turbo_copy!((u1[:, :, :, 0, 0]), (u1[:, :, :, nx, 0]))
+        turbo_copy!((u1[:, :, :, nx + 1, 0]), (u1[:, :, :, 1, 0]))
+        turbo_copy!((u1[:, :, :, 0, ny + 1]), (u1[:, :, :, nx, ny + 1]))
+        turbo_copy!((u1[:, :, :, nx + 1, ny + 1]), (u1[:, :, :, 1, ny + 1]))
     else
         # TOTHINK - Reflect bc and stuff for corners as well?
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 0:0, 0:0)),
@@ -1613,10 +1614,10 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid, op, u1
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, nx+1:nx+1, ny+1:ny+1)),
         #         u1, CartesianIndices((1:nvar, 1:nd, 1:nd, nx:nx, ny+1:ny+1)))
 
-        @turbo u1[:, :, :, 0, 0] .= u1[:, :, :, 1, 0]
-        @turbo u1[:, :, :, nx + 1, 0] .= u1[:, :, :, nx, 0]
-        @turbo u1[:, :, :, 0, ny + 1] .= u1[:, :, :, 1, ny + 1]
-        @turbo u1[:, :, :, nx + 1, ny + 1] .= u1[:, :, :, nx, ny + 1]
+        turbo_copy!((u1[:, :, :, 0, 0]), (u1[:, :, :, 1, 0]))
+        turbo_copy!((u1[:, :, :, nx + 1, 0]), (u1[:, :, :, nx, 0]))
+        turbo_copy!((u1[:, :, :, 0, ny + 1]), (u1[:, :, :, 1, ny + 1]))
+        turbo_copy!((u1[:, :, :, nx + 1, ny + 1]), (u1[:, :, :, nx, ny + 1]))
     end
 
     return nothing
@@ -3502,14 +3503,15 @@ function compute_error(problem, grid, eq::AbstractEquations{2}, aux, op, u1, t)
     nx, ny = grid.size
     @unpack xc, yc, dx, dy = grid
 
-    l1_error, l2_error, energy = 0.0, 0.0, 0.0
+    error_type = promote_type(eltype(u1), Float64)
+    l1_error, l2_error, energy = (zero(error_type) for _ in 1:3)
     @inbounds @floop for element in CartesianIndices((1:nx, 1:ny))
         # for element in CartesianIndices((1:nx, 1:ny))
         el_x, el_y = element[1], element[2]
         ue, un = arr_cache[Threads.threadid()]
         for j in 1:nq, i in 1:nq
-            x = xc[el_x] - 0.5 * dx[el_x] + dx[el_x] * xq[i]
-            y = yc[el_y] - 0.5 * dy[el_y] + dy[el_y] * xq[j]
+            x = xc[el_x] - 0.5f0 * dx[el_x] + dx[el_x] * xq[i]
+            y = yc[el_y] - 0.5f0 * dy[el_y] + dy[el_y] * xq[j]
             ue_node = exact_solution(x, y, t)
             set_node_vars!(ue, ue_node, eq, i, j)
         end
@@ -3524,7 +3526,7 @@ function compute_error(problem, grid, eq::AbstractEquations{2}, aux, op, u1, t)
                                            jj)
             end
         end
-        l1 = l2 = e = 0.0
+        l1 = l2 = e = zero(error_type)
         for j in 1:nq, i in 1:nq
             un_node = get_node_vars(un, eq, i, j)
             ue_node = get_node_vars(ue, eq, i, j) # KLUDGE - allocated ue is not needed
@@ -3545,11 +3547,14 @@ function compute_error(problem, grid, eq::AbstractEquations{2}, aux, op, u1, t)
     l1_error = l1_error / domain_size
     l2_error = sqrt(l2_error / domain_size)
     energy = energy / domain_size
-    @printf(error_file, "%.16e %.16e %.16e %.16e\n", t, l1_error[1], l2_error[1],
-            energy[1])
+    # `@printf` only knows the standard floating point types, so the errors are
+    # written out as `Float64`. The returned values keep their full precision.
+    @printf(error_file, "%.16e %.16e %.16e %.16e\n", Float64(t),
+            Float64(l1_error[1]),
+            Float64(l2_error[1]), Float64(energy[1]))
 
-    return Dict("l1_error" => l1_error, "l2_error" => l2_error,
-                "energy" => energy)
+    return Dict{String, error_type}("l1_error" => l1_error, "l2_error" => l2_error,
+                                    "energy" => energy)
     end # timer
 end
 
@@ -3567,13 +3572,14 @@ function create_aux_cache(eq, op)
     @unpack xg = op
     nd = length(xg)
     nvar = nvariables(eq)
+    # See `compute_error`: the error norm is evaluated in at least `Float64`.
+    RealT = promote_type(eltype(xg), Float64)
     nq = nd + 3    # number of quadrature points in each direction
-    xq, wq = weights_and_points(nq, "gl")
+    xq, wq = weights_and_points(nq, "gl", RealT)
 
     V = Vandermonde_lag(xg, xq) # matrix evaluating at `xq`
     # using values at solution points `xg`
 
-    RealT = eltype(xg)
     MArr = MArray{Tuple{nvar, nq, nq}, RealT}
 
     # for each thread, construct `cache_size` number of objects with
@@ -3656,11 +3662,11 @@ function write_soln!(base_name, fcount, iter, time, dt,
     # Output cell-averages
     filename = get_filename("output/avg", ndigits, fcount)
     # filename = string("output/", filename)
-    vtk_avg = vtk_grid(filename, grid.xc, grid.yc)
+    vtk_avg = vtk_grid(filename, to_output(grid.xc), to_output(grid.yc))
     nx, ny = grid.size
-    vtk_avg["Cell Averages"] = @view z[1, 1:nx, 1:ny]
+    vtk_avg["Cell Averages"] = to_output(@view z[1, 1:nx, 1:ny])
     vtk_avg["CYCLE"] = iter
-    vtk_avg["TIME"] = time
+    vtk_avg["TIME"] = to_output(time)
     out = vtk_save(vtk_avg)
     println("Wrote file ", out[1])
     write_poly(eq, grid, op, u1, fcount)

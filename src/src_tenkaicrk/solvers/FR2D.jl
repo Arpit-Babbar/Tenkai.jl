@@ -858,7 +858,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
         un, um, tmp = cache.nodal_modal[Threads.threadid()]
         # Continuous extension to faces
         u = @view u1[:, :, :, el_x, el_y]
-        @turbo un .= u
+        Tenkai.turbo_copy!(un, u)
 
         # Copying is needed because we replace these with variables actually
         # used for indicators like primitives or rho*p, etc.
@@ -938,7 +938,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
 
     # Smoothening of alpha
     if smooth_alpha == true
-        @turbo alpha_temp .= alpha
+        Tenkai.turbo_copy!(alpha_temp, alpha)
         for element_index in element_iterator(grid)
             element = element_indices(element_index, grid)
             el_x, el_y = element[1], element[2]
@@ -960,7 +960,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
 
     if limiter.pure_fv == true
         @assert scheme.limiter.name == "blend"
-        @turbo alpha .= one(eltype(alpha))
+        Tenkai.turbo_copy!(alpha, one(eltype(alpha)))
     end
 
     return nothing
@@ -999,8 +999,8 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid::StepGr
 
     @unpack u1x, u1y = cache
 
-    @turbo u1x .= u1
-    @turbo u1y .= u1
+    Tenkai.turbo_copy!(u1x, u1)
+    Tenkai.turbo_copy!(u1y, u1)
 
     left, right, bottom, top = problem.boundary_condition
     boundary_value = problem.boundary_value

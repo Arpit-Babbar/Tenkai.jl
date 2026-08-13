@@ -359,9 +359,9 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, j, el_x, el_y)
         end
 
-        @turbo F2[:, :, :, el_x, el_y] .= F2_loc
-        @turbo G2[:, :, :, el_x, el_y] .= G2_loc
-        @turbo U2[:, :, :, el_x, el_y] .= U2_loc
+        turbo_copy!(@view(F2[:, :, :, el_x, el_y]), F2_loc)
+        turbo_copy!(@view(G2[:, :, :, el_x, el_y]), G2_loc)
+        turbo_copy!(@view(U2[:, :, :, el_x, el_y]), U2_loc)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
@@ -413,9 +413,9 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, probl
         F2_ = @view F2[:, :, :, el_x, el_y]
         G2_ = @view G2[:, :, :, el_x, el_y]
         U2_ = @view U2[:, :, :, el_x, el_y]
-        @turbo F .= F2_
-        @turbo G .= G2_
-        @turbo U .= U2_
+        turbo_copy!(F, F2_)
+        turbo_copy!(G, G2_)
+        turbo_copy!(U, U2_)
 
         refresh!(ust)
 

@@ -272,6 +272,53 @@ function Parameters(grid_size, cfl, bounds, save_iter_interval,
 end
 
 #------------------------------------------------------------------------------
+# LoopVectorization helpers
+#------------------------------------------------------------------------------
+# LoopVectorization's `@turbo` only understands the number types that map onto
+# machine registers. Tenkai can be run in any arithmetic, so the vectorized copy
+# and fill are selected by dispatch on the element type and fall back to a plain
+# broadcast otherwise. The `Float64` path is unchanged.
+const TurboEltype = Union{Bool, Float32, Float64,
+                          Int8, Int16, Int32, Int64,
+                          UInt8, UInt16, UInt32, UInt64}
+
+@inline turbo_copy!(dest, src) = _turbo_copy!(dest, src, eltype(dest), eltype(src))
+
+@inline function _turbo_copy!(dest, src, ::Type{<:TurboEltype}, ::Type{<:TurboEltype})
+    @turbo dest .= src
+    return dest
+end
+
+@inline function _turbo_copy!(dest, src, ::Type, ::Type)
+    dest .= src
+    return dest
+end
+
+@inline turbo_fill!(dest, value) = _turbo_fill!(dest, value, eltype(dest))
+
+@inline function _turbo_fill!(dest, value, ::Type{<:TurboEltype})
+    @turbo dest .= value
+    return dest
+end
+
+@inline function _turbo_fill!(dest, value, ::Type)
+    fill!(dest, value)
+    return dest
+end
+
+#------------------------------------------------------------------------------
+# Output helpers
+#------------------------------------------------------------------------------
+# VTK files (and most plotting backends) only understand the standard floating
+# point types. Simulations running in another arithmetic, e.g. `Float64x2`,
+# therefore convert their data to `Float64` on the way out. This only affects
+# what is written to disk, never what is computed.
+@inline to_output(x::Real) = Float64(x)
+@inline to_output(x::AbstractArray{<:Real}) = Float64.(x)
+@inline to_output(x::AbstractArray{Float64}) = x
+@inline to_output(x::Float64) = x
+
+#------------------------------------------------------------------------------
 # A struct which gives zero whenever you try to index it as a zero
 #------------------------------------------------------------------------------
 struct EmptyZeros{RealT <: Real} end
@@ -979,7 +1026,7 @@ end
 end
 
 @inline @inbounds function refresh!(u)
-    @turbo u .= zero(eltype(u))
+    turbo_fill!(u, zero(eltype(u)))
 end
 
 #-------------------------------------------------------------------------------
@@ -1119,11 +1166,17 @@ tenkai2trixiode(solver, equation, problem, scheme, param) = ()
 # simulation at the time of the crash.
 #-------------------------------------------------------------------------------
 function solve(equation, problem, scheme, param;
+               # The floating point type used throughout the simulation. It is
+               # taken from the domain of the problem, so that running in a
+               # different arithmetic (`Float32`, `Float64x2`, `Double64`,
+               # `BigFloat`, ...) only requires building the `Problem` with a
+               # domain of that type.
+               RealT = eltype(problem.domain),
                # 1D/2D Cartesian grid
                grid = make_cartesian_grid(problem, param.grid_size),
                # fr operators like differentiation matrix, correction functions
                op = fr_operators(scheme.degree, scheme.solution_points,
-                                 scheme.correction_function),
+                                 scheme.correction_function, RealT),
                # cache for storing solution and other arrays
                cache = (; setup_arrays(grid, scheme, equation)...,
                         trixi_ode = tenkai2trixiode(scheme.solver, equation, problem,

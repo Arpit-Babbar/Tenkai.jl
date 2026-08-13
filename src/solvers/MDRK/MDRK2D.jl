@@ -91,6 +91,7 @@ end
 @inline @inbounds function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data,
                                             eval_data_big,
                                             xg, Vl, Vr, F, G, F2, G2, Fb, Fb2, aux)
+    RealT = eltype(xg)
     nvar = nvariables(eq)
     nd = length(xg)
 
@@ -166,30 +167,31 @@ end
         gmmd = flux(x, yd, ummd_node, eq, 2)
         gmmu = flux(x, yu, ummu_node, eq, 2)
 
-        ftl_node = 1.0 / 12.0 * (-fppl + 8.0 * fpl - 8.0 * fml + fmml)
-        ftr_node = 1.0 / 12.0 * (-fppr + 8.0 * fpr - 8.0 * fmr + fmmr)
+        ftl_node = (one(RealT) / 12) * (-fppl + 8.0 * fpl - 8.0 * fml + fmml)
+        ftr_node = (one(RealT) / 12) * (-fppr + 8.0 * fpr - 8.0 * fmr + fmmr)
 
         multiply_add_to_node_vars!(Fb, 0.125, ftl_node, eq, i, 1)
         multiply_add_to_node_vars!(Fb, 0.125, ftr_node, eq, i, 2)
-        multiply_add_to_node_vars!(Fb2, 1.0 / 6.0, ftl_node, eq, i, 1)
-        multiply_add_to_node_vars!(Fb2, 1.0 / 6.0, ftr_node, eq, i, 2)
+        multiply_add_to_node_vars!(Fb2, (one(RealT) / 6), ftl_node, eq, i, 1)
+        multiply_add_to_node_vars!(Fb2, (one(RealT) / 6), ftr_node, eq, i, 2)
 
         gtd_node = 0.5 * (gpd - gmd)
         gtu_node = 0.5 * (gpu - gmu)
 
-        gtd_node = 1.0 / 12.0 * (-gppd + 8.0 * gpd - 8.0 * gmd + gmmd)
-        gtu_node = 1.0 / 12.0 * (-gppu + 8.0 * gpu - 8.0 * gmu + gmmu)
+        gtd_node = (one(RealT) / 12) * (-gppd + 8.0 * gpd - 8.0 * gmd + gmmd)
+        gtu_node = (one(RealT) / 12) * (-gppu + 8.0 * gpu - 8.0 * gmu + gmmu)
 
         multiply_add_to_node_vars!(Fb, 0.125, gtd_node, eq, i, 3)
         multiply_add_to_node_vars!(Fb, 0.125, gtu_node, eq, i, 4)
-        multiply_add_to_node_vars!(Fb2, 1.0 / 6.0, gtd_node, eq, i, 3)
-        multiply_add_to_node_vars!(Fb2, 1.0 / 6.0, gtu_node, eq, i, 4)
+        multiply_add_to_node_vars!(Fb2, (one(RealT) / 6), gtd_node, eq, i, 3)
+        multiply_add_to_node_vars!(Fb2, (one(RealT) / 6), gtu_node, eq, i, 4)
     end
 end
 
 @inbounds @inline function eval_bflux_mdrk!(eq::AbstractEquations{2}, grid, cell_data,
                                             eval_data_big,
                                             xg, Vl, Vr, F, G, Fb, Fb2, aux, ::Nothing)
+    RealT = eltype(xg)
     nvar = nvariables(eq)
     nd = length(xg)
 
@@ -256,17 +258,17 @@ end
         gmmd = flux(x, yd, ummd_node, eq, 2)
         gmmu = flux(x, yu, ummu_node, eq, 2)
 
-        ftl_node = 1.0 / 12.0 * (-fppl + 8.0 * fpl - 8.0 * fml + fmml)
-        ftr_node = 1.0 / 12.0 * (-fppr + 8.0 * fpr - 8.0 * fmr + fmmr)
+        ftl_node = (one(RealT) / 12) * (-fppl + 8.0 * fpl - 8.0 * fml + fmml)
+        ftr_node = (one(RealT) / 12) * (-fppr + 8.0 * fpr - 8.0 * fmr + fmmr)
 
-        multiply_add_to_node_vars!(Fb, 1.0 / 3.0, ftl_node, eq, i, 1)
-        multiply_add_to_node_vars!(Fb, 1.0 / 3.0, ftr_node, eq, i, 2)
+        multiply_add_to_node_vars!(Fb, (one(RealT) / 3), ftl_node, eq, i, 1)
+        multiply_add_to_node_vars!(Fb, (one(RealT) / 3), ftr_node, eq, i, 2)
 
-        gtd_node = 1.0 / 12.0 * (-gppd + 8.0 * gpd - 8.0 * gmd + gmmd)
-        gtu_node = 1.0 / 12.0 * (-gppu + 8.0 * gpu - 8.0 * gmu + gmmu)
+        gtd_node = (one(RealT) / 12) * (-gppd + 8.0 * gpd - 8.0 * gmd + gmmd)
+        gtu_node = (one(RealT) / 12) * (-gppu + 8.0 * gpu - 8.0 * gmu + gmmu)
 
-        multiply_add_to_node_vars!(Fb, 1.0 / 3.0, gtd_node, eq, i, 3)
-        multiply_add_to_node_vars!(Fb, 1.0 / 3.0, gtu_node, eq, i, 4)
+        multiply_add_to_node_vars!(Fb, (one(RealT) / 3), gtd_node, eq, i, 3)
+        multiply_add_to_node_vars!(Fb, (one(RealT) / 3), gtu_node, eq, i, 4)
     end
 end
 
@@ -314,6 +316,7 @@ end
 function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
                                        problem, scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
+    RealT = eltype(u1)
     nvar = nvariables(eq)
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
@@ -429,15 +432,15 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
             fp, gp = flux(x, y, up, eq)
             fpp, gpp = flux(x, y, upp, eq)
 
-            ft = 1.0 / 12.0 * (-fpp + 8.0 * fp - 8.0 * fm + fmm) # This ft is actually Δt * ft
-            gt = 1.0 / 12.0 * (-gpp + 8.0 * gp - 8.0 * gm + gmm) # This gt is actually Δt * gt
+            ft = (one(RealT) / 12) * (-fpp + 8.0 * fp - 8.0 * fm + fmm) # This ft is actually Δt * ft
+            gt = (one(RealT) / 12) * (-gpp + 8.0 * gp - 8.0 * gm + gmm) # This gt is actually Δt * gt
 
             multiply_add_to_node_vars!(F, 0.125, ft, eq, i, j)
             multiply_add_to_node_vars!(G, 0.125, gt, eq, i, j)
             multiply_add_to_node_vars!(U, 0.125, ut_node, eq, i, j)
-            multiply_add_to_node_vars!(F2_loc, 1.0 / 6.0, ft, eq, i, j)
-            multiply_add_to_node_vars!(G2_loc, 1.0 / 6.0, gt, eq, i, j)
-            multiply_add_to_node_vars!(U2_loc, 1.0 / 6.0, ut_node, eq, i, j)
+            multiply_add_to_node_vars!(F2_loc, (one(RealT) / 6), ft, eq, i, j)
+            multiply_add_to_node_vars!(G2_loc, (one(RealT) / 6), gt, eq, i, j)
+            multiply_add_to_node_vars!(U2_loc, (one(RealT) / 6), ut_node, eq, i, j)
             F_node = get_node_vars(F, eq, i, j)
             for ii in Base.OneTo(nd)
                 multiply_add_to_node_vars!(res, lamx * D1[ii, i], F_node, eq,
@@ -465,16 +468,16 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
                                    X, t, dt, source_terms, eq)
             multiply_add_to_node_vars!(S, 0.125, st, eq, i, j)
 
-            multiply_add_to_node_vars!(S2, 1.0 / 6.0, st, eq, i, j, el_x, el_y)
+            multiply_add_to_node_vars!(S2, (one(RealT) / 6), st, eq, i, j, el_x, el_y)
 
             S_node = get_node_vars(S, eq, i, j)
 
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, j, el_x, el_y)
         end
 
-        @turbo F2[:, :, :, el_x, el_y] .= F2_loc
-        @turbo G2[:, :, :, el_x, el_y] .= G2_loc
-        @turbo U2[:, :, :, el_x, el_y] .= U2_loc
+        turbo_copy!(@view(F2[:, :, :, el_x, el_y]), F2_loc)
+        turbo_copy!(@view(G2[:, :, :, el_x, el_y]), G2_loc)
+        turbo_copy!(@view(U2[:, :, :, el_x, el_y]), U2_loc)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
@@ -493,6 +496,7 @@ end
 function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, problem,
                                        scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
+    RealT = eltype(u1)
     nvar = nvariables(eq)
     @unpack xg, Dm, D1, Vl, Vr = op
     nd = length(xg)
@@ -524,9 +528,9 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, probl
         F2_ = @view F2[:, :, :, el_x, el_y]
         G2_ = @view G2[:, :, :, el_x, el_y]
         U2_ = @view U2[:, :, :, el_x, el_y]
-        @turbo F .= F2_
-        @turbo G .= G2_
-        @turbo U .= U2_
+        turbo_copy!(F, F2_)
+        turbo_copy!(G, G2_)
+        turbo_copy!(U, U2_)
 
         refresh!(ust)
 
@@ -596,16 +600,16 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, probl
             fpp, gpp = flux(x, y, upp, eq)
 
             #  ft_node = get_node_vars(ft, eq, i, j)
-            ft = 1.0 / 12.0 * (-fpp + 8.0 * fp - 8.0 * fm + fmm)
-            gt = 1.0 / 12.0 * (-gpp + 8.0 * gp - 8.0 * gm + gmm)
-            multiply_add_to_node_vars!(F, 1.0 / 3.0, ft, eq, i, j)
-            multiply_add_to_node_vars!(G, 1.0 / 3.0, gt, eq, i, j)
-            multiply_add_to_node_vars!(U, 1.0 / 3.0, ust_node, eq, i, j)
+            ft = (one(RealT) / 12) * (-fpp + 8.0 * fp - 8.0 * fm + fmm)
+            gt = (one(RealT) / 12) * (-gpp + 8.0 * gp - 8.0 * gm + gmm)
+            multiply_add_to_node_vars!(F, (one(RealT) / 3), ft, eq, i, j)
+            multiply_add_to_node_vars!(G, (one(RealT) / 3), gt, eq, i, j)
+            multiply_add_to_node_vars!(U, (one(RealT) / 3), ust_node, eq, i, j)
 
             st = calc_source_t_N34(us_node, up, upp, um, umm, X, t + 0.5 * dt, dt,
                                    source_terms, eq)
 
-            multiply_add_to_node_vars!(S2, 1.0 / 3.0, st, eq, i, j, el_x, el_y)
+            multiply_add_to_node_vars!(S2, (one(RealT) / 3), st, eq, i, j, el_x, el_y)
 
             S_node = get_node_vars(S2, eq, i, j, el_x, el_y)
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, j, el_x, el_y)

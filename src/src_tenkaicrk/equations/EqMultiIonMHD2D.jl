@@ -715,21 +715,21 @@ function update_ghost_values_u1!(eq::MultiIonMHD2D, problem, grid, op, u1, aux, 
     @unpack xg = op
     nvar = size(u1, 1)
     @views if problem.periodic_x
-        @turbo u1[:, :, :, 0, 1:ny] .= u1[:, :, :, nx, 1:ny]
-        @turbo u1[:, :, :, nx + 1, 1:ny] .= u1[:, :, :, 1, 1:ny]
+        Tenkai.turbo_copy!((u1[:, :, :, 0, 1:ny]), (u1[:, :, :, nx, 1:ny]))
+        Tenkai.turbo_copy!((u1[:, :, :, nx + 1, 1:ny]), (u1[:, :, :, 1, 1:ny]))
     end
 
     @views if problem.periodic_y
-        @turbo u1[:, :, :, 1:nx, 0] .= u1[:, :, :, 1:nx, ny]
-        @turbo u1[:, :, :, 1:nx, ny + 1] .= u1[:, :, :, 1:nx, 1]
+        Tenkai.turbo_copy!((u1[:, :, :, 1:nx, 0]), (u1[:, :, :, 1:nx, ny]))
+        Tenkai.turbo_copy!((u1[:, :, :, 1:nx, ny + 1]), (u1[:, :, :, 1:nx, 1]))
     end
 
     @views if problem.periodic_x && problem.periodic_y
         # Corners
-        @turbo u1[:, :, :, 0, 0] .= u1[:, :, :, nx, 0]
-        @turbo u1[:, :, :, nx + 1, 0] .= u1[:, :, :, 1, 0]
-        @turbo u1[:, :, :, 0, ny + 1] .= u1[:, :, :, nx, ny + 1]
-        @turbo u1[:, :, :, nx + 1, ny + 1] .= u1[:, :, :, 1, ny + 1]
+        Tenkai.turbo_copy!((u1[:, :, :, 0, 0]), (u1[:, :, :, nx, 0]))
+        Tenkai.turbo_copy!((u1[:, :, :, nx + 1, 0]), (u1[:, :, :, 1, 0]))
+        Tenkai.turbo_copy!((u1[:, :, :, 0, ny + 1]), (u1[:, :, :, nx, ny + 1]))
+        Tenkai.turbo_copy!((u1[:, :, :, nx + 1, ny + 1]), (u1[:, :, :, 1, ny + 1]))
         return nothing
     end
 
@@ -862,16 +862,16 @@ function update_ghost_values_u1!(eq::MultiIonMHD2D, problem, grid, op, u1, aux, 
 
     # Corners (Probably not needed)
     @views if problem.periodic_x
-        @turbo u1[:, :, :, 0, 0] .= u1[:, :, :, nx, 0]
-        @turbo u1[:, :, :, nx + 1, 0] .= u1[:, :, :, 1, 0]
-        @turbo u1[:, :, :, 0, ny + 1] .= u1[:, :, :, nx, ny + 1]
-        @turbo u1[:, :, :, nx + 1, ny + 1] .= u1[:, :, :, 1, ny + 1]
+        Tenkai.turbo_copy!((u1[:, :, :, 0, 0]), (u1[:, :, :, nx, 0]))
+        Tenkai.turbo_copy!((u1[:, :, :, nx + 1, 0]), (u1[:, :, :, 1, 0]))
+        Tenkai.turbo_copy!((u1[:, :, :, 0, ny + 1]), (u1[:, :, :, nx, ny + 1]))
+        Tenkai.turbo_copy!((u1[:, :, :, nx + 1, ny + 1]), (u1[:, :, :, 1, ny + 1]))
     else
         # TOTHINK - Reflect bc and stuff for corners as well?
-        @turbo u1[:, :, :, 0, 0] .= u1[:, :, :, 1, 0]
-        @turbo u1[:, :, :, nx + 1, 0] .= u1[:, :, :, nx, 0]
-        @turbo u1[:, :, :, 0, ny + 1] .= u1[:, :, :, 1, ny + 1]
-        @turbo u1[:, :, :, nx + 1, ny + 1] .= u1[:, :, :, nx, ny + 1]
+        Tenkai.turbo_copy!((u1[:, :, :, 0, 0]), (u1[:, :, :, 1, 0]))
+        Tenkai.turbo_copy!((u1[:, :, :, nx + 1, 0]), (u1[:, :, :, nx, 0]))
+        Tenkai.turbo_copy!((u1[:, :, :, 0, ny + 1]), (u1[:, :, :, 1, ny + 1]))
+        Tenkai.turbo_copy!((u1[:, :, :, nx + 1, ny + 1]), (u1[:, :, :, nx, ny + 1]))
     end
 
     return nothing

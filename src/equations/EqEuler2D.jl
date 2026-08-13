@@ -2357,7 +2357,7 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::Euler2D,
     @unpack xc, yc = grid
     filename = get_filename("output/avg", ndigits, fcount)
     # filename = string("output/", filename)
-    vtk = vtk_grid(filename, xc, yc)
+    vtk = vtk_grid(filename, Tenkai.to_output(xc), Tenkai.to_output(yc))
     xy = [[xc[i], yc[j]] for i in 1:nx, j in 1:ny]
     # KLUDGE - Do it efficiently
     prim = @views copy(z[:, 1:nx, 1:ny])
@@ -2369,24 +2369,24 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::Euler2D,
     velx_arr = prim[2, 1:nx, 1:ny]
     vely_arr = prim[3, 1:nx, 1:ny]
     pres_arr = prim[4, 1:nx, 1:ny]
-    vtk["sol"] = density_arr
-    vtk["Density"] = density_arr
-    vtk["Velocity_x"] = velx_arr
-    vtk["Velocity_y"] = vely_arr
-    vtk["Pressure"] = pres_arr
+    vtk["sol"] = Tenkai.to_output(density_arr)
+    vtk["Density"] = Tenkai.to_output(density_arr)
+    vtk["Velocity_x"] = Tenkai.to_output(velx_arr)
+    vtk["Velocity_y"] = Tenkai.to_output(vely_arr)
+    vtk["Pressure"] = Tenkai.to_output(pres_arr)
     for j in 1:ny, i in 1:nx
         @views con2prim!(eq, exact_data[i, j], prim[:, i, j])
     end
-    @views vtk["Exact Density"] = prim[1, 1:nx, 1:ny]
-    @views vtk["Exact Velocity_x"] = prim[2, 1:nx, 1:ny]
-    @views vtk["Exact Velocity_y"] = prim[3, 1:nx, 1:ny]
-    @views vtk["Exact Pressure"] = prim[4, 1:nx, 1:ny]
+    @views vtk["Exact Density"] = Tenkai.to_output(prim[1, 1:nx, 1:ny])
+    @views vtk["Exact Velocity_x"] = Tenkai.to_output(prim[2, 1:nx, 1:ny])
+    @views vtk["Exact Velocity_y"] = Tenkai.to_output(prim[3, 1:nx, 1:ny])
+    @views vtk["Exact Pressure"] = Tenkai.to_output(prim[4, 1:nx, 1:ny])
     # @views vtk["Exact Density"] = exact_data[1:nx,1:ny][1]
     # @views vtk["Exact Velocity_x"] = exact_data[1:nx,1:ny][2]
     # @views vtk["Exact Velocity_y"] = exact_data[1:nx,1:ny][3]
     # @views vtk["Exact Pressure"] = exact_data[1:nx,1:ny][4]
     vtk["CYCLE"] = iter
-    vtk["TIME"] = time
+    vtk["TIME"] = Tenkai.to_output(time)
     out = vtk_save(vtk)
     println("Wrote file ", out[1])
     write_poly(eq, grid, op, u1, fcount)
@@ -2399,10 +2399,10 @@ function Tenkai.write_soln!(base_name, fcount, iter, time, dt, eq::Euler2D,
 
     # HDF5 file
     element_variables = Dict()
-    element_variables[:density] = vec(density_arr)
-    element_variables[:velocity_x] = vec(velx_arr)
-    element_variables[:velocity_y] = vec(vely_arr)
-    element_variables[:pressure] = vec(pres_arr)
+    element_variables[:density] = Tenkai.to_output(vec(density_arr))
+    element_variables[:velocity_x] = Tenkai.to_output(vec(velx_arr))
+    element_variables[:velocity_y] = Tenkai.to_output(vec(vely_arr))
+    element_variables[:pressure] = Tenkai.to_output(vec(pres_arr))
     # element_variables[:indicator_shock_capturing] = vec(aux.blend.cache.alpha[1:nx,1:ny])
     filename = save_solution_file(u1, time, dt, iter, grid, eq, op,
                                   element_variables) # Save h5 file
@@ -2459,7 +2459,7 @@ function save_solution_file(u_, time, dt, iter,
         var_names = ("Density", "Velocity x", "Velocity y", "Pressure")
         for v in 1:n_vars
             # Convert to 1D array
-            file["variables_$v"] = vec(data[v, .., :])
+            file["variables_$v"] = Tenkai.to_output(vec(data[v, .., :]))
 
             # Add variable name as attribute
             var = file["variables_$v"]
@@ -2469,7 +2469,7 @@ function save_solution_file(u_, time, dt, iter,
         # Store element variables
         for (v, (key, element_variable)) in enumerate(element_variables)
             # Add to file
-            file["element_variables_$v"] = element_variable
+            file["element_variables_$v"] = Tenkai.to_output(element_variable)
 
             # Add variable name as attribute
             var = file["element_variables_$v"]
