@@ -332,6 +332,23 @@ end
 # Select time scheme
 #------------------------------------------------------------------------------
 
+# The time integrator that `time_scheme = "by degree"` selects. The RKFR CFL
+# numbers in `get_cfl` are the stability limits of these, so anything else has
+# to be treated with care; see `warn_if_cfl_not_calibrated`.
+function default_time_scheme(degree)
+    if degree == 0
+        return "RK11"
+    elseif degree == 1
+        return "SSPRK22"
+    elseif degree == 2
+        return "SSPRK33"
+    elseif degree == 3 || degree == 4
+        return "SSPRK54"
+    else
+        @assert false "Degree not implemeneted!!"
+    end
+end
+
 function get_time_scheme(degree, param)
     time_schemes = Dict("Tsit5" => Tsit5, "SSPRK54" => SSPRK54,
                         "RK11" => apply_rk11!,
@@ -344,24 +361,7 @@ function get_time_scheme(degree, param)
         return time_scheme, time_schemes[time_scheme]
     else
         @assert time_scheme == "by degree"
-        if degree == 0
-            time_scheme == "RK11"
-            return time_scheme, apply_rk11!
-        elseif degree == 1
-            time_scheme = "SSPRK22"
-            return time_scheme, apply_ssprk22!
-        elseif degree == 2
-            time_scheme = "SSPRK33"
-            return time_scheme, apply_ssprk33!
-        elseif degree == 3
-            time_scheme = "SSPRK54"
-            return time_scheme, SSPRK54
-        elseif degree == 4
-            time_scheme = "SSPRK54"
-            return time_scheme, SSPRK54
-        else
-            @assert false "Degree not implemeneted!!"
-        end
+        return default_time_scheme(degree), time_schemes[default_time_scheme(degree)]
     end
 end
 

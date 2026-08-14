@@ -321,6 +321,7 @@ function get_cfl(eq::AbstractEquations{2}, scheme, param)
             println("Using LW-D2 CFL with RKFR")
         end
     elseif solver == "rkfr" || solver isa AbstractRKSolver
+        warn_if_cfl_not_calibrated(degree, param)
         cfl_radau = os_vector([1.0, 0.333, 0.209, 0.145, 0.110])
         cfl_g2 = os_vector([1.0, 1.0, 0.45, 0.2875, 0.212])
         # Source - Gassner,Dumbser,Hindenlang,Munz(2010) & Gassner,Kopriva(2011)

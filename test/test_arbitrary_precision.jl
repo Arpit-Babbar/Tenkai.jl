@@ -190,10 +190,11 @@ function rk_time_scheme(solver, degree)
     return degree == 1 ? "SSPRK22" : degree == 2 ? "SSPRK33" : "RK4"
 end
 
-# `get_cfl` returns the stability limit of the time integrator that "by degree"
-# would have picked, which for degrees 3 and 4 is the five stage `SSPRK54`. The
-# classical `RK4` used here takes fewer stages per step and so has a smaller
-# stability region, and needs a correspondingly smaller time step.
+# The RKFR CFL numbers are calibrated for the integrator that "by degree" would
+# have picked, which for degrees 3 and 4 is the five stage `SSPRK54`. The
+# classical `RK4` used here takes fewer stages per step, so its stability region
+# is smaller and it needs a smaller time step. `get_cfl` warns about exactly
+# this; lowering the safety factor is the remedy it suggests.
 rk_cfl_safety_factor(solver, degree) = (solver == "rkfr" && degree >= 3) ? 0.4 : 0.98
 
 # Order of the fully discrete scheme: the degree of the solution space gives
