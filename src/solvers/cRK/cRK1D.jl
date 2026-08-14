@@ -160,6 +160,19 @@ function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44},
     return nothing
 end
 
+# Number of per-cell and per-face scratch arrays each cRK solver reads out of
+# its cache, i.e. the length of the tuples destructured in
+# `compute_cell_residual_cRK!` and in its boundary flux evaluation.
+cell_data_size_solver(::cRKSolver) = 0
+cell_data_size_solver(::cRK22) = 4  # F, f, U, u2
+cell_data_size_solver(::cRK33) = 6  # F, f, U, u2, u3, S
+cell_data_size_solver(::cRK44) = 7  # F, f, U, u2, u3, u4, S
+
+eval_data_size_solver(::cRKSolver) = 0
+eval_data_size_solver(::cRK22) = 2  # u2 at 2 faces
+eval_data_size_solver(::cRK33) = 4  # u, u3 at 2 faces
+eval_data_size_solver(::cRK44) = 8  # u, u2, u3, u4 at 2 faces
+
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
                       eq::AbstractEquations{1})
     RealT = eltype(grid.xc)
@@ -200,6 +213,13 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
     else
         @assert false "Degree not implemented"
     end
+
+    # The sizes above only account for the degree, but the number of stage
+    # values a cRK solver keeps is independent of it: `cRK44` reads eight face
+    # values (u, u2, u3 and u4 at each of the two faces) whatever the degree,
+    # which does not fit in the six that degrees 0 to 2 would allocate.
+    cell_data_size = max(cell_data_size, cell_data_size_solver(scheme.solver))
+    eval_data_size = max(eval_data_size, eval_data_size_solver(scheme.solver))
 
     RealT = eltype(grid.xc)
     MArr = MArray{Tuple{nvariables(eq), nd}, RealT}

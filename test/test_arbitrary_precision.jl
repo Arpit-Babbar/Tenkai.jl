@@ -219,16 +219,12 @@ end
     solver_degree_pairs(dimension)
 
 Every (solver, degree) combination that Tenkai supports on Cartesian grids.
-`cRK44` with degree below 3 is skipped in 1D: its cell data cache is sized for
-the higher degrees and indexing it out of bounds is a pre-existing failure,
-independent of the arithmetic (it fails the same way in `Float64`).
 """
 function solver_degree_pairs(dimension)
     pairs = Tuple{String, Int}[]
     for solver in ("lwfr", "rkfr", "mdrk", "cRK22", "cRK33", "cRK44"),
         degree in 1:4
 
-        dimension == 1 && solver == "cRK44" && degree < 3 && continue
         push!(pairs, (solver, degree))
     end
     return pairs
