@@ -133,6 +133,33 @@ end
 #-------------------------------------------------------------------------------
 # Choose cfl based on degree and correction function
 #-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+# The RKFR entries of the CFL tables in `get_cfl` are the stability limits of
+# the time integrator that each degree uses by default, not of an arbitrary
+# one. Selecting a different integrator and keeping the tabulated number gives
+# a time step that is only correct by accident: the classical `RK4`, for
+# instance, takes four stages per step where `SSPRK54` takes five, so its
+# stability region is smaller and the tabulated step is too large.
+#
+# Deriving the missing entries means computing, for every combination of
+# integrator, degree and correction function, the largest step for which the
+# integrator's stability function maps the spectrum of the FR operator into
+# the unit disc. Those are calibration constants; rather than guess them, this
+# says plainly that the number does not apply.
+#-------------------------------------------------------------------------------
+function warn_if_cfl_not_calibrated(degree, param)
+    @unpack time_scheme = param
+    time_scheme == "by degree" && return nothing
+    calibrated_for = default_time_scheme(degree)
+    time_scheme == calibrated_for && return nothing
+    @warn """The RKFR CFL numbers are calibrated for $calibrated_for, which is what \
+             degree $degree uses by default, but time_scheme = $time_scheme was \
+             requested. The stability limit of $time_scheme is a different number, so \
+             the step taken from the CFL table may be unstable. Pass `cfl` explicitly, \
+             or lower `cfl_safety_factor`, for this combination.""" maxlog=1
+    return nothing
+end
+
 function get_cfl(eq::AbstractEquations{1}, scheme, param)
     @unpack solver, degree, correction_function = scheme
     @unpack cfl_safety_factor, cfl_style = param
@@ -158,6 +185,7 @@ function get_cfl(eq::AbstractEquations{1}, scheme, param)
             end
         end
     elseif solver == "rkfr" || solver isa AbstractRKSolver
+        warn_if_cfl_not_calibrated(degree, param)
         cfl_radau = os_vector([1.0, 0.333, 0.209, 0.145, 0.110])
         cfl_g2 = os_vector([1.0, 1.0, 0.45, 0.2875, 0.212])
     elseif solver == "mdrk"
