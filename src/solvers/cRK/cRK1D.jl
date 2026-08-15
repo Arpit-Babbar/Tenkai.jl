@@ -160,6 +160,20 @@ function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44},
     return nothing
 end
 
+# Number of per-cell and per-face scratch arrays each cRK solver reads out of
+# its cache, i.e. the length of the tuples destructured in
+# `compute_cell_residual_cRK!` and in its boundary flux evaluation. These do not
+# depend on the degree.
+cell_data_size(::cRKSolver) = 0
+cell_data_size(::cRK22) = 4  # F, f, U, u2
+cell_data_size(::cRK33) = 6  # F, f, U, u2, u3, S
+cell_data_size(::cRK44) = 7  # F, f, U, u2, u3, u4, S
+
+eval_data_size(::cRKSolver) = 0
+eval_data_size(::cRK22) = 2  # u2 at 2 faces
+eval_data_size(::cRK33) = 4  # u, u3 at 2 faces
+eval_data_size(::cRK44) = 8  # u, u2, u3, u4 at 2 faces
+
 function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
                       eq::AbstractEquations{1})
     RealT = eltype(grid.xc)
@@ -182,31 +196,11 @@ function setup_arrays(grid, scheme::Scheme{<:cRKSolver},
     u1_b = copy(Ub)
     ub_N = gArray(nvar, 2, nx) # The final stage of cRK before communication
 
-    if degree == 0
-        cell_data_size = 7 # TODO - Make this 0
-        eval_data_size = 6 # TODO - Make this 0
-    elseif degree == 1
-        cell_data_size = 8 # TODO - Make this 7
-        eval_data_size = 6
-    elseif degree == 2
-        cell_data_size = 9
-        eval_data_size = 6
-    elseif degree == 3
-        cell_data_size = 14
-        eval_data_size = 16
-    elseif degree == 4
-        cell_data_size = 16
-        eval_data_size = 18
-    else
-        @assert false "Degree not implemented"
-    end
-
-    RealT = eltype(grid.xc)
     MArr = MArray{Tuple{nvariables(eq), nd}, RealT}
-    cell_data = alloc_for_threads(MArr, cell_data_size)
+    cell_data = alloc_for_threads(MArr, cell_data_size(scheme.solver))
 
     MArr = MArray{Tuple{nvariables(eq), 1}, RealT}
-    eval_data = alloc_for_threads(MArr, eval_data_size)
+    eval_data = alloc_for_threads(MArr, eval_data_size(scheme.solver))
 
     cache = (; u1, ua, res, Fb, Ub, u1_b, ub_N, cell_data, eval_data)
     return cache
