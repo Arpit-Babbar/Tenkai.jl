@@ -3490,11 +3490,7 @@ function compute_error(problem, grid, eq::AbstractEquations{2}, aux, op, u1, t)
 
     @unpack exact_solution = problem
 
-    # The error is computed with the Gauss rule built in `create_aux_cache`:
-    # `xq` are its points, `w2d` the tensor product of its weights and `V` the
-    # Vandermonde matrix that evaluates the solution polynomial at `xq`. All
-    # three have to come from the same rule for `l1_error` and `l2_error` to be
-    # the norms they claim to be.
+    # If w2d is changed, xq and V need to be changed as well
     @unpack xq, w2d, V, arr_cache = error_cache
 
     nq = length(xq)
