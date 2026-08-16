@@ -92,7 +92,7 @@ end
                                             eval_data_big,
                                             xg, Vl, Vr, F, G, F2, G2, Fb, Fb2, aux)
     RealT = eltype(xg)
-    # RealT(1 // 6) would read better but is slow; see "Rational coefficients" in FR.jl.
+    # _1 keeps the coefficients below in RealT rather than Float64.
     _1 = one(RealT)
     nvar = nvariables(eq)
     nd = length(xg)
@@ -120,13 +120,13 @@ end
         gu = flux(x, yu, uu_node, eq, 2)
 
         # KLUDGE - Indices order needs to be changed!!
-        set_node_vars!(Fb, 0.5 * fl, eq, i, 1)
+        set_node_vars!(Fb, 0.5f0 * fl, eq, i, 1)
         set_node_vars!(Fb2, fl, eq, i, 1)
-        set_node_vars!(Fb, 0.5 * fr, eq, i, 2)
+        set_node_vars!(Fb, 0.5f0 * fr, eq, i, 2)
         set_node_vars!(Fb2, fr, eq, i, 2)
-        set_node_vars!(Fb, 0.5 * gd, eq, i, 3)
+        set_node_vars!(Fb, 0.5f0 * gd, eq, i, 3)
         set_node_vars!(Fb2, gd, eq, i, 3)
-        set_node_vars!(Fb, 0.5 * gu, eq, i, 4)
+        set_node_vars!(Fb, 0.5f0 * gu, eq, i, 4)
         set_node_vars!(Fb2, gu, eq, i, 4)
 
         upl_node = get_node_vars(upl, eq, i)
@@ -169,24 +169,24 @@ end
         gmmd = flux(x, yd, ummd_node, eq, 2)
         gmmu = flux(x, yu, ummu_node, eq, 2)
 
-        ftl_node = (_1 / 12) * (-fppl + 8.0 * fpl - 8.0 * fml + fmml)
-        ftr_node = (_1 / 12) * (-fppr + 8.0 * fpr - 8.0 * fmr + fmmr)
+        ftl_node = _1 / 12 * (-fppl + 8 * fpl - 8 * fml + fmml)
+        ftr_node = _1 / 12 * (-fppr + 8 * fpr - 8 * fmr + fmmr)
 
-        multiply_add_to_node_vars!(Fb, 0.125, ftl_node, eq, i, 1)
-        multiply_add_to_node_vars!(Fb, 0.125, ftr_node, eq, i, 2)
-        multiply_add_to_node_vars!(Fb2, (_1 / 6), ftl_node, eq, i, 1)
-        multiply_add_to_node_vars!(Fb2, (_1 / 6), ftr_node, eq, i, 2)
+        multiply_add_to_node_vars!(Fb, 0.125f0, ftl_node, eq, i, 1)
+        multiply_add_to_node_vars!(Fb, 0.125f0, ftr_node, eq, i, 2)
+        multiply_add_to_node_vars!(Fb2, _1 / 6, ftl_node, eq, i, 1)
+        multiply_add_to_node_vars!(Fb2, _1 / 6, ftr_node, eq, i, 2)
 
-        gtd_node = 0.5 * (gpd - gmd)
-        gtu_node = 0.5 * (gpu - gmu)
+        gtd_node = 0.5f0 * (gpd - gmd)
+        gtu_node = 0.5f0 * (gpu - gmu)
 
-        gtd_node = (_1 / 12) * (-gppd + 8.0 * gpd - 8.0 * gmd + gmmd)
-        gtu_node = (_1 / 12) * (-gppu + 8.0 * gpu - 8.0 * gmu + gmmu)
+        gtd_node = _1 / 12 * (-gppd + 8 * gpd - 8 * gmd + gmmd)
+        gtu_node = _1 / 12 * (-gppu + 8 * gpu - 8 * gmu + gmmu)
 
-        multiply_add_to_node_vars!(Fb, 0.125, gtd_node, eq, i, 3)
-        multiply_add_to_node_vars!(Fb, 0.125, gtu_node, eq, i, 4)
-        multiply_add_to_node_vars!(Fb2, (_1 / 6), gtd_node, eq, i, 3)
-        multiply_add_to_node_vars!(Fb2, (_1 / 6), gtu_node, eq, i, 4)
+        multiply_add_to_node_vars!(Fb, 0.125f0, gtd_node, eq, i, 3)
+        multiply_add_to_node_vars!(Fb, 0.125f0, gtu_node, eq, i, 4)
+        multiply_add_to_node_vars!(Fb2, _1 / 6, gtd_node, eq, i, 3)
+        multiply_add_to_node_vars!(Fb2, _1 / 6, gtu_node, eq, i, 4)
     end
 end
 
@@ -194,7 +194,7 @@ end
                                             eval_data_big,
                                             xg, Vl, Vr, F, G, Fb, Fb2, aux, ::Nothing)
     RealT = eltype(xg)
-    # RealT(1 // 6) would read better but is slow; see "Rational coefficients" in FR.jl.
+    # _1 keeps the coefficients below in RealT rather than Float64.
     _1 = one(RealT)
     nvar = nvariables(eq)
     nd = length(xg)
@@ -262,17 +262,17 @@ end
         gmmd = flux(x, yd, ummd_node, eq, 2)
         gmmu = flux(x, yu, ummu_node, eq, 2)
 
-        ftl_node = (_1 / 12) * (-fppl + 8.0 * fpl - 8.0 * fml + fmml)
-        ftr_node = (_1 / 12) * (-fppr + 8.0 * fpr - 8.0 * fmr + fmmr)
+        ftl_node = _1 / 12 * (-fppl + 8 * fpl - 8 * fml + fmml)
+        ftr_node = _1 / 12 * (-fppr + 8 * fpr - 8 * fmr + fmmr)
 
-        multiply_add_to_node_vars!(Fb, (_1 / 3), ftl_node, eq, i, 1)
-        multiply_add_to_node_vars!(Fb, (_1 / 3), ftr_node, eq, i, 2)
+        multiply_add_to_node_vars!(Fb, _1 / 3, ftl_node, eq, i, 1)
+        multiply_add_to_node_vars!(Fb, _1 / 3, ftr_node, eq, i, 2)
 
-        gtd_node = (_1 / 12) * (-gppd + 8.0 * gpd - 8.0 * gmd + gmmd)
-        gtu_node = (_1 / 12) * (-gppu + 8.0 * gpu - 8.0 * gmu + gmmu)
+        gtd_node = _1 / 12 * (-gppd + 8 * gpd - 8 * gmd + gmmd)
+        gtu_node = _1 / 12 * (-gppu + 8 * gpu - 8 * gmu + gmmu)
 
-        multiply_add_to_node_vars!(Fb, (_1 / 3), gtd_node, eq, i, 3)
-        multiply_add_to_node_vars!(Fb, (_1 / 3), gtu_node, eq, i, 4)
+        multiply_add_to_node_vars!(Fb, _1 / 3, gtd_node, eq, i, 3)
+        multiply_add_to_node_vars!(Fb, _1 / 3, gtu_node, eq, i, 4)
     end
 end
 
@@ -321,7 +321,7 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
                                        problem, scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
     RealT = eltype(u1)
-    # RealT(1 // 6) would read better but is slow; see "Rational coefficients" in FR.jl.
+    # _1 keeps the coefficients below in RealT rather than Float64.
     _1 = one(RealT)
     nvar = nvariables(eq)
     @unpack xg, Dm, D1, Vl, Vr = op
@@ -355,12 +355,12 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
 
         u1_ = @view u1[:, :, :, el_x, el_y]
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
-            x = xc - 0.5 * dx + xg[i] * dx
-            y = yc - 0.5 * dy + xg[j] * dy
+            x = xc - 0.5f0 * dx + xg[i] * dx
+            y = yc - 0.5f0 * dy + xg[j] * dy
             u_node = get_node_vars(u1_, eq, i, j)
             flux1, flux2 = flux(x, y, u_node, eq)
-            set_node_vars!(F, 0.5 * flux1, eq, i, j)
-            set_node_vars!(G, 0.5 * flux2, eq, i, j)
+            set_node_vars!(F, 0.5f0 * flux1, eq, i, j)
+            set_node_vars!(G, 0.5f0 * flux2, eq, i, j)
             set_node_vars!(F2_loc, flux1, eq, i, j)
             set_node_vars!(G2_loc, flux2, eq, i, j)
             for ii in Base.OneTo(nd)
@@ -373,24 +373,24 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
                 # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
                 multiply_add_to_node_vars!(ut, -lamy * Dm[jj, j], flux2, eq, i, jj)
             end
-            set_node_vars!(U, 0.5 * u_node, eq, i, j)
+            set_node_vars!(U, 0.5f0 * u_node, eq, i, j)
             set_node_vars!(U2_loc, u_node, eq, i, j)
         end
 
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
-            y_ = yc - 0.5 * dy + xg[j] * dy
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
+            y_ = yc - 0.5f0 * dy + xg[j] * dy
             x = SVector(x_, y_)
             u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
             s_node = calc_source(u_node, x, t, source_terms, eq)
-            set_node_vars!(S, 0.5 * s_node, eq, i, j)
+            set_node_vars!(S, 0.5f0 * s_node, eq, i, j)
             set_node_vars!(S2, s_node, eq, i, j, el_x, el_y)
             multiply_add_to_node_vars!(ut, dt, s_node, eq, i, j)
         end
 
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
-            x = xc - 0.5 * dx + xg[i] * dx
-            y = yc - 0.5 * dy + xg[j] * dy
+            x = xc - 0.5f0 * dx + xg[i] * dx
+            y = yc - 0.5f0 * dy + xg[j] * dy
             X = SVector(x, y)
             u_node = get_node_vars(u1_, eq, i, j)
             ut_node = get_node_vars(ut, eq, i, j)
@@ -398,8 +398,8 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
             um = u_node - ut_node
             up = u_node + ut_node
 
-            umm = u_node - 2.0 * ut_node
-            upp = u_node + 2.0 * ut_node
+            umm = u_node - 2 * ut_node
+            upp = u_node + 2 * ut_node
 
             # For efficient computation of time averaged flux at interfaces
             # ul = u * V
@@ -438,15 +438,15 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
             fp, gp = flux(x, y, up, eq)
             fpp, gpp = flux(x, y, upp, eq)
 
-            ft = (_1 / 12) * (-fpp + 8.0 * fp - 8.0 * fm + fmm) # This ft is actually Δt * ft
-            gt = (_1 / 12) * (-gpp + 8.0 * gp - 8.0 * gm + gmm) # This gt is actually Δt * gt
+            ft = _1 / 12 * (-fpp + 8 * fp - 8 * fm + fmm) # This ft is actually Δt * ft
+            gt = _1 / 12 * (-gpp + 8 * gp - 8 * gm + gmm) # This gt is actually Δt * gt
 
-            multiply_add_to_node_vars!(F, 0.125, ft, eq, i, j)
-            multiply_add_to_node_vars!(G, 0.125, gt, eq, i, j)
-            multiply_add_to_node_vars!(U, 0.125, ut_node, eq, i, j)
-            multiply_add_to_node_vars!(F2_loc, (_1 / 6), ft, eq, i, j)
-            multiply_add_to_node_vars!(G2_loc, (_1 / 6), gt, eq, i, j)
-            multiply_add_to_node_vars!(U2_loc, (_1 / 6), ut_node, eq, i, j)
+            multiply_add_to_node_vars!(F, 0.125f0, ft, eq, i, j)
+            multiply_add_to_node_vars!(G, 0.125f0, gt, eq, i, j)
+            multiply_add_to_node_vars!(U, 0.125f0, ut_node, eq, i, j)
+            multiply_add_to_node_vars!(F2_loc, _1 / 6, ft, eq, i, j)
+            multiply_add_to_node_vars!(G2_loc, _1 / 6, gt, eq, i, j)
+            multiply_add_to_node_vars!(U2_loc, _1 / 6, ut_node, eq, i, j)
             F_node = get_node_vars(F, eq, i, j)
             for ii in Base.OneTo(nd)
                 multiply_add_to_node_vars!(res, lamx * D1[ii, i], F_node, eq,
@@ -472,9 +472,9 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
 
             st = calc_source_t_N12(up, um,
                                    X, t, dt, source_terms, eq)
-            multiply_add_to_node_vars!(S, 0.125, st, eq, i, j)
+            multiply_add_to_node_vars!(S, 0.125f0, st, eq, i, j)
 
-            multiply_add_to_node_vars!(S2, (_1 / 6), st, eq, i, j, el_x, el_y)
+            multiply_add_to_node_vars!(S2, _1 / 6, st, eq, i, j, el_x, el_y)
 
             S_node = get_node_vars(S, eq, i, j)
 
@@ -503,7 +503,7 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, probl
                                        scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
     RealT = eltype(u1)
-    # RealT(1 // 6) would read better but is slow; see "Rational coefficients" in FR.jl.
+    # _1 keeps the coefficients below in RealT rather than Float64.
     _1 = one(RealT)
     nvar = nvariables(eq)
     @unpack xg, Dm, D1, Vl, Vr = op
@@ -545,8 +545,8 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, probl
         u1_ = @view u1[:, :, :, el_x, el_y]
         us_ = @view us[:, :, :, el_x, el_y]
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
-            x = xc - 0.5 * dx + xg[i] * dx
-            y = yc - 0.5 * dy + xg[j] * dy
+            x = xc - 0.5f0 * dx + xg[i] * dx
+            y = yc - 0.5f0 * dy + xg[j] * dy
             us_node = get_node_vars(us_, eq, i, j)
             flux1, flux2 = flux(x, y, us_node, eq)
             for ii in Base.OneTo(nd)
@@ -562,25 +562,25 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, probl
         end
 
         for j in 1:nd, i in 1:nd
-            x = xc - 0.5 * dx + xg[i] * dx
-            y = yc - 0.5 * dy + xg[j] * dy
+            x = xc - 0.5f0 * dx + xg[i] * dx
+            y = yc - 0.5f0 * dy + xg[j] * dy
             X = SVector(x, y)
             u_node = get_node_vars(us, eq, i, j, el_x, el_y)
-            s_node = calc_source(u_node, X, t + 0.5 * dt, source_terms, eq)
+            s_node = calc_source(u_node, X, t + 0.5f0 * dt, source_terms, eq)
             multiply_add_to_node_vars!(ust, dt, s_node, eq, i, j)
         end
 
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
-            x = xc - 0.5 * dx + xg[i] * dx
-            y = yc - 0.5 * dy + xg[j] * dy
+            x = xc - 0.5f0 * dx + xg[i] * dx
+            y = yc - 0.5f0 * dy + xg[j] * dy
             X = SVector(x, y)
             us_node = get_node_vars(us_, eq, i, j)
             ust_node = get_node_vars(ust, eq, i, j)
 
             um = us_node - ust_node
             up = us_node + ust_node
-            umm = us_node - 2.0 * ust_node
-            upp = us_node + 2.0 * ust_node
+            umm = us_node - 2 * ust_node
+            upp = us_node + 2 * ust_node
 
             multiply_add_to_node_vars!(upl, Vl[i], up, eq, j)
             multiply_add_to_node_vars!(upr, Vr[i], up, eq, j)
@@ -608,16 +608,16 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, probl
             fpp, gpp = flux(x, y, upp, eq)
 
             #  ft_node = get_node_vars(ft, eq, i, j)
-            ft = (_1 / 12) * (-fpp + 8.0 * fp - 8.0 * fm + fmm)
-            gt = (_1 / 12) * (-gpp + 8.0 * gp - 8.0 * gm + gmm)
-            multiply_add_to_node_vars!(F, (_1 / 3), ft, eq, i, j)
-            multiply_add_to_node_vars!(G, (_1 / 3), gt, eq, i, j)
-            multiply_add_to_node_vars!(U, (_1 / 3), ust_node, eq, i, j)
+            ft = _1 / 12 * (-fpp + 8 * fp - 8 * fm + fmm)
+            gt = _1 / 12 * (-gpp + 8 * gp - 8 * gm + gmm)
+            multiply_add_to_node_vars!(F, _1 / 3, ft, eq, i, j)
+            multiply_add_to_node_vars!(G, _1 / 3, gt, eq, i, j)
+            multiply_add_to_node_vars!(U, _1 / 3, ust_node, eq, i, j)
 
-            st = calc_source_t_N34(us_node, up, upp, um, umm, X, t + 0.5 * dt, dt,
+            st = calc_source_t_N34(us_node, up, upp, um, umm, X, t + 0.5f0 * dt, dt,
                                    source_terms, eq)
 
-            multiply_add_to_node_vars!(S2, (_1 / 3), st, eq, i, j, el_x, el_y)
+            multiply_add_to_node_vars!(S2, _1 / 3, st, eq, i, j, el_x, el_y)
 
             S_node = get_node_vars(S2, eq, i, j, el_x, el_y)
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, j, el_x, el_y)

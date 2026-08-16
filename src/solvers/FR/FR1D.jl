@@ -545,9 +545,9 @@ function apply_tvb_limiter!(eq::AbstractEquations{1, 1}, problem, scheme, grid,
                       Mdx2)
         # limit if jumps are detected
         if abs(dul - dulm) > 1e-06 || abs(dur - durm) > 1e-06
-            dux = 0.5 * (dulm + durm)
+            dux = 0.5f0 * (dulm + durm)
             for ii in 1:nd
-                u1_[ii, el_x] = ua_[el_x] + 2.0 * (xg[ii] - 0.5) * dux
+                u1_[ii, el_x] = ua_[el_x] + 2 * (xg[ii] - 0.5f0) * dux
             end
         end
     end
@@ -574,7 +574,7 @@ function apply_hierarchical_limiter!(eq::AbstractEquations{1}, # 1D equations
     nd = degree + 1
 
     # Work in [-1,1]
-    xg = 2.0 * xg_ .- 1.0
+    xg = 2 * xg_ .- 1
 
     # Convert to modal basis
     Pn2m = nodal2modal_krivodonova(xg)
@@ -749,9 +749,9 @@ function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
         un[:, nd + 2] .= 0.0
         for ii in 1:nd # get face values as average of the two cells
             for n in 1:nvar
-                un[n, 1] += 0.5 *
+                un[n, 1] += 0.5f0 *
                             (u1[n, ii, i - 1] * Vr[ii] + u1[n, ii, i] * Vl[ii])
-                un[n, nd + 2] += 0.5 *
+                un[n, nd + 2] += 0.5f0 *
                                  (u1[n, ii, i] * Vr[ii] + u1[n, ii, i + 1] * Vl[ii])
             end
         end
@@ -846,7 +846,7 @@ function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
                 alpha[i] = amax
             else
                 y = log(E[i] / E0) / log(E1 / E0)
-                z = sin(0.5 * pi * y)^2
+                z = sin(0.5f0 * pi * y)^2
                 alpha[i] = amax * z
             end
         end
@@ -873,7 +873,7 @@ function modal_smoothness_indicator_new(eq::AbstractEquations{1}, t, iter,
                     alpha_[m] = 1.0
                 else
                     y = log(E[i] / E0[m]) / log(E1[m] / E0[m])
-                    z = sin(0.5 * pi * y)^2
+                    z = sin(0.5f0 * pi * y)^2
                     alpha_[m] = amax * z
                 end
             end
@@ -1003,12 +1003,13 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
         E[i] = maximum(ind) # maximum content among all indicating variables
 
         T = a * 10^(-c * nd^(0.25))
-        s = log((1.0 - 0.0001) / 0.0001)  # chosen to ensure so that E = 0 => alpha = amin
-        alpha[i] = 1.0 / (1.0 + exp((-s / T) * (E[i] - T)))
+        eps_alpha = RealT(0.0001)
+        s = log((1 - eps_alpha) / eps_alpha)  # so that E = 0 => alpha = amin
+        alpha[i] = 1 / (1 + exp((-s / T) * (E[i] - T)))
 
         if alpha[i] < amin # amin = 0.0001
             alpha[i] = 0.0
-        elseif alpha[i] > 1.0 - amin
+        elseif alpha[i] > 1 - amin
             alpha[i] = 1.0
         end
 
@@ -1029,15 +1030,15 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{1}, t, iter,
     # smoothing in time
     if smoothing_in_time
         for i in 1:nx
-            alpha[i] = max(0.9 * alpha0[i], 0.5 * alpha0[i - 1],
-                           0.5 * alpha0[i + 1],
+            alpha[i] = max(RealT(0.9) * alpha0[i], 0.5f0 * alpha0[i - 1],
+                           0.5f0 * alpha0[i + 1],
                            alpha[i])
         end
     end
     # Smoothening of alpha
     alpha0 .= alpha
     for i in 1:nx
-        alpha[i] = max(0.5 * alpha0[i - 1], alpha[i], 0.5 * alpha0[i + 1])
+        alpha[i] = max(0.5f0 * alpha0[i - 1], alpha[i], 0.5f0 * alpha0[i + 1])
         alpha[i] = min(alpha[i], amax)
     end
 
@@ -1087,13 +1088,14 @@ function modal_smoothness_indicator_gassner_new(eq::AbstractEquations{1}, t,
     alpha = blend.alpha    # vector containing smoothness indicator values
     @unpack a0, a1 = blend # smoothing coefficients
 
-    amin = 0.001
-    amax = 1.0
+    RealT = eltype(u1)
+
+    amin = RealT(0.001)
+    amax = one(RealT)
 
     # some strings specifying the kind of blending
     @unpack indicator_model, indicating_variables = limiter
 
-    RealT = eltype(u1)
     # Get nodal basis from values at extended solution points
     Pn2m = nodal2modal(xg)
 
@@ -1121,7 +1123,7 @@ function modal_smoothness_indicator_gassner_new(eq::AbstractEquations{1}, t,
                                          zeros(RealT, n_ind_nvar),
                                          zeros(RealT, n_ind_nvar)
         for n in 1:n_ind_nvar
-            @views um[n, 1] *= 0.1 # FIXME - Replace with 0.1*cell_max/global_max
+            @views um[n, 1] *= RealT(0.1) # FIXME - Replace with 0.1*cell_max/global_max
 
             # Last node
             ind_den = @views sum(um[n, 1:end] .^ 2)      # Gassner takes constant node
@@ -1157,7 +1159,7 @@ function modal_smoothness_indicator_gassner_new(eq::AbstractEquations{1}, t,
         end
         # E[i] = maximum(ind) # maximum content among all indicating variables
 
-        a_, c_ = 0.5, 1.8
+        a_, c_ = RealT(0.5), RealT(1.8)
         E_nd = maximum(ind_nd)
         E_nd_m_1 = maximum(ind_nd_m_1)
         E_nd_m_2 = maximum(ind_nd_m_2)
@@ -1170,10 +1172,11 @@ function modal_smoothness_indicator_gassner_new(eq::AbstractEquations{1}, t,
         a_nd_m_2 = a_
         c_nd_m_2 = c_
         T_nd_m_2 = a_nd_m_2 * 10^(-c_nd_m_2 * (nd - 2)^(0.25))
-        s = log((1.0 - 0.0001) / 0.0001)  # chosen to ensure so that E = 0 => alpha = amin
-        alpha_nd = 1.0 / (1.0 + exp((-s / T_nd) * (E_nd - T_nd)))
+        eps_alpha = RealT(0.0001)
+        s = log((1 - eps_alpha) / eps_alpha)  # so that E = 0 => alpha = amin
+        alpha_nd = 1 / (1 + exp((-s / T_nd) * (E_nd - T_nd)))
         # alpha_nd = 0.0
-        alpha_nd_m_1 = 1.0 / (1.0 + exp((-s / T_nd_m_1) * (E_nd_m_1 - T_nd_m_1)))
+        alpha_nd_m_1 = 1 / (1 + exp((-s / T_nd_m_1) * (E_nd_m_1 - T_nd_m_1)))
         # alpha_nd_m_1 = 0.0
         # alpha_nd_m_2 = 1.0 / (1.0 + exp( (-s/T_nd_m_2) * (E_nd_m_2 - T_nd_m_2) ))
         alpha_nd_m_2 = 0.0
@@ -1181,7 +1184,7 @@ function modal_smoothness_indicator_gassner_new(eq::AbstractEquations{1}, t,
 
         if alpha[i] < amin # amin = 0.0001
             alpha[i] = 0.0
-        elseif alpha[i] > 1.0 - amin
+        elseif alpha[i] > 1 - amin
             alpha[i] = 1.0
         end
     end
@@ -1204,7 +1207,7 @@ function modal_smoothness_indicator_gassner_new(eq::AbstractEquations{1}, t,
         # tmp0 = alpha[i]
 
         if alpha[i] < amax
-            alpha[i] = max(0.5 * alpha0[i - 1], alpha[i], 0.5 * alpha0[i + 1])
+            alpha[i] = max(0.5f0 * alpha0[i - 1], alpha[i], 0.5f0 * alpha0[i + 1])
         end
         alpha[i] = min(alpha[i], amax)
         # tmp = tmp0
@@ -1255,8 +1258,10 @@ function modal_smoothness_indicator_gassner_face(eq, t, iter, fcount, dt, grid,
     alpha = blend.alpha    # vector containing smoothness indicator values
     @unpack a0, a1 = blend # smoothing coefficients
 
-    amin = 0.001
-    amax = 1.0
+    RealT = eltype(u1)
+
+    amin = RealT(0.001)
+    amax = one(RealT)
 
     # some strings specifying the kind of blending
     @unpack indicator_model, indicating_variables = limiter
@@ -1285,9 +1290,9 @@ function modal_smoothness_indicator_gassner_face(eq, t, iter, fcount, dt, grid,
         un[:, nd + 2] .= 0.0
         for ii in 1:nd # get face values as average of the two cells
             for n in 1:nvar
-                un[n, 1] += 0.5 *
+                un[n, 1] += 0.5f0 *
                             (u1[n, ii, i - 1] * Vr[ii] + u1[n, ii, i] * Vl[ii])
-                un[n, nd + 2] += 0.5 *
+                un[n, nd + 2] += 0.5f0 *
                                  (u1[n, ii, i] * Vr[ii] + u1[n, ii, i + 1] * Vl[ii])
             end
         end
@@ -1341,7 +1346,7 @@ function modal_smoothness_indicator_gassner_face(eq, t, iter, fcount, dt, grid,
         end
         # E[i] = maximum(ind) # maximum content among all indicating variables
 
-        a_, c_ = 0.5, 1.8
+        a_, c_ = RealT(0.5), RealT(1.8)
         E_ = maximum(ind_nd)
         E_m_1 = maximum(ind_nd_m_1)
         E_m_2 = maximum(ind_nd_m_2)
@@ -1350,7 +1355,7 @@ function modal_smoothness_indicator_gassner_face(eq, t, iter, fcount, dt, grid,
         a_ = 1.0
         T_ = a_ * 10^(-c_ * (nd + 2)^(0.25))
         a_m_1 = 1.0
-        c_m_1 = 2.2
+        c_m_1 = RealT(2.2)
         T_m_1 = a_m_1 * 10^(-c_m_1 * (nd + 1)^(0.25))
         a_m_2 = 1.0
         c_m_2 = 3.0
@@ -1358,16 +1363,17 @@ function modal_smoothness_indicator_gassner_face(eq, t, iter, fcount, dt, grid,
         a_m_3 = 1.0
         c_m_3 = 3.0
         T_m_3 = a_m_3 * 10^(-c_m_3 * (nd - 1)^(0.25))
-        s = log((1.0 - 0.0001) / 0.0001)  # chosen to ensure so that E = 0 => alpha = amin
-        alpha_nd = 1.0 / (1.0 + exp((-s / T_) * (E_ - T_)))
-        alpha_nd_m_1 = 1.0 / (1.0 + exp((-s / T_m_1) * (E_m_1 - T_m_1)))
-        alpha_nd_m_2 = 1.0 / (1.0 + exp((-s / T_m_2) * (E_m_2 - T_m_2)))
-        alpha_nd_m_3 = 1.0 / (1.0 + exp((-s / T_m_3) * (E_m_3 - T_m_3)))
+        eps_alpha = RealT(0.0001)
+        s = log((1 - eps_alpha) / eps_alpha)  # so that E = 0 => alpha = amin
+        alpha_nd = 1 / (1 + exp((-s / T_) * (E_ - T_)))
+        alpha_nd_m_1 = 1 / (1 + exp((-s / T_m_1) * (E_m_1 - T_m_1)))
+        alpha_nd_m_2 = 1 / (1 + exp((-s / T_m_2) * (E_m_2 - T_m_2)))
+        alpha_nd_m_3 = 1 / (1 + exp((-s / T_m_3) * (E_m_3 - T_m_3)))
         alpha[i] = max(alpha_nd, alpha_nd_m_1, alpha_nd_m_2, alpha_nd_m_3)
 
         if alpha[i] < amin # amin = 0.0001
             alpha[i] = 0.0
-        elseif alpha[i] > 1.0 - amin
+        elseif alpha[i] > 1 - amin
             alpha[i] = 1.0
         end
     end
@@ -1390,7 +1396,7 @@ function modal_smoothness_indicator_gassner_face(eq, t, iter, fcount, dt, grid,
         # tmp0 = alpha[i]
 
         if alpha[i] < amax
-            alpha[i] = max(0.5 * alpha0[i - 1], alpha[i], 0.5 * alpha0[i + 1])
+            alpha[i] = max(0.5f0 * alpha0[i - 1], alpha[i], 0.5f0 * alpha0[i + 1])
         end
         alpha[i] = min(alpha[i], amax)
         # tmp = tmp0
@@ -1529,7 +1535,7 @@ end
     @unpack numflux = blend
     fn_low = @view blend.fn_low[:, :, cell]
     nd = length(wg)
-    xxf = (xf + wg[1] * dx, xf + dx * (1.0 - wg[end]))
+    xxf = (xf + wg[1] * dx, xf + dx * (1 - wg[end]))
     face_indices = (2, nd)
     for ii in 1:2
         xx = xxf[ii]
@@ -1612,7 +1618,7 @@ end
     fl = flux(xf, ul, eq)
     fr = flux(xf, ur, eq)
     fn = scaling_factor * num_flux(xf, ul, ur, fl, fr, ul, ur, eq, 1)
-    Fn = (1.0 - alp) * Fn + alp * fn
+    Fn = (1 - alp) * Fn + alp * fn
     Fn = get_blended_flux(i, eq, dt, grid, blend, scheme, xf, u1, fn, Fn,
                           lamx, op, alp)
     return Fn, (1.0, 1.0)
@@ -1635,7 +1641,7 @@ end
 
     @unpack xg, wg = op
     nd = length(xg)
-    alp = 0.5 * (alpha[i - 1] + alpha[i])
+    alp = 0.5f0 * (alpha[i - 1] + alpha[i])
     if alp < 1e-12
         return blend_flux_only(i, op, scheme, blend, grid, xf, u1, eq, dt, alp, Fn,
                                lamx,
@@ -1657,7 +1663,7 @@ end
 
     # alp = test_alp(i, eq, dt, grid, blend, scheme, xf, u1, fn, Fn, lamx, op, alp)
 
-    Fn = (1.0 - alp) * Fn + alp * fn
+    Fn = (1 - alp) * Fn + alp * fn
 
     Fn = get_blended_flux(i, eq, dt, grid, blend, scheme, xf, u1, fn, Fn, lamx, op,
                           alp)
@@ -1715,7 +1721,7 @@ end
     # Fn = (1.0 - alpha[i]) * Fn
     # one_m_alpha = (1.0 - alpha[i-1], 1.0 - alpha[i])
     # return Fn_, one_m_alpha
-    return Fn, (1.0 - alpha[i - 1], 1.0 - alpha[i])
+    return Fn, (1 - alpha[i - 1], 1 - alpha[i])
     end # timer
 end
 
@@ -1751,12 +1757,12 @@ end
         xxf[ii] = xxf[ii - 1] + dx * wg[ii]
     end
     # @unpack beta = blend
-    beta = 2.0 - blend.alpha[cell]
+    beta = 2 - blend.alpha[cell]
 
     # Get solution points
-    xe[0] = xf - dx * (1.0 - xg[nd])     # Last solution point of left cell
+    xe[0] = xf - dx * (1 - xg[nd])     # Last solution point of left cell
     turbo_copy!(@view(xe[1:nd]), xf .+ dx * xg)  # Solution points on cell
-    xe[nd + 1] = xf + dx * (1.0 + xg[1]) # First solution point on right cell
+    xe[nd + 1] = xf + dx * (1 + xg[1]) # First solution point on right cell
 
     # Force cell-centred approach
     # TOTHINK - Get concrete evidence that this force cell-centred is bad
@@ -1810,8 +1816,8 @@ end
 
         ufl = u_ + slope * (xxf[ii - 1] - xe[ii]) # left face value u_j^{n,-}
         ufr = u_ + slope * (xxf[ii] - xe[ii]) # right face value u_j^{n,+}
-        u_s_l = u_ + slope * 2.0 * (xxf[ii - 1] - xe[ii]) # u_j^{*,-}
-        u_s_r = u_ + slope * 2.0 * (xxf[ii] - xe[ii]) # u_j^{*,+}
+        u_s_l = u_ + slope * 2 * (xxf[ii - 1] - xe[ii]) # u_j^{*,-}
+        u_s_r = u_ + slope * 2 * (xxf[ii] - xe[ii]) # u_j^{*,+}
 
         # Convert back to conservative for update
         recon2cons(u) = blend.recon2conservative!(u, ua, eq)
@@ -1823,10 +1829,10 @@ end
         fr = flux(xxf[ii], ufr, eq)          # f(u_j^{n,+})
         # Use finite difference to evolve face values to time level n+1/2
         for n in 1:nvar
-            unph[n, 1, ii] = ufl[n] + (0.5 * dt_scaled
+            unph[n, 1, ii] = ufl[n] + (0.5f0 * dt_scaled
                               * (fl[n] - fr[n]) / (xxf[ii] - xxf[ii - 1])) # u_j^{n+1/2,-}
             unph[n, 2, ii] = ufr[n] +
-                             0.5 * dt_scaled *
+                             0.5f0 * dt_scaled *
                              ((fl[n] - fr[n])
                               /
                               (xxf[ii] - xxf[ii - 1])) # u_j^{n+1/2,+}
@@ -1866,7 +1872,7 @@ end
     # Here, blend.lamx[i] = dt/dx[i]*alpha[i]. KLUDGE - Can this be avoided?
     @turbo for ix in 1:nd, n in 1:nvar
         r[n, ix] = blend.lamx[cell] * resl[n, ix] +
-                   (1.0 - blend.alpha[cell]) * r[n, ix]
+                   (1 - blend.alpha[cell]) * r[n, ix]
     end
     # Somehow, broadcasting or
     # axpby!(blend.lamx[cell], resl, 1.0-blend.alpha[cell], r)
@@ -1886,7 +1892,7 @@ end
     #! format: noindent
     @unpack blend = aux
     @unpack alpha = blend
-    alp = 0.5 * (alpha[i - 1] + alpha[i])
+    alp = 0.5f0 * (alpha[i - 1] + alpha[i])
     if alp < 1e-12
         return blend_flux_only(i, op, scheme, blend, grid, xf, u1, eq, dt, alp, Fn,
                                lamx,
@@ -1902,7 +1908,7 @@ end
     dx = grid.dx
     # Reuse arrays to save memory
     unph = @view blend.unph[:, :, 1]
-    beta = 2.0 - alp
+    beta = 2 - alp
 
     # The lower order residual of blending scheme comes from lower order
     # numerical flux at the subcell faces. Here we deal with the residual that
@@ -1943,7 +1949,7 @@ end
 
     # left, right face values at current time level
     ufl, ufr = u_ + slope * (xfl - x), u_ + slope * (xfr - x)
-    u_s_l, u_s_r = u_ + 2.0 * slope * (xfl - x), u_ + 2.0 * slope * (xfr - x)
+    u_s_l, u_s_r = u_ + 2 * slope * (xfl - x), u_ + 2 * slope * (xfr - x)
 
     recon2cons_l(u) = blend.recon2conservative!(u, ual, eq)
 
@@ -1956,7 +1962,7 @@ end
     fr = flux(xfr, ufr, eq)
     for n in 1:nvar
         # perform update to get u^{n+1/2,-} with finite difference method
-        unph[n, 1] = ufr[n] + 0.5 * scaled_dt * (fl[n] - fr[n]) / (xfr - xfl)
+        unph[n, 1] = ufr[n] + 0.5f0 * scaled_dt * (fl[n] - fr[n]) / (xfr - xfl)
     end
 
     # We now compute the right face value u^{n+1/2,+}
@@ -1989,7 +1995,7 @@ end
 
     # left, right face values at current time level
     ufl, ufr = u_ + slope * (xfl - x), u_ + slope * (xfr - x)
-    u_s_l, u_s_r = u_ + 2.0 * slope * (xfl - x), u_ + 2.0 * slope * (xfr - x)
+    u_s_l, u_s_r = u_ + 2 * slope * (xfl - x), u_ + 2 * slope * (xfr - x)
 
     recon2cons_r(u) = blend.recon2conservative!(u, uar, eq)
 
@@ -2003,7 +2009,7 @@ end
     fr_ = flux(xr, ufr_, eq)
     for n in 1:nvar
         # perform update to get u^{n+1/2,+} with finite difference method
-        unph[n, 2] = ufl_[n] + 0.5 * scaled_dt * (fl_[n] - fr_[n]) / (xfr - xfl)
+        unph[n, 2] = ufl_[n] + 0.5f0 * scaled_dt * (fl_[n] - fr_[n]) / (xfr - xfl)
     end
 
     # left, right fluxes at i^th face at time level n+1/2
@@ -2019,7 +2025,7 @@ end
     # it's supposed to be 0.25 microseconds
     # alp = test_alp(i, eq, dt, grid, blend, scheme, xf, u1, fn, Fn, lamx, op, alp)
 
-    Fn = (1.0 - alp) * Fn + alp * fn
+    Fn = (1 - alp) * Fn + alp * fn
 
     Fn = get_blended_flux(i, eq, dt, grid, blend, scheme, xf, u1, fn, Fn, lamx, op,
                           alp)
@@ -2051,7 +2057,7 @@ end
         blend.resl[n, 1, i] -= dt / dx[i] * Fn[n] / wg[1] # store for extra limiting
     end
 
-    return Fn, (1.0 - alpha[i - 1], 1.0 - alpha[i])
+    return Fn, (1 - alpha[i - 1], 1 - alpha[i])
     end # limiter
 end
 
@@ -2335,12 +2341,13 @@ function Blend(eq::AbstractEquations{1}, op, grid,
         println("Indicator not implemented for degree")
         @assert false
     end
+    E1 = convert(RealT, E1)
     E0 = E1 * convert(RealT, 1e-2) # E < E0 implies smoothness
     tolE = convert(RealT, 1.0e-6)  # If denominator < tolE, do purely high order
     E, alpha = zeros(RealT, nx),
                OffsetArray(zeros(RealT, nx + 2), OffsetArrays.Origin(0))
     alpha0 = copy(alpha)
-    a0 = convert(RealT, 1.0 / 3.0)
+    a0 = convert(RealT, 1 / 3)
     a1 = 1 - 2 * a0              # smoothing coefficients
     idata = zeros(RealT, nx)                          # t, alpha[1:nx]
     lamx = OffsetArray(zeros(RealT, nx + 2),

@@ -79,14 +79,14 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op, probl
                                        scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
     RealT = eltype(u1)
-    # RealT(1 // 6) would read better but is slow; see "Rational coefficients" in FR.jl.
+    # _1 keeps the coefficients below in RealT rather than Float64.
     _1 = one(RealT)
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     nd = length(xg)
     nx = grid.size
     @unpack bflux_ind = scheme.bflux
     @unpack blend = aux
-    refresh!(u) = fill!(u, 0.0)
+    refresh!(u) = fill!(u, zero(eltype(u)))
 
     @unpack source_terms = problem
 
@@ -106,40 +106,40 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op, probl
         refresh!(ut)
         # Solution points
         for i in 1:nd
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             # Compute flux at all solution points
             flux1 = flux(x_, u_node, eq)
-            set_node_vars!(F, 0.5 * flux1, eq, i)
+            set_node_vars!(F, 0.5f0 * flux1, eq, i)
             set_node_vars!(F2_loc, flux1, eq, i)
             for ix in 1:nd # utt[n] = -lamx * Dm * ft[n] for each n=1:nvar
                 multiply_add_to_node_vars!(ut, -lamx * Dm[ix, i], flux1, eq, ix)
             end
-            set_node_vars!(U, 0.5 * u_node, eq, i)
+            set_node_vars!(U, 0.5f0 * u_node, eq, i)
             set_node_vars!(U2_loc, u_node, eq, i)
         end
 
         # Add source term contribution to ut and some to S
         for i in 1:nd
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             s_node = calc_source(u_node, x_, t, source_terms, eq)
-            set_node_vars!(S, 0.5 * s_node, eq, i)
+            set_node_vars!(S, 0.5f0 * s_node, eq, i)
             set_node_vars!(S2, s_node, eq, i, cell)
             multiply_add_to_node_vars!(ut, dt, s_node, eq, i)
         end
 
         # computes and stores ft, gt and puts them in respective place
         for i in Base.OneTo(nd) # Loop over solution points
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
 
             ut_node = get_node_vars(ut, eq, i)
             u_node = get_node_vars(u1, eq, i, cell)
 
             um = u_node - ut_node
             up = u_node + ut_node
-            umm = u_node - 2.0 * ut_node
-            upp = u_node + 2.0 * ut_node
+            umm = u_node - 2 * ut_node
+            upp = u_node + 2 * ut_node
 
             # For high accurate time averaged flux at interfaces
             # TODO - Is this facter than storing them in an array?
@@ -159,19 +159,19 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op, probl
             fmm = flux(x_, umm, eq)
             fpp = flux(x_, upp, eq)
 
-            ft = (_1 / 12) * (-fpp + 8.0 * fp - 8.0 * fm + fmm) # This ft is actually Δt * ft
-            multiply_add_to_node_vars!(F, 0.125, ft, eq, i) # F += 0.125*dt*ft
-            multiply_add_to_node_vars!(U, 0.125, ut_node, eq, i) # U += 0.125*dt*ut
-            multiply_add_to_node_vars!(F2_loc, (_1 / 6), ft, eq, i) # F2 += 1/6 * dt*ft
-            multiply_add_to_node_vars!(U2_loc, (_1 / 6), ut_node, eq, i) # U2 += 1/6 * dt*ut
+            ft = _1 / 12 * (-fpp + 8 * fp - 8 * fm + fmm) # This ft is actually Δt * ft
+            multiply_add_to_node_vars!(F, 0.125f0, ft, eq, i) # F += 0.125*dt*ft
+            multiply_add_to_node_vars!(U, 0.125f0, ut_node, eq, i) # U += 0.125*dt*ut
+            multiply_add_to_node_vars!(F2_loc, _1 / 6, ft, eq, i) # F2 += 1/6 * dt*ft
+            multiply_add_to_node_vars!(U2_loc, _1 / 6, ut_node, eq, i) # U2 += 1/6 * dt*ut
 
             st = calc_source_t_N34(u_node, up, upp, um, umm, x_, t, dt, source_terms, eq)
-            multiply_add_to_node_vars!(S, 0.125, st, eq, i)
+            multiply_add_to_node_vars!(S, 0.125f0, st, eq, i)
 
             S_node = get_node_vars(S, eq, i)
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, cell)
 
-            multiply_add_to_node_vars!(S2, (_1 / 6), st, eq, i, cell)
+            multiply_add_to_node_vars!(S2, _1 / 6, st, eq, i, cell)
         end
 
         for i in 1:nd # Loop over solution points
@@ -210,8 +210,8 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op, probl
 
             fl, fr = flux(xl, ul, eq), flux(xr, ur, eq)
 
-            set_node_vars!(Fb, 0.5 * fl, eq, 1, cell)
-            set_node_vars!(Fb, 0.5 * fr, eq, 2, cell)
+            set_node_vars!(Fb, 0.5f0 * fl, eq, 1, cell)
+            set_node_vars!(Fb, 0.5f0 * fr, eq, 2, cell)
             set_node_vars!(Fb2, fl, eq, 1, cell)
             set_node_vars!(Fb2, fr, eq, 2, cell)
 
@@ -220,13 +220,13 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{1}, grid, op, probl
             fmml, fmmr = flux(xl, umml, eq), flux(xr, ummr, eq)
             fppl, fppr = flux(xl, uppl, eq), flux(xr, uppr, eq)
 
-            ftl = (_1 / 12) * (-fppl + 8.0 * fpl - 8.0 * fml + fmml)
-            ftr = (_1 / 12) * (-fppr + 8.0 * fpr - 8.0 * fmr + fmmr)
+            ftl = _1 / 12 * (-fppl + 8 * fpl - 8 * fml + fmml)
+            ftr = _1 / 12 * (-fppr + 8 * fpr - 8 * fmr + fmmr)
 
-            multiply_add_to_node_vars!(Fb, 0.125, ftl, eq, 1, cell)
-            multiply_add_to_node_vars!(Fb, 0.125, ftr, eq, 2, cell)
-            multiply_add_to_node_vars!(Fb2, (_1 / 6), ftl, eq, 1, cell)
-            multiply_add_to_node_vars!(Fb2, (_1 / 6), ftr, eq, 2, cell)
+            multiply_add_to_node_vars!(Fb, 0.125f0, ftl, eq, 1, cell)
+            multiply_add_to_node_vars!(Fb, 0.125f0, ftr, eq, 2, cell)
+            multiply_add_to_node_vars!(Fb2, _1 / 6, ftl, eq, 1, cell)
+            multiply_add_to_node_vars!(Fb2, _1 / 6, ftr, eq, 2, cell)
         end
     end
     return nothing
@@ -236,7 +236,7 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op, probl
                                        scheme, aux, t, dt, u1, res, Fb, Ub,
                                        cache)
     RealT = eltype(u1)
-    # RealT(1 // 6) would read better but is slow; see "Rational coefficients" in FR.jl.
+    # _1 keeps the coefficients below in RealT rather than Float64.
     _1 = one(RealT)
     @unpack xg, wg, Dm, D1, Vl, Vr = op
     nd = length(xg)
@@ -244,7 +244,7 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op, probl
     @unpack us = cache
     @unpack bflux_ind = scheme.bflux
     @unpack blend = aux
-    refresh!(u) = fill!(u, 0.0)
+    refresh!(u) = fill!(u, zero(eltype(u)))
 
     @unpack source_terms = problem
 
@@ -266,7 +266,7 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op, probl
         refresh!(ust)
         # Solution points
         for i in 1:nd
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             us_node = get_node_vars(us, eq, i, cell)
             # Compute flux at all solution points
             flux_ = flux(x_, us_node, eq)
@@ -277,23 +277,23 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op, probl
 
         # Add source term contribution to ust
         for i in 1:nd
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(us, eq, i, cell)
-            s_node = calc_source(u_node, x_, t + 0.5 * dt, source_terms, eq)
+            s_node = calc_source(u_node, x_, t + 0.5f0 * dt, source_terms, eq)
             multiply_add_to_node_vars!(ust, dt, s_node, eq, i)
         end
 
         # computes and stores ft, gt and puts them in respective place
         for i in Base.OneTo(nd) # Loop over solution points
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
 
             us_node = get_node_vars(us, eq, i, cell) # u(t+0.5*dt)
             ust_node = get_node_vars(ust, eq, i)
 
             um = us_node - ust_node # u(t - 0.5*dt)
             up = us_node + ust_node # u(t + 1.5*dt)
-            umm = us_node - 2.0 * ust_node # u(t - 2.0*dt)
-            upp = us_node + 2.0 * ust_node # u(t + 3.5*dt)
+            umm = us_node - 2 * ust_node # u(t - 2.0*dt)
+            upp = us_node + 2 * ust_node # u(t + 3.5*dt)
             fm = flux(x_, um, eq)
             fp = flux(x_, up, eq)
             fmm = flux(x_, umm, eq)
@@ -311,16 +311,16 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op, probl
             umml += Vl[i] * umm
             ummr += Vr[i] * umm
 
-            ft_s = (_1 / 12) * (-fpp + 8.0 * fp - 8.0 * fm + fmm)
+            ft_s = _1 / 12 * (-fpp + 8 * fp - 8 * fm + fmm)
 
-            multiply_add_to_node_vars!(F, (_1 / 3), ft_s, eq, i)    # F += 1/3 *dt*ft
+            multiply_add_to_node_vars!(F, _1 / 3, ft_s, eq, i)    # F += 1/3 *dt*ft
 
-            multiply_add_to_node_vars!(U, (_1 / 3), ust_node, eq, i)    # U += 1/6 * dt * ut
+            multiply_add_to_node_vars!(U, _1 / 3, ust_node, eq, i)    # U += 1/6 * dt * ut
 
-            st = calc_source_t_N34(us_node, up, upp, um, umm, x_, t + 0.5 * dt, dt,
+            st = calc_source_t_N34(us_node, up, upp, um, umm, x_, t + 0.5f0 * dt, dt,
                                    source_terms, eq)
 
-            multiply_add_to_node_vars!(S2, (_1 / 3), st, eq, i, cell)
+            multiply_add_to_node_vars!(S2, _1 / 3, st, eq, i, cell)
 
             S_node = get_node_vars(S2, eq, i, cell)
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, cell)
@@ -363,11 +363,11 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{1}, grid, op, probl
             fmml, fmmr = flux(xl, umml, eq), flux(xr, ummr, eq)
             fppl, fppr = flux(xl, uppl, eq), flux(xr, uppr, eq)
 
-            ftl = (_1 / 12) * (-fppl + 8.0 * fpl - 8.0 * fml + fmml)
-            ftr = (_1 / 12) * (-fppr + 8.0 * fpr - 8.0 * fmr + fmmr)
+            ftl = _1 / 12 * (-fppl + 8 * fpl - 8 * fml + fmml)
+            ftr = _1 / 12 * (-fppr + 8 * fpr - 8 * fmr + fmmr)
 
-            multiply_add_to_node_vars!(Fb, (_1 / 3), ftl, eq, 1, cell)
-            multiply_add_to_node_vars!(Fb, (_1 / 3), ftr, eq, 2, cell)
+            multiply_add_to_node_vars!(Fb, _1 / 3, ftl, eq, 1, cell)
+            multiply_add_to_node_vars!(Fb, _1 / 3, ftr, eq, 2, cell)
         end
     end
     return nothing

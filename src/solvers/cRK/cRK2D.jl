@@ -11,8 +11,8 @@ function get_cfl(eq::AbstractEquations{2}, scheme::Scheme{<:cRKSolver}, param)
     @unpack dissipation = scheme
     @assert (degree >= 0&&degree < 5) "Invalid degree"
     os_vector(v) = OffsetArray(v, OffsetArrays.Origin(0))
-    cfl_radau = os_vector([1.0, 0.259, 0.170, 0.103, 0.069])
-    cfl_g2 = os_vector([1.0, 0.511, 0.333, 0.170, 0.103])
+    cfl_radau = os_vector([1, 0.259, 0.170, 0.103, 0.069])
+    cfl_g2 = os_vector([1, 0.511, 0.333, 0.170, 0.103])
     # Reduce this cfl by a small amount
     if correction_function == "radau"
         return cfl_safety_factor * cfl_radau[degree]
@@ -262,17 +262,17 @@ function eval_bflux!(eq::AbstractEquations{2}, scheme::Scheme{<:cRK33}, grid,
 
         # KLUDGE - Indices order needs to be changed, or something else
         # needs to be done to avoid cache misses
-        multiply_add_to_node_vars!(Fb, 0.25, fl, 0.75, f3l, eq, i, 1)
-        multiply_add_to_node_vars!(Fb, 0.25, fr, 0.75, f3r, eq, i, 2)
-        multiply_add_to_node_vars!(Fb, 0.25, gd, 0.75, g3d, eq, i, 3)
-        multiply_add_to_node_vars!(Fb, 0.25, gu, 0.75, g3u, eq, i, 4)
+        multiply_add_to_node_vars!(Fb, 0.25f0, fl, 0.75f0, f3l, eq, i, 1)
+        multiply_add_to_node_vars!(Fb, 0.25f0, fr, 0.75f0, f3r, eq, i, 2)
+        multiply_add_to_node_vars!(Fb, 0.25f0, gd, 0.75f0, g3d, eq, i, 3)
+        multiply_add_to_node_vars!(Fb, 0.25f0, gu, 0.75f0, g3u, eq, i, 4)
     end
 end
 
 function eval_bflux!(eq::AbstractEquations{2}, scheme::Scheme{<:cRK44}, grid,
                      cell_data, eval_data, xg, Vl, Vr, F, G, Fb, aux)
     RealT = eltype(xg)
-    # RealT(1 // 6) would read better but is slow; see "Rational coefficients" in FR.jl.
+    # _1 keeps the coefficients below in RealT rather than Float64.
     _1 = one(RealT)
     nvar = nvariables(eq)
     nd = length(xg)
@@ -364,31 +364,23 @@ function eval_bflux!(eq::AbstractEquations{2}, scheme::Scheme{<:cRK44}, grid,
 
         # KLUDGE - Indices order needs to be changed, or something else
         # needs to be done to avoid cache misses
-        multiply_add_to_node_vars!(Fb, (_1 / 6), fl, (_1 / 3), f2l, eq,
-                                   i, 1)
-        multiply_add_to_node_vars!(Fb, (_1 / 3), f3l, (_1 / 6), f4l, eq,
-                                   i, 1)
+        multiply_add_to_node_vars!(Fb, _1 / 6, fl, _1 / 3, f2l, eq, i, 1)
+        multiply_add_to_node_vars!(Fb, _1 / 3, f3l, _1 / 6, f4l, eq, i, 1)
 
-        multiply_add_to_node_vars!(Fb, (_1 / 6), fr, (_1 / 3), f2r, eq,
-                                   i, 2)
-        multiply_add_to_node_vars!(Fb, (_1 / 3), f3r, (_1 / 6), f4r, eq,
-                                   i, 2)
+        multiply_add_to_node_vars!(Fb, _1 / 6, fr, _1 / 3, f2r, eq, i, 2)
+        multiply_add_to_node_vars!(Fb, _1 / 3, f3r, _1 / 6, f4r, eq, i, 2)
 
-        multiply_add_to_node_vars!(Fb, (_1 / 6), gd, (_1 / 3), g2d, eq,
-                                   i, 3)
-        multiply_add_to_node_vars!(Fb, (_1 / 3), g3d, (_1 / 6), g4d, eq,
-                                   i, 3)
+        multiply_add_to_node_vars!(Fb, _1 / 6, gd, _1 / 3, g2d, eq, i, 3)
+        multiply_add_to_node_vars!(Fb, _1 / 3, g3d, _1 / 6, g4d, eq, i, 3)
 
-        multiply_add_to_node_vars!(Fb, (_1 / 6), gu, (_1 / 3), g2u, eq,
-                                   i, 4)
-        multiply_add_to_node_vars!(Fb, (_1 / 3), g3u, (_1 / 6), g4u, eq,
-                                   i, 4)
+        multiply_add_to_node_vars!(Fb, _1 / 6, gu, _1 / 3, g2u, eq, i, 4)
+        multiply_add_to_node_vars!(Fb, _1 / 3, g3u, _1 / 6, g4u, eq, i, 4)
     end
 end
 
 function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, problem,
                                 scheme::Scheme{<:cRKSolver}, param, aux, t, dt, u1,
-                                Fb, Ub, ua, res, scaling_factor = 1.0)
+                                Fb, Ub, ua, res, scaling_factor = 1)
     @timeit aux.timer "Face residual" begin
     #! format: noindent
     @unpack bl, br, xg, wg, degree = op
@@ -505,7 +497,7 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
         alpha = get_element_alpha(blend, el_x, el_y) # TODO - Use a function to get this
-        one_m_alp = 1.0 - alpha
+        one_m_alp = 1 - alpha
         for ix in Base.OneTo(nd)
             for jy in Base.OneTo(nd)
                 Fl = get_node_vars(Fb, eq, jy, 1, el_x, el_y)
@@ -583,37 +575,37 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
 
             # Solution points
             for j in 1:nd, i in 1:nd
-                x = xc - 0.5 * dx + xg[i] * dx
-                y = yc - 0.5 * dy + xg[j] * dy
+                x = xc - 0.5f0 * dx + xg[i] * dx
+                y = yc - 0.5f0 * dy + xg[j] * dy
                 u_node = get_node_vars(u1_, eq, i, j)
                 flux1, flux2 = flux(x, y, u_node, eq)
                 for ii in Base.OneTo(nd)
                     # ut              += -lam * D * f for each variable
                     # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-                    multiply_add_to_node_vars!(u2, -0.5 * lamx * Dm[ii, i], flux1, eq,
+                    multiply_add_to_node_vars!(u2, -0.5f0 * lamx * Dm[ii, i], flux1, eq,
                                                ii, j)
                 end
                 for jj in Base.OneTo(nd)
                     # C += -lam*g*Dm' for each variable
                     # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-                    multiply_add_to_node_vars!(u2, -0.5 * lamy * Dm[jj, j], flux2, eq,
+                    multiply_add_to_node_vars!(u2, -0.5f0 * lamy * Dm[jj, j], flux2, eq,
                                                i, jj)
                 end
             end
 
             # Add source term contribution to u2 and some to S
             for j in 1:nd, i in 1:nd
-                x = xc - 0.5 * dx + xg[i] * dx
-                y = yc - 0.5 * dy + xg[j] * dy
+                x = xc - 0.5f0 * dx + xg[i] * dx
+                y = yc - 0.5f0 * dy + xg[j] * dy
                 u_node = get_node_vars(u1_, eq, i, j)
                 X = SVector(x, y)
                 s_node = calc_source(u_node, X, t, source_terms, eq)
-                multiply_add_to_node_vars!(u2, 0.5 * dt, s_node, eq, i, j)
+                multiply_add_to_node_vars!(u2, 0.5f0 * dt, s_node, eq, i, j)
             end
 
             for j in Base.OneTo(nd), i in Base.OneTo(nd)
-                x = xc - 0.5 * dx + xg[i] * dx
-                y = yc - 0.5 * dy + xg[j] * dy
+                x = xc - 0.5f0 * dx + xg[i] * dx
+                y = yc - 0.5f0 * dy + xg[j] * dy
 
                 u2_node = get_node_vars(u2, eq, i, j)
 
@@ -638,7 +630,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
 
                 u2_node = get_node_vars(u2, eq, i, j)
                 X = SVector(x, y)
-                S_node = calc_source(u2_node, X, t + 0.5 * dt, source_terms, eq)
+                S_node = calc_source(u2_node, X, t + 0.5f0 * dt, source_terms, eq)
                 multiply_add_to_node_vars!(r1, -dt, S_node, eq, i, j)
 
                 # KLUDGE - update to v1.8 and call with @inline
@@ -705,30 +697,30 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
 
             # Solution points
             for j in 1:nd, i in 1:nd
-                x = xc - 0.5 * dx + xg[i] * dx
-                y = yc - 0.5 * dy + xg[j] * dy
+                x = xc - 0.5f0 * dx + xg[i] * dx
+                y = yc - 0.5f0 * dy + xg[j] * dy
                 u_node = get_node_vars(u1_, eq, i, j)
                 flux1, flux2 = flux(x, y, u_node, eq)
-                set_node_vars!(F, 0.25 * flux1, eq, i, j)
-                set_node_vars!(G, 0.25 * flux2, eq, i, j)
-                set_node_vars!(U, 0.25 * u_node, eq, i, j)
+                set_node_vars!(F, 0.25f0 * flux1, eq, i, j)
+                set_node_vars!(G, 0.25f0 * flux2, eq, i, j)
+                set_node_vars!(U, 0.25f0 * u_node, eq, i, j)
                 for ii in Base.OneTo(nd)
                     # ut              += -lam * D * f for each variable
                     # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-                    multiply_add_to_node_vars!(u2, -lamx / 3.0 * Dm[ii, i], flux1, eq,
+                    multiply_add_to_node_vars!(u2, -lamx / 3 * Dm[ii, i], flux1, eq,
                                                ii, j)
                 end
                 for jj in Base.OneTo(nd)
                     # C += -lam*g*Dm' for each variable
                     # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-                    multiply_add_to_node_vars!(u2, -lamy / 3.0 * Dm[jj, j], flux2, eq,
+                    multiply_add_to_node_vars!(u2, -lamy / 3 * Dm[jj, j], flux2, eq,
                                                i, jj)
                 end
             end
 
             for j in Base.OneTo(nd), i in Base.OneTo(nd)
-                x = xc - 0.5 * dx + xg[i] * dx
-                y = yc - 0.5 * dy + xg[j] * dy
+                x = xc - 0.5f0 * dx + xg[i] * dx
+                y = yc - 0.5f0 * dy + xg[j] * dy
 
                 u2_node = get_node_vars(u2, eq, i, j)
 
@@ -737,28 +729,28 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{2}, grid, op,
                 for ii in Base.OneTo(nd)
                     # ut              += -lam * D * f for each variable
                     # i.e.,  ut[ii,j] += -lam * Dm[ii,i] f[i,j] (sum over i)
-                    multiply_add_to_node_vars!(u3, -2.0 * lamx / 3.0 * Dm[ii, i], flux1,
+                    multiply_add_to_node_vars!(u3, -2 * lamx / 3 * Dm[ii, i], flux1,
                                                eq, ii, j)
                 end
                 for jj in Base.OneTo(nd)
                     # C += -lam*g*Dm' for each variable
                     # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
-                    multiply_add_to_node_vars!(u3, -2.0 * lamy / 3.0 * Dm[jj, j], flux2,
+                    multiply_add_to_node_vars!(u3, -2 * lamy / 3 * Dm[jj, j], flux2,
                                                eq, i, jj)
                 end
             end
 
             for j in Base.OneTo(nd), i in Base.OneTo(nd)
-                x = xc - 0.5 * dx + xg[i] * dx
-                y = yc - 0.5 * dy + xg[j] * dy
+                x = xc - 0.5f0 * dx + xg[i] * dx
+                y = yc - 0.5f0 * dy + xg[j] * dy
 
                 u3_node = get_node_vars(u3, eq, i, j)
 
                 flux1, flux2 = flux(x, y, u3_node, eq)
 
-                multiply_add_to_node_vars!(F, 0.75, flux1, eq, i, j)
-                multiply_add_to_node_vars!(G, 0.75, flux2, eq, i, j)
-                multiply_add_to_node_vars!(U, 0.75, u3_node, eq, i, j)
+                multiply_add_to_node_vars!(F, 0.75f0, flux1, eq, i, j)
+                multiply_add_to_node_vars!(G, 0.75f0, flux2, eq, i, j)
+                multiply_add_to_node_vars!(U, 0.75f0, u3_node, eq, i, j)
 
                 F_node = get_node_vars(F, eq, i, j)
                 G_node = get_node_vars(G, eq, i, j)

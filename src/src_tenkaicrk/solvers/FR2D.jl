@@ -1639,7 +1639,7 @@ function update_ghost_values_cRK!(problem, scheme, eq::AbstractEquations{2},
     @unpack boundary_condition, boundary_value = problem
     left, right, bottom, top = boundary_condition
 
-    refresh!(u) = fill!(u, 0.0)
+    refresh!(u) = fill!(u, zero(eltype(u)))
 
     # For Dirichlet bc, use upwind flux at faces by assigning both physical
     # and ghost cells through the bc.

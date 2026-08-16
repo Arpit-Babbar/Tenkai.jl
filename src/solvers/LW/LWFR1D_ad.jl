@@ -140,7 +140,7 @@ function compute_cell_residual_1!(eq::AbstractEquations{1}, grid, op, problem,
     nx = grid.size
     @unpack bflux_ind = scheme.bflux
     @unpack blend = aux
-    refresh!(u) = fill!(u, 0.0)
+    refresh!(u) = fill!(u, zero(eltype(u)))
     # Pre-allocate local variables
 
     @unpack cell_data, eval_data = cache
@@ -158,7 +158,7 @@ function compute_cell_residual_1!(eq::AbstractEquations{1}, grid, op, problem,
 
         # Solution points
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             # Compute flux at all solution points
             flux1 = flux(x_, u_node, eq)
@@ -171,13 +171,13 @@ function compute_cell_residual_1!(eq::AbstractEquations{1}, grid, op, problem,
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             ft = derivative_bundle(flux_, (u_node, ut_node))
-            multiply_add_to_node_vars!(F, 0.5, ft, eq, i)
+            multiply_add_to_node_vars!(F, 0.5f0, ft, eq, i)
             ut_node = get_node_vars(ut, eq, i)
-            multiply_add_to_node_vars!(U, 0.5, ut_node, eq, i)
+            multiply_add_to_node_vars!(U, 0.5f0, ut_node, eq, i)
             F_node = get_node_vars(F, eq, i)
             for ix in Base.OneTo(nd)
                 multiply_add_to_node_vars!(res, lamx * D1[ix, i], F_node, eq, ix, cell)
@@ -231,8 +231,8 @@ function compute_cell_residual_1!(eq::AbstractEquations{1}, grid, op, problem,
             ftl = derivative_bundle(flux_, (ul_node, utl_node))
             ftr = derivative_bundle(flux_, (ur_node, utr_node))
 
-            multiply_add_to_node_vars!(Fb, 0.5, ftl, eq, 1, cell)
-            multiply_add_to_node_vars!(Fb, 0.5, ftr, eq, 2, cell)
+            multiply_add_to_node_vars!(Fb, 0.5f0, ftl, eq, 1, cell)
+            multiply_add_to_node_vars!(Fb, 0.5f0, ftr, eq, 2, cell)
             # @assert false "Not implemented"
         end
     end
@@ -249,7 +249,7 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, problem,
     nx = grid.size
     @unpack bflux_ind = scheme.bflux
     @unpack blend = aux
-    refresh!(u) = fill!(u, 0.0)
+    refresh!(u) = fill!(u, zero(eltype(u)))
     # Pre-allocate local variables
 
     @unpack cell_data, eval_data = cache
@@ -267,7 +267,7 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, problem,
 
         # Solution points
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             # Compute flux at all solution points
             flux1 = flux(x_, u_node, eq)
@@ -280,7 +280,7 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, problem,
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             ft = derivative_bundle(flux_, (u_node, ut_node))
@@ -288,19 +288,19 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, problem,
                 multiply_add_to_node_vars!(utt, -lamx * Dm[ii, i], ft, eq, ii)
             end
 
-            multiply_add_to_node_vars!(F, 0.5, ft, eq, i)
-            multiply_add_to_node_vars!(U, 0.5, ut_node, eq, i)
+            multiply_add_to_node_vars!(F, 0.5f0, ft, eq, i)
+            multiply_add_to_node_vars!(U, 0.5f0, ut_node, eq, i)
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             utt_node = get_node_vars(utt, eq, i)
             ftt = derivative_bundle(flux_, (u_node, ut_node, utt_node))
 
-            multiply_add_to_node_vars!(F, 1.0 / 6.0, ftt, eq, i)
-            multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, eq, i)
+            multiply_add_to_node_vars!(F, 1 / 6, ftt, eq, i)
+            multiply_add_to_node_vars!(U, 1 / 6, utt_node, eq, i)
             F_node = get_node_vars(F, eq, i)
             for ii in Base.OneTo(nd)
                 multiply_add_to_node_vars!(res, lamx * D1[ii, i], F_node, eq, ii, cell)
@@ -358,8 +358,8 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, problem,
             ftl = derivative_bundle(flux_, (ul_node, utl_node))
             ftr = derivative_bundle(flux_, (ur_node, utr_node))
 
-            multiply_add_to_node_vars!(Fb, 0.5, ftl, eq, 1, cell)
-            multiply_add_to_node_vars!(Fb, 0.5, ftr, eq, 2, cell)
+            multiply_add_to_node_vars!(Fb, 0.5f0, ftl, eq, 1, cell)
+            multiply_add_to_node_vars!(Fb, 0.5f0, ftr, eq, 2, cell)
 
             uttl_node = get_node_vars(uttl, eq, 1)
             uttr_node = get_node_vars(uttr, eq, 1)
@@ -367,8 +367,8 @@ function compute_cell_residual_2!(eq::AbstractEquations{1}, grid, op, problem,
             fttl = derivative_bundle(flux_, (ul_node, utl_node, uttl_node))
             fttr = derivative_bundle(flux_, (ur_node, utr_node, uttr_node))
 
-            multiply_add_to_node_vars!(Fb, 1.0 / 6.0, fttl, eq, 1, cell)
-            multiply_add_to_node_vars!(Fb, 1.0 / 6.0, fttr, eq, 2, cell)
+            multiply_add_to_node_vars!(Fb, 1 / 6, fttl, eq, 1, cell)
+            multiply_add_to_node_vars!(Fb, 1 / 6, fttr, eq, 2, cell)
         end
     end
     return nothing
@@ -383,7 +383,7 @@ function compute_cell_residual_3!(eq::AbstractEquations{1}, grid, op, problem,
     nx = grid.size
     @unpack bflux_ind = scheme.bflux
     @unpack blend = aux
-    refresh!(u) = fill!(u, 0.0)
+    refresh!(u) = fill!(u, zero(eltype(u)))
     # Pre-allocate local variables
 
     @unpack cell_data, eval_data = cache
@@ -401,7 +401,7 @@ function compute_cell_residual_3!(eq::AbstractEquations{1}, grid, op, problem,
 
         # Solution points
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             # Compute flux at all solution points
             flux1 = flux(x_, u_node, eq)
@@ -414,7 +414,7 @@ function compute_cell_residual_3!(eq::AbstractEquations{1}, grid, op, problem,
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             ft = derivative_bundle(flux_, (u_node, ut_node))
@@ -422,12 +422,12 @@ function compute_cell_residual_3!(eq::AbstractEquations{1}, grid, op, problem,
                 multiply_add_to_node_vars!(utt, -lamx * Dm[ii, i], ft, eq, ii)
             end
 
-            multiply_add_to_node_vars!(F, 0.5, ft, eq, i)
-            multiply_add_to_node_vars!(U, 0.5, ut_node, eq, i)
+            multiply_add_to_node_vars!(F, 0.5f0, ft, eq, i)
+            multiply_add_to_node_vars!(U, 0.5f0, ut_node, eq, i)
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             utt_node = get_node_vars(utt, eq, i)
@@ -436,20 +436,20 @@ function compute_cell_residual_3!(eq::AbstractEquations{1}, grid, op, problem,
                 multiply_add_to_node_vars!(uttt, -lamx * Dm[ii, i], ftt, eq, ii)
             end
 
-            multiply_add_to_node_vars!(F, 1.0 / 6.0, ftt, eq, i)
-            multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, eq, i)
+            multiply_add_to_node_vars!(F, 1 / 6, ftt, eq, i)
+            multiply_add_to_node_vars!(U, 1 / 6, utt_node, eq, i)
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             utt_node = get_node_vars(utt, eq, i)
             uttt_node = get_node_vars(uttt, eq, i)
             fttt = derivative_bundle(flux_, (u_node, ut_node, utt_node, uttt_node))
 
-            multiply_add_to_node_vars!(F, 1.0 / 24.0, fttt, eq, i)
-            multiply_add_to_node_vars!(U, 1.0 / 24.0, uttt_node, eq, i)
+            multiply_add_to_node_vars!(F, 1 / 24, fttt, eq, i)
+            multiply_add_to_node_vars!(U, 1 / 24, uttt_node, eq, i)
             F_node = get_node_vars(F, eq, i)
             for ii in Base.OneTo(nd)
                 multiply_add_to_node_vars!(res, lamx * D1[ii, i], F_node, eq, ii, cell)
@@ -511,8 +511,8 @@ function compute_cell_residual_3!(eq::AbstractEquations{1}, grid, op, problem,
             ftl = derivative_bundle(flux_, (ul_node, utl_node))
             ftr = derivative_bundle(flux_, (ur_node, utr_node))
 
-            multiply_add_to_node_vars!(Fb, 0.5, ftl, eq, 1, cell)
-            multiply_add_to_node_vars!(Fb, 0.5, ftr, eq, 2, cell)
+            multiply_add_to_node_vars!(Fb, 0.5f0, ftl, eq, 1, cell)
+            multiply_add_to_node_vars!(Fb, 0.5f0, ftr, eq, 2, cell)
 
             uttl_node = get_node_vars(uttl, eq, 1)
             uttr_node = get_node_vars(uttr, eq, 1)
@@ -520,8 +520,8 @@ function compute_cell_residual_3!(eq::AbstractEquations{1}, grid, op, problem,
             fttl = derivative_bundle(flux_, (ul_node, utl_node, uttl_node))
             fttr = derivative_bundle(flux_, (ur_node, utr_node, uttr_node))
 
-            multiply_add_to_node_vars!(Fb, 1.0 / 6.0, fttl, eq, 1, cell)
-            multiply_add_to_node_vars!(Fb, 1.0 / 6.0, fttr, eq, 2, cell)
+            multiply_add_to_node_vars!(Fb, 1 / 6, fttl, eq, 1, cell)
+            multiply_add_to_node_vars!(Fb, 1 / 6, fttr, eq, 2, cell)
 
             utttl_node = get_node_vars(utttl, eq, 1)
             utttr_node = get_node_vars(utttr, eq, 1)
@@ -529,8 +529,8 @@ function compute_cell_residual_3!(eq::AbstractEquations{1}, grid, op, problem,
             ftttl = derivative_bundle(flux_, (ul_node, utl_node, uttl_node, utttl_node))
             ftttr = derivative_bundle(flux_, (ur_node, utr_node, uttr_node, utttr_node))
 
-            multiply_add_to_node_vars!(Fb, 1.0 / 24.0, ftttl, eq, 1, cell)
-            multiply_add_to_node_vars!(Fb, 1.0 / 24.0, ftttr, eq, 2, cell)
+            multiply_add_to_node_vars!(Fb, 1 / 24, ftttl, eq, 1, cell)
+            multiply_add_to_node_vars!(Fb, 1 / 24, ftttr, eq, 2, cell)
         end
     end
     return nothing
@@ -545,7 +545,7 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, problem,
     nx = grid.size
     @unpack bflux_ind = scheme.bflux
     @unpack blend = aux
-    refresh!(u) = fill!(u, 0.0)
+    refresh!(u) = fill!(u, zero(eltype(u)))
     # Pre-allocate local variables
 
     @unpack cell_data, eval_data = cache
@@ -563,7 +563,7 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, problem,
 
         # Solution points
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             # Compute flux at all solution points
             flux1 = flux(x_, u_node, eq)
@@ -576,7 +576,7 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, problem,
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             ft = derivative_bundle(flux_, (u_node, ut_node))
@@ -584,12 +584,12 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, problem,
                 multiply_add_to_node_vars!(utt, -lamx * Dm[ii, i], ft, eq, ii)
             end
 
-            multiply_add_to_node_vars!(F, 0.5, ft, eq, i)
-            multiply_add_to_node_vars!(U, 0.5, ut_node, eq, i)
+            multiply_add_to_node_vars!(F, 0.5f0, ft, eq, i)
+            multiply_add_to_node_vars!(U, 0.5f0, ut_node, eq, i)
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             utt_node = get_node_vars(utt, eq, i)
@@ -598,12 +598,12 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, problem,
                 multiply_add_to_node_vars!(uttt, -lamx * Dm[ii, i], ftt, eq, ii)
             end
 
-            multiply_add_to_node_vars!(F, 1.0 / 6.0, ftt, eq, i)
-            multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, eq, i)
+            multiply_add_to_node_vars!(F, 1 / 6, ftt, eq, i)
+            multiply_add_to_node_vars!(U, 1 / 6, utt_node, eq, i)
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             utt_node = get_node_vars(utt, eq, i)
@@ -613,12 +613,12 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, problem,
                 multiply_add_to_node_vars!(utttt, -lamx * Dm[ii, i], fttt, eq, ii)
             end
 
-            multiply_add_to_node_vars!(F, 1.0 / 24.0, fttt, eq, i)
-            multiply_add_to_node_vars!(U, 1.0 / 24.0, uttt_node, eq, i)
+            multiply_add_to_node_vars!(F, 1 / 24, fttt, eq, i)
+            multiply_add_to_node_vars!(U, 1 / 24, uttt_node, eq, i)
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             utt_node = get_node_vars(utt, eq, i)
@@ -626,8 +626,8 @@ function compute_cell_residual_4!(eq::AbstractEquations{1}, grid, op, problem,
             utttt_node = get_node_vars(utttt, eq, i)
             ftttt = derivative_bundle(flux_, (u_node, ut_node, utt_node, uttt_node))
 
-            multiply_add_to_node_vars!(F, 1.0 / 120.0, ftttt, eq, i)
-            multiply_add_to_node_vars!(U, 1.0 / 120.0, utttt_node, eq, i)
+            multiply_add_to_node_vars!(F, 1 / 120, ftttt, eq, i)
+            multiply_add_to_node_vars!(U, 1 / 120, utttt_node, eq, i)
             F_node = get_node_vars(F, eq, i)
             for ii in Base.OneTo(nd)
                 multiply_add_to_node_vars!(res, lamx * D1[ii, i], F_node, eq, ii, cell)
@@ -666,7 +666,7 @@ function compute_cell_residual_5!(eq::AbstractEquations{1}, grid, op, problem,
     nx = grid.size
     @unpack bflux_ind = scheme.bflux
     @unpack blend = aux
-    refresh!(u) = fill!(u, 0.0)
+    refresh!(u) = fill!(u, zero(eltype(u)))
     # Pre-allocate local variables
 
     @unpack cell_data, eval_data = cache
@@ -684,7 +684,7 @@ function compute_cell_residual_5!(eq::AbstractEquations{1}, grid, op, problem,
 
         # Solution points
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             # Compute flux at all solution points
             flux1 = flux(x_, u_node, eq)
@@ -697,7 +697,7 @@ function compute_cell_residual_5!(eq::AbstractEquations{1}, grid, op, problem,
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             ft = derivative_bundle(flux_, (u_node, ut_node))
@@ -705,12 +705,12 @@ function compute_cell_residual_5!(eq::AbstractEquations{1}, grid, op, problem,
                 multiply_add_to_node_vars!(utt, -lamx * Dm[ii, i], ft, eq, ii)
             end
 
-            multiply_add_to_node_vars!(F, 0.5, ft, eq, i)
-            multiply_add_to_node_vars!(U, 0.5, ut_node, eq, i)
+            multiply_add_to_node_vars!(F, 0.5f0, ft, eq, i)
+            multiply_add_to_node_vars!(U, 0.5f0, ut_node, eq, i)
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             utt_node = get_node_vars(utt, eq, i)
@@ -719,12 +719,12 @@ function compute_cell_residual_5!(eq::AbstractEquations{1}, grid, op, problem,
                 multiply_add_to_node_vars!(uttt, -lamx * Dm[ii, i], ftt, eq, ii)
             end
 
-            multiply_add_to_node_vars!(F, 1.0 / 6.0, ftt, eq, i)
-            multiply_add_to_node_vars!(U, 1.0 / 6.0, utt_node, eq, i)
+            multiply_add_to_node_vars!(F, 1 / 6, ftt, eq, i)
+            multiply_add_to_node_vars!(U, 1 / 6, utt_node, eq, i)
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             utt_node = get_node_vars(utt, eq, i)
@@ -734,12 +734,12 @@ function compute_cell_residual_5!(eq::AbstractEquations{1}, grid, op, problem,
                 multiply_add_to_node_vars!(utttt, -lamx * Dm[ii, i], fttt, eq, ii)
             end
 
-            multiply_add_to_node_vars!(F, 1.0 / 24.0, fttt, eq, i)
-            multiply_add_to_node_vars!(U, 1.0 / 24.0, uttt_node, eq, i)
+            multiply_add_to_node_vars!(F, 1 / 24, fttt, eq, i)
+            multiply_add_to_node_vars!(U, 1 / 24, uttt_node, eq, i)
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             utt_node = get_node_vars(utt, eq, i)
@@ -750,12 +750,12 @@ function compute_cell_residual_5!(eq::AbstractEquations{1}, grid, op, problem,
                 multiply_add_to_node_vars!(uttttt, -lamx * Dm[ii, i], ftttt, eq, ii)
             end
 
-            multiply_add_to_node_vars!(F, 1.0 / 120.0, ftttt, eq, i)
-            multiply_add_to_node_vars!(U, 1.0 / 120.0, utttt_node, eq, i)
+            multiply_add_to_node_vars!(F, 1 / 120, ftttt, eq, i)
+            multiply_add_to_node_vars!(U, 1 / 120, utttt_node, eq, i)
         end
 
         for i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
             u_node = get_node_vars(u1, eq, i, cell)
             ut_node = get_node_vars(ut, eq, i)
             utt_node = get_node_vars(utt, eq, i)
@@ -765,8 +765,8 @@ function compute_cell_residual_5!(eq::AbstractEquations{1}, grid, op, problem,
             fttttt = derivative_bundle(flux_,
                                        (u_node, ut_node, utt_node, uttt_node,
                                         utttt_node))
-            multiply_add_to_node_vars!(F, 1.0 / 720.0, fttttt, eq, i)
-            multiply_add_to_node_vars!(U, 1.0 / 720.0, uttttt_node, eq, i)
+            multiply_add_to_node_vars!(F, 1 / 720, fttttt, eq, i)
+            multiply_add_to_node_vars!(U, 1 / 720, uttttt_node, eq, i)
             F_node = get_node_vars(F, eq, i)
             for ii in Base.OneTo(nd)
                 multiply_add_to_node_vars!(res, lamx * D1[ii, i], F_node, eq, ii, cell)

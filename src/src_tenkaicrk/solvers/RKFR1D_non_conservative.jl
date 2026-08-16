@@ -138,7 +138,7 @@ function compute_cell_residual_rkfr!(eq::AbstractNonConservativeEquations{1}, gr
     nx = grid.size
     nd = length(xg)
     @unpack bflux_ind = scheme.bflux
-    refresh!(u) = fill!(u, 0.0)
+    refresh!(u) = fill!(u, zero(eltype(u)))
     eq_nc = non_conservative_equation(eq)
 
     refresh!.((ub, Fb, res, ub_N))

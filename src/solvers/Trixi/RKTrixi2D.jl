@@ -222,8 +222,8 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
                              cache, res)
 
         for j in Base.OneTo(nd), i in Base.OneTo(nd) # solution points loop
-            x = xc - 0.5 * dx + xg[i] * dx
-            y = yc - 0.5 * dy + xg[j] * dy
+            x = xc - 0.5f0 * dx + xg[i] * dx
+            y = yc - 0.5f0 * dy + xg[j] * dy
             X = SVector(x, y)
             u_node = get_node_vars(u, eq, i, j)
 
@@ -248,8 +248,8 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{2}, grid, op, problem
                        get_node_vars(ub_, eq, ii, 2)
             ubd, ubu = get_node_vars(ub_, eq, ii, 3),
                        get_node_vars(ub_, eq, ii, 4)
-            x = xc - 0.5 * dx + xg[ii] * dx
-            y = yc - 0.5 * dy + xg[ii] * dy
+            x = xc - 0.5f0 * dx + xg[ii] * dx
+            y = yc - 0.5f0 * dy + xg[ii] * dy
             fbl, fbr = flux(xl, y, ubl, eq, 1), flux(xr, y, ubr, eq, 1)
             fbd, fbu = flux(x, yd, ubd, eq, 2), flux(x, yu, ubu, eq, 2)
             set_node_vars!(Fb_, fbl, eq, ii, 1)
@@ -414,7 +414,7 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem,
     lamx = dt / dx
 
     # limit the higher order part
-    lmul!(1.0 - alpha, r)
+    lmul!(1 - alpha, r)
 
     trixi_equations = get_trixi_equations(semi, eq)
 

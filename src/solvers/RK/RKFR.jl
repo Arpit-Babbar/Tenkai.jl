@@ -146,9 +146,9 @@ function apply_rk11_muscl!(eq, problem, param, grid, op, scheme, aux, t, dt,
             #             (u[n,i+1] - u[n,i-1]) / (2.0*dx),
             #             (u[n,i+1] - u[n,i]  ) / dx,
             #             0.0 )
-            s = (u1[n, 1, i + 1] - u1[n, 1, i - 1]) / (2.0 * dx)
-            ufl[n] = u[n, i] - 0.5 * dx * s
-            ufr[n] = u[n, i] + 0.5 * dx * s
+            s = (u1[n, 1, i + 1] - u1[n, 1, i - 1]) / (2 * dx)
+            ufl[n] = u[n, i] - 0.5f0 * dx * s
+            ufr[n] = u[n, i] + 0.5f0 * dx * s
         end
         eq.prim2con!(ufl)
         eq.prim2con!(ufr)
@@ -156,8 +156,8 @@ function apply_rk11_muscl!(eq, problem, param, grid, op, scheme, aux, t, dt,
         eq.flux!(xf[i + 1], ufr, eq, fr)
 
         for n in 1:nvar
-            unph[n, 1, i] = ufl[n] + 0.5 * (dt / dx) * (fl[n] - fr[n])
-            unph[n, 2, i] = ufr[n] + 0.5 * (dt / dx) * (fl[n] - fr[n])
+            unph[n, 1, i] = ufl[n] + 0.5f0 * (dt / dx) * (fl[n] - fr[n])
+            unph[n, 2, i] = ufr[n] + 0.5f0 * (dt / dx) * (fl[n] - fr[n])
         end
     end
 
@@ -231,7 +231,7 @@ function apply_ssprk33!(eq, problem, param, grid, op, scheme, aux,
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 3
-    ts = t + 0.5 * dt
+    ts = t + 0.5f0 * dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
     axpy!(-1.0, res, u1)                     # u1 = u1 - res
@@ -266,7 +266,7 @@ function apply_ssprk43!(eq, problem, param, grid, op, scheme, aux,
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 2
-    ts = t + 0.5 * dt
+    ts = t + 0.5f0 * dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
     axpy!(-0.5, res, u1)                     # u1 = u1 - res
@@ -281,7 +281,7 @@ function apply_ssprk43!(eq, problem, param, grid, op, scheme, aux,
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 4
-    ts = t + 0.5 * dt
+    ts = t + 0.5f0 * dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
     axpy!(-0.5, res, u1)                    # u1 = u1 - res
@@ -305,7 +305,7 @@ function apply_rk4!(eq, problem, param, grid, op, scheme, aux, t,
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 2
-    ts = t + 0.5 * dt
+    ts = t + 0.5f0 * dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
     axpyz!(-0.5, res, u0, u1)       # u1   = u0 - 0.5*r1
@@ -313,7 +313,7 @@ function apply_rk4!(eq, problem, param, grid, op, scheme, aux, t,
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     # Stage 3
-    ts = t + 0.5 * dt
+    ts = t + 0.5f0 * dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
     axpyz!(-1.0, res, u0, u1)       # u1   = u0 - r1
@@ -324,7 +324,7 @@ function apply_rk4!(eq, problem, param, grid, op, scheme, aux, t,
     ts = t + dt
     compute_residual_rkfr!(eq, problem, grid, op, scheme, param, aux, ts, dt,
                            iter, fcount, cache, u1, Fb, ub, ua, res)
-    axpyz!(-1.0 / 6.0, res, utmp, u1) # u1   = utmp - (1/6)*r1
+    axpyz!(-1 / 6, res, utmp, u1) # u1   = utmp - (1/6)*r1
     compute_cell_average!(ua, u1, t, eq, grid, problem, scheme, aux, op)
     apply_limiter!(eq, problem, grid, scheme, param, op, aux, ua, u1)
     return nothing

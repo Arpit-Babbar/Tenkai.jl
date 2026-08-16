@@ -67,7 +67,7 @@ end
 
 function calc_source_t_N12(up, um, x, t, dt, source_terms, eq::AbstractEquations)
     s(u_, Δt) = source_terms(u_, x, t + Δt, eq)
-    s_t = 0.5 * (s(up, dt) - s(um, -dt))
+    s_t = 0.5f0 * (s(up, dt) - s(um, -dt))
     return s_t
 end
 
@@ -79,9 +79,9 @@ end
 function calc_source_t_N34(u, up, upp, um, umm, x, t, dt, source_terms,
                            eq::AbstractEquations)
     s(u_, Δt) = source_terms(u_, x, t + Δt, eq)
-    s_t = (1.0 / 12.0) * (-s(upp, 2.0 * dt) + 8.0 * s(up, dt)
+    s_t = (1 / 12) * (-s(upp, 2 * dt) + 8 * s(up, dt)
            -
-           8.0 * s(um, -dt) + s(umm, -2.0 * dt))
+           8 * s(um, -dt) + s(umm, -2 * dt))
     return s_t
 end
 
@@ -92,7 +92,7 @@ end
 
 function calc_source_tt_N23(u, up, um, x, t, dt, source_terms, eq::AbstractEquations)
     s(u_, Δt) = source_terms(u_, x, t + Δt, eq)
-    s_tt = s(up, dt) - 2.0 * s(u, 0.0) + s(um, -dt)
+    s_tt = s(up, dt) - 2 * s(u, 0.0) + s(um, -dt)
     return s_tt
 end
 
@@ -104,11 +104,11 @@ end
 function calc_source_tt_N4(u, up, upp, um, umm, x, t, dt, source_terms,
                            eq::AbstractEquations)
     s(u_, Δt) = source_terms(u_, x, t + Δt, eq)
-    s_tt = (1.0 / 12.0) * (-s(upp, 2.0 * dt) + 16.0 * s(up, dt)
+    s_tt = (1 / 12) * (-s(upp, 2 * dt) + 16 * s(up, dt)
             -
-            30.0 * s(u, 0.0)
+            30 * s(u, 0.0)
             +
-            16.0 * s(um, -dt) - s(umm, -2.0 * dt))
+            16 * s(um, -dt) - s(umm, -2 * dt))
     return s_tt
 end
 
@@ -120,9 +120,9 @@ end
 function calc_source_ttt_N34(u, up, upp, um, umm, x, t, dt, source_terms,
                              eq::AbstractEquations)
     s(u_, Δt) = source_terms(u_, x, t + Δt, eq)
-    s_ttt = 0.5 * (s(upp, 2.0 * dt) - 2.0 * s(up, dt)
-             +
-             2.0 * s(um, -dt) - s(umm, -2.0 * dt))
+    s_ttt = 0.5f0 * (s(upp, 2 * dt) - 2 * s(up, dt)
+                     +
+                     2 * s(um, -dt) - s(umm, -2 * dt))
     return s_ttt
 end
 
@@ -134,8 +134,8 @@ end
 function calc_source_tttt_N4(u, up, upp, um, umm, x, t, dt, source_terms,
                              eq::AbstractEquations)
     s(u_, Δt) = source_terms(u_, x, t + Δt, eq)
-    s_tttt = s(upp, 2.0 * dt) - 4.0 * s(up, dt) + 6.0 * s(u, 0.0) - 4.0 * s(um, -dt) +
-             s(umm, -2.0 * dt)
+    s_tttt = s(upp, 2 * dt) - 4 * s(up, dt) + 6 * s(u, 0.0) - 4 * s(um, -dt) +
+             s(umm, -2 * dt)
     return s_tttt
 end
 
