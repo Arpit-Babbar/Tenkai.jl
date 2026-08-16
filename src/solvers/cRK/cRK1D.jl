@@ -166,7 +166,7 @@ end
 # `compute_cell_residual_cRK!` and in its boundary flux evaluation.
 #
 # `cRKSolver` is also the supertype of the IMEX solvers in `TenkaicRK`, which
-# share this `setup_arrays`. Rather than reach across for each of them, an
+# share this `setup_arrays`. An
 # unlisted solver gets the largest allocation any solver in the tree has asked
 # for, so it cannot overrun its cache. The arrays are `nvar x nd` and
 # `nvar x 1`, so the spare ones cost nothing worth saving.
