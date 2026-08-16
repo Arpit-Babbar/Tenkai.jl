@@ -58,10 +58,6 @@ function perform_mdrk_step!(eq, t, iter, fcount, dt, grid, problem, scheme,
     compute_face_residual!(eq, grid, op, cache, problem, scheme, param, aux, t, dt,
                            uprev,
                            Fb, Ub, ua, res, stage_scaling_factor)
-    # Does nothing in the second stage. TODO - Fix this for performance
-    # `copyto!` is used instead of `@turbo unew .= uprev` because
-    # LoopVectorization only supports the native floating point types, while
-    # Tenkai can be run in any arithmetic.
     copyto!(unew, uprev)
     update_solution_lwfr!(unew, res, aux) # s1: us = u1 - res, s2: u1 = u1 - res
     compute_cell_average!(ua, unew, t, eq, grid, problem, scheme, aux, op)
