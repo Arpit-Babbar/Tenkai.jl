@@ -272,6 +272,23 @@ function Parameters(grid_size, cfl, bounds, save_iter_interval,
 end
 
 #------------------------------------------------------------------------------
+# `dest .= src`, vectorized with LoopVectorization. Written as a loop rather than
+# a broadcast because `@turbo` on a loop falls back to a plain loop by itself
+# when `check_args` rejects the element type, which is what lets Tenkai run in an
+# arithmetic LoopVectorization does not support; the broadcast form has no such
+# fallback. Trixi.jl relies on the same mechanism. The loop also happens to be
+# about twice as fast as the broadcast on the large ghost value copies.
+@inline function turbo_copy!(dest, src)
+    @turbo warn_check_args=false for i in eachindex(dest, src)
+        dest[i] = src[i]
+    end
+    return dest
+end
+
+# Constants take the working type: `8`, `0.5f0`, `RealT(1.8)`, `_1 / 6`. Not
+# `RealT(1 // 6)`, which is 275x slower in `Float64x2` (`BigFloat` conversion).
+
+#------------------------------------------------------------------------------
 # A struct which gives zero whenever you try to index it as a zero
 #------------------------------------------------------------------------------
 struct EmptyZeros{RealT <: Real} end
@@ -979,7 +996,7 @@ end
 end
 
 @inline @inbounds function refresh!(u)
-    @turbo u .= zero(eltype(u))
+    fill!(u, zero(eltype(u)))
 end
 
 #-------------------------------------------------------------------------------
@@ -1119,11 +1136,17 @@ tenkai2trixiode(solver, equation, problem, scheme, param) = ()
 # simulation at the time of the crash.
 #-------------------------------------------------------------------------------
 function solve(equation, problem, scheme, param;
+               # The floating point type used throughout the simulation. It is
+               # taken from the domain of the problem, so that running in a
+               # different arithmetic (`Float32`, `Float64x2`, `Double64`,
+               # `BigFloat`, ...) only requires building the `Problem` with a
+               # domain of that type.
+               RealT = eltype(problem.domain),
                # 1D/2D Cartesian grid
                grid = make_cartesian_grid(problem, param.grid_size),
                # fr operators like differentiation matrix, correction functions
                op = fr_operators(scheme.degree, scheme.solution_points,
-                                 scheme.correction_function),
+                                 scheme.correction_function, RealT),
                # cache for storing solution and other arrays
                cache = (; setup_arrays(grid, scheme, equation)...,
                         trixi_ode = tenkai2trixiode(scheme.solver, equation, problem,

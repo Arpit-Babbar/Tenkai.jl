@@ -111,7 +111,7 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
     nx = grid.size
     nd = length(xg)
     @unpack bflux_ind = scheme.bflux
-    refresh!(u) = fill!(u, 0.0)
+    refresh!(u) = fill!(u, zero(eltype(u)))
 
     @unpack trixi_ode = cache
     semi = trixi_ode.p
@@ -136,11 +136,11 @@ function compute_cell_residual_rkfr!(eq::AbstractEquations{1}, grid, op, problem
                                     cell, semi.mesh,
                                     Trixi.have_nonconservative_terms(trixi_equations),
                                     trixi_equations, semi.solver, semi.cache, op,
-                                    lamx * (1.0 - alpha))
+                                    lamx * (1 - alpha))
 
         for ix in Base.OneTo(nd)
             # Solution points
-            x = xc - 0.5 * dx + xg[ix] * dx
+            x = xc - 0.5f0 * dx + xg[ix] * dx
             u_node = get_node_vars(u1, eq, ix, cell)
             # Compute flux at all solution points
 

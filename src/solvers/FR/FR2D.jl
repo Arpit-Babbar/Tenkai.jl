@@ -502,7 +502,7 @@ function compute_face_residual!(eq::AbstractEquations{2}, grid, op, cache, probl
     @threaded for element in CartesianIndices((1:nx, 1:ny)) # Loop over cells
         el_x, el_y = element[1], element[2]
         alpha = get_element_alpha(blend, el_x, el_y)
-        one_m_alp = 1.0 - alpha
+        one_m_alp = 1 - alpha
         for ix in Base.OneTo(nd)
             for jy in Base.OneTo(nd)
                 Fl = get_node_vars(Fb, eq, jy, 1, el_x, el_y)
@@ -780,7 +780,7 @@ function correct_variable!(eq::AbstractEquations{2}, variable, op, aux, grid,
                 u_node = get_node_vars(u1_, eq, i, j)
                 multiply_add_set_node_vars!(u1_,
                                             theta, u_node,
-                                            1.0 - theta, ua_,
+                                            1 - theta, ua_,
                                             eq, i, j)
             end
         end
@@ -913,13 +913,13 @@ function apply_tvb_limiterβ!(eq::AbstractEquations{2, 1}, problem, scheme, grid
         ual_, uar_ = get_node_vars(ual, eq, 1), get_node_vars(uar, eq, 1)
         uad_, uau_ = get_node_vars(uad, eq, 1), get_node_vars(uau, eq, 1)
 
-        multiply_add_set_node_vars!(dux, 1.0, ur_, -1.0, ul_, eq, 1)
-        multiply_add_set_node_vars!(duy, 1.0, uu_, -1.0, ud_, eq, 1)
+        multiply_add_set_node_vars!(dux, 1, ur_, -1, ul_, eq, 1)
+        multiply_add_set_node_vars!(duy, 1, uu_, -1, ud_, eq, 1)
 
-        multiply_add_set_node_vars!(dual, 1.0, ua_, -1.0, ual_, eq, 1)
-        multiply_add_set_node_vars!(duar, 1.0, uar_, -1.0, ua_, eq, 1)
-        multiply_add_set_node_vars!(duad, 1.0, ua_, -1.0, uad_, eq, 1)
-        multiply_add_set_node_vars!(duau, 1.0, uau_, -1.0, ua_, eq, 1)
+        multiply_add_set_node_vars!(dual, 1, ua_, -1, ual_, eq, 1)
+        multiply_add_set_node_vars!(duar, 1, uar_, -1, ua_, eq, 1)
+        multiply_add_set_node_vars!(duad, 1, ua_, -1, uad_, eq, 1)
+        multiply_add_set_node_vars!(duau, 1, uau_, -1, ua_, eq, 1)
 
         dux_ = get_node_vars(dux, eq, 1)
         dual_, duar_ = get_node_vars(dual, eq, 1), get_node_vars(duar, eq, 1)
@@ -946,10 +946,10 @@ function apply_tvb_limiterβ!(eq::AbstractEquations{2, 1}, problem, scheme, grid
                 multiply_add_set_node_vars!(u1_,
                                             1.0, ua_,
                                             #  2.0 * (xg[i] - 0.5),
-                                            xg[i] - 0.5,
+                                            xg[i] - 0.5f0,
                                             duxm_,
                                             #  2.0 * (xg[j] - 0.5),
-                                            xg[j] - 0.5,
+                                            xg[j] - 0.5f0,
                                             duym_,
                                             eq, i, j)
             end
@@ -1027,6 +1027,8 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
     @unpack (c, a, amin, a0, a1, smooth_alpha, smooth_factor) = blend.parameters # smoothing coefficients
     @unpack get_indicating_variables! = blend.subroutines
     @unpack cache = blend
+
+    RealT = eltype(u1)
     @unpack Pn2m = cache
 
     @threaded for element in CartesianIndices((1:nx, 1:ny))
@@ -1034,7 +1036,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
         un, um, tmp = cache.nodal_modal[Threads.threadid()]
         # Continuous extension to faces
         u = @view u1[:, :, :, el_x, el_y]
-        @turbo un .= u
+        turbo_copy!(un, u)
 
         # Copying is needed because we replace these with variables actually
         # used for indicators like primitives or rho*p, etc.
@@ -1083,12 +1085,13 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
 
         T = a * 10^(-c * nd^(0.25))
         # alpha(E=0) = 0.0001
-        s = log((1.0 - 0.0001) / 0.0001)  # chosen to that E = 0 => alpha = amin
-        alpha[el_x, el_y] = 1.0 / (1.0 + exp((-s / T) * (E[el_x, el_y] - T)))
+        eps_alpha = RealT(0.0001)
+        s = log((1 - eps_alpha) / eps_alpha)  # so that E = 0 => alpha = amin
+        alpha[el_x, el_y] = 1 / (1 + exp((-s / T) * (E[el_x, el_y] - T)))
 
         if alpha[el_x, el_y] < amin # amin = 0.0001
             alpha[el_x, el_y] = 0.0
-        elseif alpha[el_x, el_y] > 1.0 - amin
+        elseif alpha[el_x, el_y] > 1 - amin
             alpha[el_x, el_y] = 1.0
         end
 
@@ -1121,7 +1124,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
 
     # Smoothening of alpha
     if smooth_alpha == true
-        @turbo alpha_temp .= alpha
+        turbo_copy!(alpha_temp, alpha)
         for j in 1:ny, i in 1:nx
             alpha[i, j] = max(smooth_factor * alpha_temp[i - 1, j],
                               smooth_factor * alpha_temp[i, j - 1],
@@ -1142,7 +1145,7 @@ function modal_smoothness_indicator_gassner(eq::AbstractEquations{2}, t, iter,
 
     if limiter.pure_fv == true
         @assert scheme.limiter.name == "blend"
-        @turbo alpha .= one(eltype(alpha))
+        fill!(alpha, one(eltype(alpha)))
     end
 
     # KLUDGE - Should this be in apply_limiter! function?
@@ -1182,10 +1185,10 @@ function debug_blend_limiter!(eq::AbstractEquations{2}, grid, problem, scheme,
        final_time - t < 1e-10
         ndigits = 3 # KLUDGE - Add option to change
         filename = get_filename("output/alpha", ndigits, fcount)
-        vtk_alpha = vtk_grid(filename, grid.xc, grid.yc)
-        vtk_alpha["alpha"] = alpha_
+        vtk_alpha = vtk_grid(filename, Float64.(grid.xc), Float64.(grid.yc))
+        vtk_alpha["alpha"] = Float64.(alpha_)
         vtk_alpha["CYCLE"] = iter
-        vtk_alpha["TIME"] = t
+        vtk_alpha["TIME"] = Float64(t)
         vtk_alpha["Total activations"] = total_activations
         out = vtk_save(vtk_alpha)
         println("Wrote file ", out[1])
@@ -1194,18 +1197,19 @@ function debug_blend_limiter!(eq::AbstractEquations{2}, grid, problem, scheme,
 
             max_filename = "output/alpha_max"
             alpha_max = @view blend.cache.alpha_max[1:nx, 1:ny]
-            vtk_alpha_max = vtk_grid(max_filename, grid.xc, grid.yc)
-            vtk_alpha_max["alpha_max"] = alpha_max
+            vtk_alpha_max = vtk_grid(max_filename, Float64.(grid.xc),
+                                     Float64.(grid.yc))
+            vtk_alpha_max["alpha_max"] = Float64.(alpha_max)
             vtk_alpha_max["CYCLE"] = iter
-            vtk_alpha_max["TIME"] = t
+            vtk_alpha_max["TIME"] = Float64(t)
             vtk_alpha_max["Total activations"] = length(alpha_max[alpha_max .> 1e-12])
             out_max = vtk_save(vtk_alpha_max)
             println("Wrote file ", out_max[1])
 
             writedlm("output/time_vs_activations",
                      zip(blend.cache.times, blend.cache.total_activations))
-            writedlm("output/grid_xc.txt", grid.xc)
-            writedlm("output/grid_yc.txt", grid.yc)
+            writedlm("output/grid_xc.txt", Float64.(grid.xc))
+            writedlm("output/grid_yc.txt", Float64.(grid.yc))
         end
     end
     end # timer
@@ -1326,18 +1330,19 @@ function Blend(eq::AbstractEquations{2}, op, grid,
     nd = degree + 1
     nvar = nvariables(eq)
 
-    E1 = a * 10^(-c * (degree + 3)^0.25)
-    E0 = E1 * 1e-2 # E < E0 implies smoothness
-    tolE = 1.0e-6  # If denominator < tolE, do purely high order
-    a0 = 1.0 / 3.0
-    a1 = 1.0 - 2.0 * a0              # smoothing coefficients
+    RealT = eltype(grid.xc)
+
+    E1 = convert(RealT, a * 10^(-c * (degree + 3)^0.25))
+    E0 = E1 * convert(RealT, 1e-2) # E < E0 implies smoothness
+    tolE = convert(RealT, 1.0e-6)  # If denominator < tolE, do purely high order
+    a0 = convert(RealT, 1 / 3)
+    a1 = 1 - 2 * a0              # smoothing coefficients
     parameters = (; E1, E0, tolE, amax, a0, a1, constant_node_factor,
                   smooth_alpha, smooth_factor,
                   c, a, amin, tvbM, super_debug,
                   pure_fv, positivity_blending, debug = debug_blend)
 
     # Big arrays
-    RealT = eltype(grid.xc)
     E = zeros(RealT, nx, ny)
     alpha = OffsetArray(zeros(RealT, nx + 2, ny + 2), OffsetArrays.Origin(0, 0))
     alpha_temp, alpha_max = (similar(alpha) for _ in 1:2)
@@ -1416,8 +1421,8 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid, op, u1
     @unpack xg = op
     nvar = size(u1, 1)
     @views if problem.periodic_x
-        @turbo u1[:, :, :, 0, 1:ny] .= u1[:, :, :, nx, 1:ny]
-        @turbo u1[:, :, :, nx + 1, 1:ny] .= u1[:, :, :, 1, 1:ny]
+        turbo_copy!((u1[:, :, :, 0, 1:ny]), (u1[:, :, :, nx, 1:ny]))
+        turbo_copy!((u1[:, :, :, nx + 1, 1:ny]), (u1[:, :, :, 1, 1:ny]))
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 0:0, 1:ny)),
         #         u1, CartesianIndices((1:nvar, 1:nd, 1:nd, nx:nx, 1:ny)))
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, nx+1:nx+1, 1:ny)),
@@ -1425,8 +1430,8 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid, op, u1
     end
 
     @views if problem.periodic_y
-        @turbo u1[:, :, :, 1:nx, 0] .= u1[:, :, :, 1:nx, ny]
-        @turbo u1[:, :, :, 1:nx, ny + 1] .= u1[:, :, :, 1:nx, 1]
+        turbo_copy!((u1[:, :, :, 1:nx, 0]), (u1[:, :, :, 1:nx, ny]))
+        turbo_copy!((u1[:, :, :, 1:nx, ny + 1]), (u1[:, :, :, 1:nx, 1]))
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 1:nx, 0:0)),
         #         u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 1:nx, ny:ny)))
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 1:nx, ny+1:ny+1)),
@@ -1435,10 +1440,10 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid, op, u1
 
     @views if problem.periodic_x && problem.periodic_y
         # Corners
-        @turbo u1[:, :, :, 0, 0] .= u1[:, :, :, nx, 0]
-        @turbo u1[:, :, :, nx + 1, 0] .= u1[:, :, :, 1, 0]
-        @turbo u1[:, :, :, 0, ny + 1] .= u1[:, :, :, nx, ny + 1]
-        @turbo u1[:, :, :, nx + 1, ny + 1] .= u1[:, :, :, 1, ny + 1]
+        turbo_copy!((u1[:, :, :, 0, 0]), (u1[:, :, :, nx, 0]))
+        turbo_copy!((u1[:, :, :, nx + 1, 0]), (u1[:, :, :, 1, 0]))
+        turbo_copy!((u1[:, :, :, 0, ny + 1]), (u1[:, :, :, nx, ny + 1]))
+        turbo_copy!((u1[:, :, :, nx + 1, ny + 1]), (u1[:, :, :, 1, ny + 1]))
 
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 0:0, 0:0)),
         #         u1, CartesianIndices((1:nvar, 1:nd, 1:nd, nx:nx, 0:0)))
@@ -1598,10 +1603,10 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid, op, u1
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, nx+1:nx+1, ny+1:ny+1)),
         #         u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 1:1, ny+1:ny+1)))
 
-        @turbo u1[:, :, :, 0, 0] .= u1[:, :, :, nx, 0]
-        @turbo u1[:, :, :, nx + 1, 0] .= u1[:, :, :, 1, 0]
-        @turbo u1[:, :, :, 0, ny + 1] .= u1[:, :, :, nx, ny + 1]
-        @turbo u1[:, :, :, nx + 1, ny + 1] .= u1[:, :, :, 1, ny + 1]
+        turbo_copy!((u1[:, :, :, 0, 0]), (u1[:, :, :, nx, 0]))
+        turbo_copy!((u1[:, :, :, nx + 1, 0]), (u1[:, :, :, 1, 0]))
+        turbo_copy!((u1[:, :, :, 0, ny + 1]), (u1[:, :, :, nx, ny + 1]))
+        turbo_copy!((u1[:, :, :, nx + 1, ny + 1]), (u1[:, :, :, 1, ny + 1]))
     else
         # TOTHINK - Reflect bc and stuff for corners as well?
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, 0:0, 0:0)),
@@ -1613,10 +1618,10 @@ function update_ghost_values_u1!(eq::AbstractEquations{2}, problem, grid, op, u1
         # copyto!(u1, CartesianIndices((1:nvar, 1:nd, 1:nd, nx+1:nx+1, ny+1:ny+1)),
         #         u1, CartesianIndices((1:nvar, 1:nd, 1:nd, nx:nx, ny+1:ny+1)))
 
-        @turbo u1[:, :, :, 0, 0] .= u1[:, :, :, 1, 0]
-        @turbo u1[:, :, :, nx + 1, 0] .= u1[:, :, :, nx, 0]
-        @turbo u1[:, :, :, 0, ny + 1] .= u1[:, :, :, 1, ny + 1]
-        @turbo u1[:, :, :, nx + 1, ny + 1] .= u1[:, :, :, nx, ny + 1]
+        turbo_copy!((u1[:, :, :, 0, 0]), (u1[:, :, :, 1, 0]))
+        turbo_copy!((u1[:, :, :, nx + 1, 0]), (u1[:, :, :, nx, 0]))
+        turbo_copy!((u1[:, :, :, 0, ny + 1]), (u1[:, :, :, 1, ny + 1]))
+        turbo_copy!((u1[:, :, :, nx + 1, ny + 1]), (u1[:, :, :, nx, ny + 1]))
     end
 
     return nothing
@@ -1635,7 +1640,7 @@ end
     # TODO - Fuse these two nested loops?
 
     # loop over vertical inner faces between (ii-1,jj) and (ii,jj)
-    xxf = (xf + wg[1] * dx, xf + dx * (1.0 - wg[end]))
+    xxf = (xf + wg[1] * dx, xf + dx * (1 - wg[end]))
     for iix in 1:2
         xx = xxf[iix] # Face x coordinate, offset because index starts from 0
         ii = face_indices[iix]
@@ -1650,7 +1655,7 @@ end
         end
     end
 
-    yyf = (yf + wg[1] * dy, yf + dy * (1.0 - wg[end]))
+    yyf = (yf + wg[1] * dy, yf + dy * (1 - wg[end]))
     # loop over horizontal inner faces between (ii,jj-1) and (ii,jj)
     for jjy in 1:2
         yy = yyf[jjy]
@@ -1694,7 +1699,7 @@ function blend_cell_residual_fo!(el_x, el_y, eq::AbstractEquations{2}, problem, 
     end
 
     # limit the higher order part
-    lmul!(1.0 - alpha, r)
+    lmul!(1 - alpha, r)
 
     # compute subcell faces
     xxf[0], yyf[0] = xf, yf
@@ -1830,7 +1835,7 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
     end
 
     # limit the higher order part
-    lmul!(1.0 - alpha, r)
+    lmul!(1 - alpha, r)
 
     # compute subcell faces
     xxf[0], yyf[0] = xf, yf
@@ -1841,13 +1846,13 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
 
     # Get solution points
     # xe[0] = xf - dx[el_x-1]*(1.0-xg[nd])
-    xe[0] = xf - grid.dx[el_x - 1] * (1.0 - xg[nd])   # Last solution point of left cell
+    xe[0] = xf - grid.dx[el_x - 1] * (1 - xg[nd])   # Last solution point of left cell
     xe[1:nd] .= xf .+ dx * xg          # Solution points inside the cell
-    xe[nd + 1] = xf + grid.dx[el_x + 1] * (1.0 + xg[1]) # First point of right cell
+    xe[nd + 1] = xf + grid.dx[el_x + 1] * (1 + xg[1]) # First point of right cell
 
-    ye[0] = yf - grid.dy[el_y - 1] * (1.0 - xg[nd]) # Last solution point of lower cell
+    ye[0] = yf - grid.dy[el_y - 1] * (1 - xg[nd]) # Last solution point of lower cell
     ye[1:nd] .= yf .+ dy * xg                         # solution points inside the cell
-    ye[nd + 1] = yf + grid.dy[el_y + 1] * (1.0 + xg[1])  # First point of upper cell
+    ye[nd + 1] = yf + grid.dy[el_y + 1] * (1 + xg[1])  # First point of upper cell
 
     # EFFICIENCY - Add @turbo here
     # @show size(ue), size(u), size(blend.cache.ue[id][1][1])
@@ -1889,7 +1894,7 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
         # was giving a type instability
         # beta1 = 2.0
         # if blend.parameters.pure_fv == true # KLUDGE - Do this in blend.paramaeters
-        beta1, beta2 = 2.0 - alpha, 2.0 - alpha # Unfortunate way to fix type instability
+        beta1, beta2 = 2 - alpha, 2 - alpha # Unfortunate way to fix type instability
         # else
         #    beta1, beta2 = 2.0 - alpha, 2.0 - alpha
         # end
@@ -1911,11 +1916,11 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
         # KLUDGE - u_star's are not needed in this function, just create and use them
         # in limit_slope
 
-        u_star_l = u_ + 2.0 * slope_x * (xxf[ii - 1] - xe[ii])
-        u_star_r = u_ + 2.0 * slope_x * (xxf[ii] - xe[ii])
+        u_star_l = u_ + 2 * slope_x * (xxf[ii - 1] - xe[ii])
+        u_star_r = u_ + 2 * slope_x * (xxf[ii] - xe[ii])
 
-        u_star_d = u_ + 2.0 * slope_y * (yyf[jj - 1] - ye[jj])
-        u_star_u = u_ + 2.0 * slope_y * (yyf[jj] - ye[jj])
+        u_star_d = u_ + 2 * slope_y * (yyf[jj - 1] - ye[jj])
+        u_star_u = u_ + 2 * slope_y * (yyf[jj] - ye[jj])
 
         ufl, ufr = limit_slope(eq, slope_x, ufl, u_star_l, ufr, u_star_r, u_,
                                xxf[ii - 1] - xe[ii], xxf[ii] - xe[ii])
@@ -2000,17 +2005,17 @@ function blend_cell_residual_muscl!(el_x, el_y, eq::AbstractEquations{2},
                                    2, # Right face
                                    ii, jj)
         multiply_add_to_node_vars!(unph, # u_{i-1/2+,j}=u_{i-1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
-                                   -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
+                                   -0.5f0 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                    fr,
-                                   -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
+                                   -0.5f0 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                    -fl,
                                    eq,
                                    3, # Bottom face
                                    ii, jj)
         multiply_add_to_node_vars!(unph, # u_{i-1/2+,j}=u_{i-1/2,j}-0.5*dt*(fr-fl)/(xfr-xfl)
-                                   -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
+                                   -0.5f0 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                    fr,
-                                   -0.5 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
+                                   -0.5f0 * scaled_dt / (xxf[ii] - xxf[ii - 1]),
                                    -fl,
                                    eq,
                                    4, # Top face
@@ -2136,7 +2141,7 @@ function blend_cell_residual_muscl_rk!(el_x, el_y, eq::AbstractEquations{2}, pro
     end
 
     # limit the higher order part
-    lmul!(1.0 - alpha, r)
+    lmul!(1 - alpha, r)
 
     # compute subcell faces
     xxf[0], yyf[0] = xf, yf
@@ -2147,13 +2152,13 @@ function blend_cell_residual_muscl_rk!(el_x, el_y, eq::AbstractEquations{2}, pro
 
     # Get solution points
     # xe[0] = xf - dx[el_x-1]*(1.0-xg[nd])
-    xe[0] = xf - grid.dx[el_x - 1] * (1.0 - xg[nd])   # Last solution point of left cell
+    xe[0] = xf - grid.dx[el_x - 1] * (1 - xg[nd])   # Last solution point of left cell
     xe[1:nd] .= xf .+ dx * xg          # Solution points inside the cell
-    xe[nd + 1] = xf + grid.dx[el_x + 1] * (1.0 + xg[1]) # First point of right cell
+    xe[nd + 1] = xf + grid.dx[el_x + 1] * (1 + xg[1]) # First point of right cell
 
-    ye[0] = yf - grid.dy[el_y - 1] * (1.0 - xg[nd]) # Last solution point of lower cell
+    ye[0] = yf - grid.dy[el_y - 1] * (1 - xg[nd]) # Last solution point of lower cell
     ye[1:nd] .= yf .+ dy * xg                         # solution points inside the cell
-    ye[nd + 1] = yf + grid.dy[el_y + 1] * (1.0 + xg[1])  # First point of upper cell
+    ye[nd + 1] = yf + grid.dy[el_y + 1] * (1 + xg[1])  # First point of upper cell
 
     # EFFICIENCY - Add @turbo here
     # @show size(ue), size(u), size(blend.cache.ue[id][1][1])
@@ -2195,7 +2200,7 @@ function blend_cell_residual_muscl_rk!(el_x, el_y, eq::AbstractEquations{2}, pro
         # was giving a type instability
         # beta1 = 2.0
         # if blend.parameters.pure_fv == true # KLUDGE - Do this in blend.paramaeters
-        beta1, beta2 = 2.0 - alpha, 2.0 - alpha # Unfortunate way to fix type instability
+        beta1, beta2 = 2 - alpha, 2 - alpha # Unfortunate way to fix type instability
         # else
         #    beta1, beta2 = 2.0 - alpha, 2.0 - alpha
         # end
@@ -2217,11 +2222,11 @@ function blend_cell_residual_muscl_rk!(el_x, el_y, eq::AbstractEquations{2}, pro
         # KLUDGE - u_star's are not needed in this function, just create and use them
         # in limit_slope
 
-        u_star_l = u_ + 2.0 * slope_x * (xxf[ii - 1] - xe[ii])
-        u_star_r = u_ + 2.0 * slope_x * (xxf[ii] - xe[ii])
+        u_star_l = u_ + 2 * slope_x * (xxf[ii - 1] - xe[ii])
+        u_star_r = u_ + 2 * slope_x * (xxf[ii] - xe[ii])
 
-        u_star_d = u_ + 2.0 * slope_y * (yyf[jj - 1] - ye[jj])
-        u_star_u = u_ + 2.0 * slope_y * (yyf[jj] - ye[jj])
+        u_star_d = u_ + 2 * slope_y * (yyf[jj - 1] - ye[jj])
+        u_star_u = u_ + 2 * slope_y * (yyf[jj] - ye[jj])
 
         ufl, ufr = limit_slope(eq, slope_x, ufl, u_star_l, ufr, u_star_r, u_,
                                xxf[ii - 1] - xe[ii], xxf[ii] - xe[ii])
@@ -2319,8 +2324,8 @@ function get_blended_flux_x(el_x, el_y, jy, eq::AbstractEquations{2}, dt, grid,
     nx, ny = grid.size
 
     # Initial trial blended flux
-    alp = 0.5 * (alpha[el_x - 1, el_y] + alpha[el_x, el_y])
-    Fn = (1.0 - alp) * Fn + alp * fn
+    alp = 0.5f0 * (alpha[el_x - 1, el_y] + alpha[el_x, el_y])
+    Fn = (1 - alp) * Fn + alp * fn
 
     ua_ll_node = get_node_vars(ua, eq, el_x - 1, el_y)
     λx_ll, _ = blending_flux_factors(eq, ua_ll_node, dx[el_x - 1], dy[el_y])
@@ -2407,7 +2412,7 @@ function blend_face_residual_fo_x!(el_x, el_y, jy, xf, y, u1, ua,
     # This subroutine allows user to specify boundary conditions
     Fn = bc_x(u1, eq, op, xf, y, jy, el_x, el_y, Fn)
 
-    return Fn, (1.0 - alpha[el_x - 1, el_y], 1.0 - alpha[el_x, el_y])
+    return Fn, (1 - alpha[el_x - 1, el_y], 1 - alpha[el_x, el_y])
     end # timer
 end
 
@@ -2544,7 +2549,7 @@ function blend_face_residual_muscl_x!(el_x, el_y, jy, xf, y, u1, ua,
                      (xf, xf + wg[1] * dx[el_x]))   # (xfl, xfr)
     face_coords_y = ((yfd_1, yfu_1), (yfd_2, yfu_2))
 
-    betas = (2.0 - alpha[el_x - 1, el_y], 2.0 - alpha[el_x, el_y])
+    betas = (2 - alpha[el_x - 1, el_y], 2 - alpha[el_x, el_y])
 
     if blend.parameters.pure_fv == true
         betas = (2.0, 2.0)
@@ -2581,10 +2586,10 @@ function blend_face_residual_muscl_x!(el_x, el_y, jy, xf, y, u1, ua,
         ufd = u_ + slope_y * (yfd - y)
         ufu = u_ + slope_y * (yfu - y)
 
-        u_star_l = u_ + 2.0 * slope_x * (xfl - x)
-        u_star_r = u_ + 2.0 * slope_x * (xfr - x)
-        u_star_d = u_ + 2.0 * slope_y * (yfd - y)
-        u_star_u = u_ + 2.0 * slope_y * (yfu - y)
+        u_star_l = u_ + 2 * slope_x * (xfl - x)
+        u_star_r = u_ + 2 * slope_x * (xfr - x)
+        u_star_d = u_ + 2 * slope_y * (yfd - y)
+        u_star_u = u_ + 2 * slope_y * (yfu - y)
 
         ufl, ufr = limit_slope(eq, slope_x, ufl, u_star_l, ufr, u_star_r, u_,
                                xfl - x, xfr - x)
@@ -2609,17 +2614,17 @@ function blend_face_residual_muscl_x!(el_x, el_y, jy, xf, y, u1, ua,
         # Use finite difference method to evolve face values to time level n+1/2
         multiply_add_set_node_vars!(unph, # unph = uf - 0.5*dt*(fr-fl)/(xfr-xfl)
                                     uf,
-                                    -0.5 * dt_scaled / (xfr - xfl),
+                                    -0.5f0 * dt_scaled / (xfr - xfl),
                                     fr,
-                                    0.5 * dt_scaled / (xfr - xfl),
+                                    0.5f0 * dt_scaled / (xfr - xfl),
                                     fl,
                                     eq,
                                     i)
 
         multiply_add_to_node_vars!(unph, # unph += -0.5*dt*(gu-gd)/(yfu-yfd)
-                                   -0.5 * dt_scaled / (yfu - yfd),
+                                   -0.5f0 * dt_scaled / (yfu - yfd),
                                    gu,
-                                   0.5 * dt_scaled / (yfu - yfd),
+                                   0.5f0 * dt_scaled / (yfu - yfd),
                                    gd,
                                    eq,
                                    i)
@@ -2647,7 +2652,7 @@ function blend_face_residual_muscl_x!(el_x, el_y, jy, xf, y, u1, ua,
     #                            - alpha[el_x,el_y]*dt/(dx[el_x]*wg[1]), Fn,
     #                            eq, 1)
 
-    return Fn, (1.0 - alpha[el_x - 1, el_y], 1.0 - alpha[el_x, el_y])
+    return Fn, (1 - alpha[el_x - 1, el_y], 1 - alpha[el_x, el_y])
     end # timer
 end
 
@@ -2817,10 +2822,10 @@ function blend_face_residual_muscl_rk_x!(el_x, el_y, jy, xf, y, u1, ua,
         ufd = u_ + slope_y * (yfd - y)
         ufu = u_ + slope_y * (yfu - y)
 
-        u_star_l = u_ + 2.0 * slope_x * (xfl - x)
-        u_star_r = u_ + 2.0 * slope_x * (xfr - x)
-        u_star_d = u_ + 2.0 * slope_y * (yfd - y)
-        u_star_u = u_ + 2.0 * slope_y * (yfu - y)
+        u_star_l = u_ + 2 * slope_x * (xfl - x)
+        u_star_r = u_ + 2 * slope_x * (xfr - x)
+        u_star_d = u_ + 2 * slope_y * (yfd - y)
+        u_star_u = u_ + 2 * slope_y * (yfu - y)
 
         ufl, ufr = limit_slope(eq, slope_x, ufl, u_star_l, ufr, u_star_r, u_,
                                xfl - x, xfr - x)
@@ -2853,7 +2858,7 @@ function blend_face_residual_muscl_rk_x!(el_x, el_y, jy, xf, y, u1, ua,
     # This subroutine allows user to specify boundary conditions
     Fn = bc_x(u1, eq, op, xf, y, jy, el_x, el_y, Fn)
 
-    return Fn, (1.0 - alpha[el_x - 1, el_y], 1.0 - alpha[el_x, el_y])
+    return Fn, (1 - alpha[el_x - 1, el_y], 1 - alpha[el_x, el_y])
     end # timer
 end
 
@@ -2869,8 +2874,8 @@ function get_blended_flux_y(el_x, el_y, ix, eq::AbstractEquations{2}, dt, grid,
     nd = length(wg)
     nx, ny = grid.size
     # Initial trial blended flux
-    alp = 0.5 * (alpha[el_x, el_y - 1] + alpha[el_x, el_y])
-    Fn = (1.0 - alp) * Fn + alp * fn
+    alp = 0.5f0 * (alpha[el_x, el_y - 1] + alpha[el_x, el_y])
+    Fn = (1 - alp) * Fn + alp * fn
 
     # Candidate in for (el_x, el_y-1)
     ua_ll_node = get_node_vars(ua, eq, el_x, el_y - 1)
@@ -2961,7 +2966,7 @@ function blend_face_residual_fo_y!(el_x, el_y, ix, x, yf, u1, ua,
     #                            Fn,
     #                            eq, 1)
 
-    return Fn, (1.0 - alpha[el_x, el_y - 1], 1.0 - alpha[el_x, el_y])
+    return Fn, (1 - alpha[el_x, el_y - 1], 1 - alpha[el_x, el_y])
     end # timer
 end
 
@@ -3090,7 +3095,7 @@ function blend_face_residual_muscl_y!(el_x, el_y, ix, x, yf, u1, ua,
                      (yf, yf + wg[1] * dy[el_y]))
     face_coords_x = ((xfl_1, xfr_1), (xfl_2, xfr_2))
 
-    betas = (2.0 - alpha[el_x, el_y - 1], 2.0 - alpha[el_x, el_y])
+    betas = (2 - alpha[el_x, el_y - 1], 2 - alpha[el_x, el_y])
     if blend.parameters.pure_fv == true
         betas = (2.0, 2.0)
     end
@@ -3125,10 +3130,10 @@ function blend_face_residual_muscl_y!(el_x, el_y, ix, x, yf, u1, ua,
         ufl = u_ + slope_x * (xfl - x)
         ufr = u_ + slope_x * (xfr - x)
 
-        u_star_d = u_ + 2.0 * slope_y * (yfd - y)
-        u_star_u = u_ + 2.0 * slope_y * (yfu - y)
-        u_star_l = u_ + 2.0 * slope_x * (xfl - x)
-        u_star_r = u_ + 2.0 * slope_x * (xfr - x)
+        u_star_d = u_ + 2 * slope_y * (yfd - y)
+        u_star_u = u_ + 2 * slope_y * (yfu - y)
+        u_star_l = u_ + 2 * slope_x * (xfl - x)
+        u_star_r = u_ + 2 * slope_x * (xfr - x)
 
         ufd, ufu = limit_slope(eq, slope_y, ufd, u_star_d, ufu, u_star_u, u_,
                                yfd - y, yfu - y)
@@ -3153,17 +3158,17 @@ function blend_face_residual_muscl_y!(el_x, el_y, ix, x, yf, u1, ua,
         # use finite difference method to evolve face values to time n+1/2
         multiply_add_set_node_vars!(unph, # unph = uf - 0.5*dt*(gu-gd)/(yfu-yfd)
                                     uf,
-                                    -0.5 * dt_scaled / (yfu - yfd),
+                                    -0.5f0 * dt_scaled / (yfu - yfd),
                                     gu,
-                                    -0.5 * dt_scaled / (yfu - yfd),
+                                    -0.5f0 * dt_scaled / (yfu - yfd),
                                     -gd,
                                     eq,
                                     i)
 
         multiply_add_to_node_vars!(unph, # unph = uf - 0.5*dt*(gu-gd)/(yfu-yfd)
-                                   -0.5 * dt_scaled / (xfr - xfl),
+                                   -0.5f0 * dt_scaled / (xfr - xfl),
                                    fr,
-                                   0.5 * dt_scaled / (xfr - xfl),
+                                   0.5f0 * dt_scaled / (xfr - xfl),
                                    fl,
                                    eq,
                                    i)
@@ -3193,7 +3198,7 @@ function blend_face_residual_muscl_y!(el_x, el_y, ix, x, yf, u1, ua,
     #                            Fn,
     #                            eq, 1)
 
-    return Fn, (1.0 - alpha[el_x, el_y - 1], 1.0 - alpha[el_x, el_y])
+    return Fn, (1 - alpha[el_x, el_y - 1], 1 - alpha[el_x, el_y])
     end # timer
 end
 
@@ -3322,7 +3327,7 @@ function blend_face_residual_muscl_rk_y!(el_x, el_y, ix, x, yf, u1, ua,
                      (yf, yf + wg[1] * dy[el_y]))
     face_coords_x = ((xfl_1, xfr_1), (xfl_2, xfr_2))
 
-    betas = (2.0 - alpha[el_x, el_y - 1], 2.0 - alpha[el_x, el_y])
+    betas = (2 - alpha[el_x, el_y - 1], 2 - alpha[el_x, el_y])
     if blend.parameters.pure_fv == true
         betas = (2.0, 2.0)
     end
@@ -3357,10 +3362,10 @@ function blend_face_residual_muscl_rk_y!(el_x, el_y, ix, x, yf, u1, ua,
         ufl = u_ + slope_x * (xfl - x)
         ufr = u_ + slope_x * (xfr - x)
 
-        u_star_d = u_ + 2.0 * slope_y * (yfd - y)
-        u_star_u = u_ + 2.0 * slope_y * (yfu - y)
-        u_star_l = u_ + 2.0 * slope_x * (xfl - x)
-        u_star_r = u_ + 2.0 * slope_x * (xfr - x)
+        u_star_d = u_ + 2 * slope_y * (yfd - y)
+        u_star_u = u_ + 2 * slope_y * (yfu - y)
+        u_star_l = u_ + 2 * slope_x * (xfl - x)
+        u_star_r = u_ + 2 * slope_x * (xfr - x)
 
         ufd, ufu = limit_slope(eq, slope_y, ufd, u_star_d, ufu, u_star_u, u_,
                                yfd - y, yfu - y)
@@ -3405,7 +3410,7 @@ function blend_face_residual_muscl_rk_y!(el_x, el_y, ix, x, yf, u1, ua,
     #                            Fn,
     #                            eq, 1)
 
-    return Fn, (1.0 - alpha[el_x, el_y - 1], 1.0 - alpha[el_x, el_y])
+    return Fn, (1 - alpha[el_x, el_y - 1], 1 - alpha[el_x, el_y])
     end # timer
 end
 
@@ -3498,14 +3503,15 @@ function compute_error(problem, grid, eq::AbstractEquations{2}, aux, op, u1, t)
     nx, ny = grid.size
     @unpack xc, yc, dx, dy = grid
 
-    l1_error, l2_error, energy = 0.0, 0.0, 0.0
+    error_type = promote_type(eltype(u1), Float64)
+    l1_error, l2_error, energy = (zero(error_type) for _ in 1:3)
     @inbounds @floop for element in CartesianIndices((1:nx, 1:ny))
         # for element in CartesianIndices((1:nx, 1:ny))
         el_x, el_y = element[1], element[2]
         ue, un = arr_cache[Threads.threadid()]
         for j in 1:nq, i in 1:nq
-            x = xc[el_x] - 0.5 * dx[el_x] + dx[el_x] * xq[i]
-            y = yc[el_y] - 0.5 * dy[el_y] + dy[el_y] * xq[j]
+            x = xc[el_x] - 0.5f0 * dx[el_x] + dx[el_x] * xq[i]
+            y = yc[el_y] - 0.5f0 * dy[el_y] + dy[el_y] * xq[j]
             ue_node = exact_solution(x, y, t)
             set_node_vars!(ue, ue_node, eq, i, j)
         end
@@ -3520,7 +3526,7 @@ function compute_error(problem, grid, eq::AbstractEquations{2}, aux, op, u1, t)
                                            jj)
             end
         end
-        l1 = l2 = e = 0.0
+        l1 = l2 = e = zero(error_type)
         for j in 1:nq, i in 1:nq
             un_node = get_node_vars(un, eq, i, j)
             ue_node = get_node_vars(ue, eq, i, j) # KLUDGE - allocated ue is not needed
@@ -3541,11 +3547,14 @@ function compute_error(problem, grid, eq::AbstractEquations{2}, aux, op, u1, t)
     l1_error = l1_error / domain_size
     l2_error = sqrt(l2_error / domain_size)
     energy = energy / domain_size
-    @printf(error_file, "%.16e %.16e %.16e %.16e\n", t, l1_error[1], l2_error[1],
-            energy[1])
+    # `@printf` only knows the standard floating point types, so the errors are
+    # written out as `Float64`. The returned values keep their full precision.
+    @printf(error_file, "%.16e %.16e %.16e %.16e\n", Float64(t),
+            Float64(l1_error[1]),
+            Float64(l2_error[1]), Float64(energy[1]))
 
-    return Dict("l1_error" => l1_error, "l2_error" => l2_error,
-                "energy" => energy)
+    return Dict{String, error_type}("l1_error" => l1_error, "l2_error" => l2_error,
+                                    "energy" => energy)
     end # timer
 end
 
@@ -3563,13 +3572,14 @@ function create_aux_cache(eq, op)
     @unpack xg = op
     nd = length(xg)
     nvar = nvariables(eq)
+    # See `compute_error`: the error norm is evaluated in at least `Float64`.
+    RealT = promote_type(eltype(xg), Float64)
     nq = nd + 3    # number of quadrature points in each direction
-    xq, wq = weights_and_points(nq, "gl")
+    xq, wq = weights_and_points(nq, "gl", RealT)
 
     V = Vandermonde_lag(xg, xq) # matrix evaluating at `xq`
     # using values at solution points `xg`
 
-    RealT = eltype(xg)
     MArr = MArray{Tuple{nvar, nq, nq}, RealT}
 
     # for each thread, construct `cache_size` number of objects with
@@ -3652,11 +3662,11 @@ function write_soln!(base_name, fcount, iter, time, dt,
     # Output cell-averages
     filename = get_filename("output/avg", ndigits, fcount)
     # filename = string("output/", filename)
-    vtk_avg = vtk_grid(filename, grid.xc, grid.yc)
+    vtk_avg = vtk_grid(filename, Float64.(grid.xc), Float64.(grid.yc))
     nx, ny = grid.size
-    vtk_avg["Cell Averages"] = @view z[1, 1:nx, 1:ny]
+    vtk_avg["Cell Averages"] = Float64.(@view z[1, 1:nx, 1:ny])
     vtk_avg["CYCLE"] = iter
-    vtk_avg["TIME"] = time
+    vtk_avg["TIME"] = Float64(time)
     out = vtk_save(vtk_avg)
     println("Wrote file ", out[1])
     write_poly(eq, grid, op, u1, fcount)

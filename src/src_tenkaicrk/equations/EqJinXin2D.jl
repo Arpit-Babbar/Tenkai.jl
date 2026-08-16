@@ -10,6 +10,7 @@ using Printf
 using TimerOutputs
 using StaticArrays
 using Tenkai.Polyester
+using Tenkai: turbo_copy!
 using Tenkai.LoopVectorization
 using Tenkai.JSON3
 using OffsetArrays
@@ -279,7 +280,7 @@ function modal_smoothness_indicator_gassner(eq::JinXin2D, t, iter,
         un, um, tmp = cache.nodal_modal[Threads.threadid()]
         # Continuous extension to faces
         u = @view u1[:, :, :, el_x, el_y]
-        @turbo un .= u
+        turbo_copy!(un, u)
 
         # Copying is needed because we replace these with variables actually
         # used for indicators like primitives or rho*p, etc.
@@ -358,7 +359,7 @@ function modal_smoothness_indicator_gassner(eq::JinXin2D, t, iter,
 
     # Smoothening of alpha
     if smooth_alpha == true
-        @turbo alpha_temp .= alpha
+        turbo_copy!(alpha_temp, alpha)
         for j in 1:ny, i in 1:nx
             epsilon_arr[i, j] = max(smooth_factor * alpha_temp[i - 1, j],
                                     smooth_factor * alpha_temp[i, j - 1],

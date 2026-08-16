@@ -146,30 +146,30 @@ end
         gu = flux(x, yu, uu_node, eq, 2)
 
         # KLUDGE - Indices order needs to be changed!!
-        set_node_vars!(Fb, 0.5 * fl, eq, i, 1)
+        set_node_vars!(Fb, 0.5f0 * fl, eq, i, 1)
         set_node_vars!(Fb2, fl, eq, i, 1)
-        set_node_vars!(Fb, 0.5 * fr, eq, i, 2)
+        set_node_vars!(Fb, 0.5f0 * fr, eq, i, 2)
         set_node_vars!(Fb2, fr, eq, i, 2)
-        set_node_vars!(Fb, 0.5 * gd, eq, i, 3)
+        set_node_vars!(Fb, 0.5f0 * gd, eq, i, 3)
         set_node_vars!(Fb2, gd, eq, i, 3)
-        set_node_vars!(Fb, 0.5 * gu, eq, i, 4)
+        set_node_vars!(Fb, 0.5f0 * gu, eq, i, 4)
         set_node_vars!(Fb2, gu, eq, i, 4)
 
         ftl_node = derivative_bundle(flux_x, (ul_node, utl_node))
         ftr_node = derivative_bundle(flux_x, (ur_node, utr_node))
 
-        multiply_add_to_node_vars!(Fb, 0.125, ftl_node, eq, i, 1)
-        multiply_add_to_node_vars!(Fb, 0.125, ftr_node, eq, i, 2)
-        multiply_add_to_node_vars!(Fb2, 1.0 / 6.0, ftl_node, eq, i, 1)
-        multiply_add_to_node_vars!(Fb2, 1.0 / 6.0, ftr_node, eq, i, 2)
+        multiply_add_to_node_vars!(Fb, 0.125f0, ftl_node, eq, i, 1)
+        multiply_add_to_node_vars!(Fb, 0.125f0, ftr_node, eq, i, 2)
+        multiply_add_to_node_vars!(Fb2, 1 / 6, ftl_node, eq, i, 1)
+        multiply_add_to_node_vars!(Fb2, 1 / 6, ftr_node, eq, i, 2)
 
         gtd_node = derivative_bundle(flux_y, (ud_node, utd_node))
         gtu_node = derivative_bundle(flux_y, (uu_node, utu_node))
 
-        multiply_add_to_node_vars!(Fb, 0.125, gtd_node, eq, i, 3)
-        multiply_add_to_node_vars!(Fb, 0.125, gtu_node, eq, i, 4)
-        multiply_add_to_node_vars!(Fb2, 1.0 / 6.0, gtd_node, eq, i, 3)
-        multiply_add_to_node_vars!(Fb2, 1.0 / 6.0, gtu_node, eq, i, 4)
+        multiply_add_to_node_vars!(Fb, 0.125f0, gtd_node, eq, i, 3)
+        multiply_add_to_node_vars!(Fb, 0.125f0, gtu_node, eq, i, 4)
+        multiply_add_to_node_vars!(Fb2, 1 / 6, gtd_node, eq, i, 3)
+        multiply_add_to_node_vars!(Fb2, 1 / 6, gtu_node, eq, i, 4)
     end
 end
 
@@ -211,14 +211,14 @@ end
         ftl_node = derivative_bundle(flux_x, (ul_node, utl_node))
         ftr_node = derivative_bundle(flux_x, (ur_node, utr_node))
 
-        multiply_add_to_node_vars!(Fb, 1.0 / 3.0, ftl_node, eq, i, 1)
-        multiply_add_to_node_vars!(Fb, 1.0 / 3.0, ftr_node, eq, i, 2)
+        multiply_add_to_node_vars!(Fb, 1 / 3, ftl_node, eq, i, 1)
+        multiply_add_to_node_vars!(Fb, 1 / 3, ftr_node, eq, i, 2)
 
         gtd_node = derivative_bundle(flux_y, (ud_node, utd_node))
         gtu_node = derivative_bundle(flux_y, (uu_node, utu_node))
 
-        multiply_add_to_node_vars!(Fb, 1.0 / 3.0, gtd_node, eq, i, 3)
-        multiply_add_to_node_vars!(Fb, 1.0 / 3.0, gtu_node, eq, i, 4)
+        multiply_add_to_node_vars!(Fb, 1 / 3, gtd_node, eq, i, 3)
+        multiply_add_to_node_vars!(Fb, 1 / 3, gtu_node, eq, i, 4)
     end
 end
 
@@ -262,12 +262,12 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
 
         u1_ = @view u1[:, :, :, el_x, el_y]
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
-            x = xc - 0.5 * dx + xg[i] * dx
-            y = yc - 0.5 * dy + xg[j] * dy
+            x = xc - 0.5f0 * dx + xg[i] * dx
+            y = yc - 0.5f0 * dy + xg[j] * dy
             u_node = get_node_vars(u1_, eq, i, j)
             flux1, flux2 = flux(x, y, u_node, eq)
-            set_node_vars!(F, 0.5 * flux1, eq, i, j)
-            set_node_vars!(G, 0.5 * flux2, eq, i, j)
+            set_node_vars!(F, 0.5f0 * flux1, eq, i, j)
+            set_node_vars!(G, 0.5f0 * flux2, eq, i, j)
             set_node_vars!(F2_loc, flux1, eq, i, j)
             set_node_vars!(G2_loc, flux2, eq, i, j)
             for ii in Base.OneTo(nd)
@@ -280,17 +280,17 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
                 # C[i,jj] += -lam*g[i,j]*Dm[jj,j] (sum over j)
                 multiply_add_to_node_vars!(ut, -lamy * Dm[jj, j], flux2, eq, i, jj)
             end
-            set_node_vars!(U, 0.5 * u_node, eq, i, j)
+            set_node_vars!(U, 0.5f0 * u_node, eq, i, j)
             set_node_vars!(U2_loc, u_node, eq, i, j)
         end
 
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
-            x_ = xc - 0.5 * dx + xg[i] * dx
-            y_ = yc - 0.5 * dy + xg[j] * dy
+            x_ = xc - 0.5f0 * dx + xg[i] * dx
+            y_ = yc - 0.5f0 * dy + xg[j] * dy
             x = SVector(x_, y_)
             u_node = get_node_vars(u1, eq, i, j, el_x, el_y)
             s_node = calc_source(u_node, x, t, source_terms, eq)
-            set_node_vars!(S, 0.5 * s_node, eq, i, j)
+            set_node_vars!(S, 0.5f0 * s_node, eq, i, j)
             set_node_vars!(S2, s_node, eq, i, j, el_x, el_y)
             multiply_add_to_node_vars!(ut, dt, s_node, eq, i, j)
         end
@@ -318,12 +318,12 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
             ft = derivative_bundle(flux_x, (u_node, ut_node))
             gt = derivative_bundle(flux_y, (u_node, ut_node))
 
-            multiply_add_to_node_vars!(F, 0.125, ft, eq, i, j)
-            multiply_add_to_node_vars!(G, 0.125, gt, eq, i, j)
-            multiply_add_to_node_vars!(U, 0.125, ut_node, eq, i, j)
-            multiply_add_to_node_vars!(F2_loc, 1.0 / 6.0, ft, eq, i, j)
-            multiply_add_to_node_vars!(G2_loc, 1.0 / 6.0, gt, eq, i, j)
-            multiply_add_to_node_vars!(U2_loc, 1.0 / 6.0, ut_node, eq, i, j)
+            multiply_add_to_node_vars!(F, 0.125f0, ft, eq, i, j)
+            multiply_add_to_node_vars!(G, 0.125f0, gt, eq, i, j)
+            multiply_add_to_node_vars!(U, 0.125f0, ut_node, eq, i, j)
+            multiply_add_to_node_vars!(F2_loc, 1 / 6, ft, eq, i, j)
+            multiply_add_to_node_vars!(G2_loc, 1 / 6, gt, eq, i, j)
+            multiply_add_to_node_vars!(U2_loc, 1 / 6, ut_node, eq, i, j)
             F_node = get_node_vars(F, eq, i, j)
             for ii in Base.OneTo(nd)
                 multiply_add_to_node_vars!(res, lamx * D1[ii, i], F_node, eq,
@@ -359,9 +359,9 @@ function compute_cell_residual_mdrk_1!(eq::AbstractEquations{2}, grid, op,
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, j, el_x, el_y)
         end
 
-        @turbo F2[:, :, :, el_x, el_y] .= F2_loc
-        @turbo G2[:, :, :, el_x, el_y] .= G2_loc
-        @turbo U2[:, :, :, el_x, el_y] .= U2_loc
+        turbo_copy!(@view(F2[:, :, :, el_x, el_y]), F2_loc)
+        turbo_copy!(@view(G2[:, :, :, el_x, el_y]), G2_loc)
+        turbo_copy!(@view(U2[:, :, :, el_x, el_y]), U2_loc)
 
         u = @view u1[:, :, :, el_x, el_y]
         blend_cell_residual!(el_x, el_y, eq, problem, scheme, aux, t, dt, grid, dx, dy,
@@ -413,17 +413,17 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, probl
         F2_ = @view F2[:, :, :, el_x, el_y]
         G2_ = @view G2[:, :, :, el_x, el_y]
         U2_ = @view U2[:, :, :, el_x, el_y]
-        @turbo F .= F2_
-        @turbo G .= G2_
-        @turbo U .= U2_
+        turbo_copy!(F, F2_)
+        turbo_copy!(G, G2_)
+        turbo_copy!(U, U2_)
 
         refresh!(ust)
 
         u1_ = @view u1[:, :, :, el_x, el_y]
         us_ = @view us[:, :, :, el_x, el_y]
         for j in Base.OneTo(nd), i in Base.OneTo(nd)
-            x = xc - 0.5 * dx + xg[i] * dx
-            y = yc - 0.5 * dy + xg[j] * dy
+            x = xc - 0.5f0 * dx + xg[i] * dx
+            y = yc - 0.5f0 * dy + xg[j] * dy
             us_node = get_node_vars(us_, eq, i, j)
             flux1, flux2 = flux(x, y, us_node, eq)
             for ii in Base.OneTo(nd)
@@ -439,11 +439,11 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, probl
         end
 
         for j in 1:nd, i in 1:nd
-            x = xc - 0.5 * dx + xg[i] * dx
-            y = yc - 0.5 * dy + xg[j] * dy
+            x = xc - 0.5f0 * dx + xg[i] * dx
+            y = yc - 0.5f0 * dy + xg[j] * dy
             X = SVector(x, y)
             u_node = get_node_vars(us, eq, i, j, el_x, el_y)
-            s_node = calc_source(u_node, X, t + 0.5 * dt, source_terms, eq)
+            s_node = calc_source(u_node, X, t + 0.5f0 * dt, source_terms, eq)
             multiply_add_to_node_vars!(ust, dt, s_node, eq, i, j)
         end
 
@@ -464,9 +464,9 @@ function compute_cell_residual_mdrk_2!(eq::AbstractEquations{2}, grid, op, probl
             ft = derivative_bundle(flux_x, (us_node, ust_node))
             gt = derivative_bundle(flux_y, (us_node, ust_node))
 
-            multiply_add_to_node_vars!(F, 1.0 / 3.0, ft, eq, i, j)
-            multiply_add_to_node_vars!(G, 1.0 / 3.0, gt, eq, i, j)
-            multiply_add_to_node_vars!(U, 1.0 / 3.0, ust_node, eq, i, j)
+            multiply_add_to_node_vars!(F, 1 / 3, ft, eq, i, j)
+            multiply_add_to_node_vars!(G, 1 / 3, gt, eq, i, j)
+            multiply_add_to_node_vars!(U, 1 / 3, ust_node, eq, i, j)
 
             # TODO - source term computation to be added
             # st = calc_source_t_N34(us_node, up, upp, um, umm, X, t+0.5*dt, dt, source_terms, eq)

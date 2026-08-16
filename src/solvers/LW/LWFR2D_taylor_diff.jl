@@ -85,8 +85,8 @@ end
     dx, dy, xc, yc, _, _ = local_grid
     @inbounds for (i, j) in eachpoint(scheme)
         @unpack xg = op
-        x = xc - 0.5 * dx + dx * xg[i]
-        y = yc - 0.5 * dy + dy * xg[j]
+        x = xc - 0.5f0 * dx + dx * xg[i]
+        y = yc - 0.5f0 * dy + dy * xg[j]
 
         u_node = get_node_vars(u, eq, i, j)
         flux1, flux2 = Tenkai.flux(x, y, u_node, eq)
@@ -456,8 +456,8 @@ function compute_cell_residual_2!(eq::AbstractEquations{2}, grid, op, problem,
         compute_fluxes_and_sources_array!(ddf_g_s, u_du_ddu_array, t, dt, local_grid, op,
                                           source_terms,
                                           eq, scheme)
-        add_to_F_G_S!(F, G, S, ddf_g_s.partials[2], 1.0 / 3.0, nd_val, nvar_val)
-        add_to_U!(U, utt, 1.0 / 3.0)
+        add_to_F_G_S!(F, G, S, ddf_g_s.partials[2], 1 / 3, nd_val, nvar_val)
+        add_to_U!(U, utt, 1 / 3)
 
         FGS2res!(r1, F, G, S, D1, dt, lamx, lamy, nd_val, nvar_val)
 
@@ -560,17 +560,17 @@ function compute_cell_residual_3!(eq::AbstractEquations{2}, grid, op, problem,
         compute_fluxes_and_sources_array!(ddf_g_s, u_du_ddu_array, t, dt, local_grid, op,
                                           source_terms,
                                           eq, scheme)
-        add_to_F_G_S!(F, G, S, ddf_g_s.partials[2], 1.0 / 3.0, nd_val, nvar_val)
-        add_to_U!(U, utt, 1.0 / 3.0)
+        add_to_F_G_S!(F, G, S, ddf_g_s.partials[2], 1 / 3, nd_val, nvar_val)
+        add_to_U!(U, utt, 1 / 3)
 
         uttt = u_du_ddu_dddu_array.partials[3]
         compute_ut!(uttt, ddf_g_s.partials[2], op, local_grid, dt, eq, nd_val, nvar_val,
-                    1.0 / 3.0) # 2! / 3!
+                    1 / 3) # 2! / 3!
         compute_fluxes_and_sources_array!(dddf_g_s, u_du_ddu_dddu_array, t, dt, local_grid,
                                           op, source_terms,
                                           eq, scheme)
-        add_to_F_G_S!(F, G, S, dddf_g_s.partials[3], 1.0 / 4.0, nd_val, nvar_val)
-        add_to_U!(U, uttt, 1.0 / 4.0)
+        add_to_F_G_S!(F, G, S, dddf_g_s.partials[3], 1 / 4, nd_val, nvar_val)
+        add_to_U!(U, uttt, 1 / 4)
 
         FGS2res!(r1, F, G, S, D1, dt, lamx, lamy, nd_val, nvar_val)
 
@@ -676,43 +676,43 @@ function compute_cell_residual_4!(eq::AbstractEquations{2}, grid, op, problem,
         set_arr_A_B!(u_du_ddu_dddu_array.partials[2], utt)
         set_arr_A_B!(u_du_ddu_dddu_ddddu_array.partials[2], utt)
 
-        t_der2 = map((x, dx, ddx) -> TaylorScalar(x, (dx, 0.5 * ddx^2)), t, dt, dt)
+        t_der2 = map((x, dx, ddx) -> TaylorScalar(x, (dx, 0.5f0 * ddx^2)), t, dt, dt)
         compute_fluxes_and_sources_array!(ddf_g_s, u_du_ddu_array, t_der2, dt, local_grid,
                                           op, source_terms,
                                           eq, scheme)
         add_to_F_G_S!(F, G, S, ddf_g_s.partials[2],
-                      1.0 / 3.0,
+                      1 / 3,
                       nd_val, nvar_val)
-        add_to_U!(U, utt, 1.0 / 3.0)
+        add_to_U!(U, utt, 1 / 3)
 
         uttt = u_du_ddu_dddu_array.partials[3]
         compute_ut!(uttt, ddf_g_s.partials[2], op, local_grid, dt, eq, nd_val, nvar_val,
-                    1.0 / 3.0) # 2! / 3!
+                    1 / 3) # 2! / 3!
         set_arr_A_B!(u_du_ddu_dddu_ddddu_array.partials[3], uttt)
-        t_der3 = map((x, dx, ddx, dddx) -> TaylorScalar(x, (dx, 0.5 * ddx^2, dddx^3 / 6.0)),
+        t_der3 = map((x, dx, ddx, dddx) -> TaylorScalar(x, (dx, 0.5f0 * ddx^2, dddx^3 / 6)),
                      t, dt, dt, dt)
         compute_fluxes_and_sources_array!(dddf_g_s, u_du_ddu_dddu_array, t_der3, dt,
                                           local_grid, op, source_terms,
                                           eq, scheme)
         add_to_F_G_S!(F, G, S, dddf_g_s.partials[3],
-                      1.0 / 4.0,
+                      1 / 4,
                       nd_val, nvar_val)
-        add_to_U!(U, uttt, 1.0 / 4.0)
+        add_to_U!(U, uttt, 1 / 4)
 
         utttt = u_du_ddu_dddu_ddddu_array.partials[4]
         compute_ut!(utttt, dddf_g_s.partials[3], op, local_grid, dt, eq, nd_val, nvar_val,
-                    1.0 / 4.0) # 3! / 4!
+                    1 / 4) # 3! / 4!
 
         t_der4 = map((x, dx, ddx, dddx, ddddx) -> TaylorScalar(x,
-                                                               (dx, 0.5 * ddx^2,
-                                                                dddx^3 / 6.0,
-                                                                ddddx^4 / 24.0)), t, dt, dt,
+                                                               (dx, 0.5f0 * ddx^2,
+                                                                dddx^3 / 6,
+                                                                ddddx^4 / 24)), t, dt, dt,
                      dt, dt)
         compute_fluxes_and_sources_array!(ddddf_g_s, u_du_ddu_dddu_ddddu_array, t_der4, dt,
                                           local_grid, op, source_terms,
                                           eq, scheme)
-        add_to_F_G_S!(F, G, S, ddddf_g_s.partials[4], 1.0 / 5.0, nd_val, nvar_val)
-        add_to_U!(U, utttt, 1.0 / 5.0)
+        add_to_F_G_S!(F, G, S, ddddf_g_s.partials[4], 1 / 5, nd_val, nvar_val)
+        add_to_U!(U, utttt, 1 / 5)
 
         FGS2res!(r1, F, G, S, D1, dt, lamx, lamy, nd_val, nvar_val)
 
@@ -793,8 +793,8 @@ function compute_bflux_array!(fb, ub, eq::AbstractEquations{2}, local_grid, op,
     dx, dy, xc, yc, _, _ = local_grid
     @unpack xg = op
 
-    xl = xc - 0.5 * dx
-    yd = yc - 0.5 * dy
+    xl = xc - 0.5f0 * dx
+    yd = yc - 0.5f0 * dy
     for i in Base.OneTo(nd)
         x = xl + dx * xg[i]
         y = yd + dy * xg[i]
@@ -823,10 +823,10 @@ end
     compute_bflux_array!(fb, ub, eq, local_grid, op, nd_val, nvar_val)
 
     @turbo for i in Base.OneTo(nd), n in Base.OneTo(nvar)
-        Fb[n, i, 1] = fb.value[n, 1, i] + 0.5 * fb.partials[1][n, 1, i]
-        Fb[n, i, 2] = fb.value[n, 2, i] + 0.5 * fb.partials[1][n, 2, i]
-        Fb[n, i, 3] = fb.value[n, 3, i] + 0.5 * fb.partials[1][n, 3, i]
-        Fb[n, i, 4] = fb.value[n, 4, i] + 0.5 * fb.partials[1][n, 4, i]
+        Fb[n, i, 1] = fb.value[n, 1, i] + 0.5f0 * fb.partials[1][n, 1, i]
+        Fb[n, i, 2] = fb.value[n, 2, i] + 0.5f0 * fb.partials[1][n, 2, i]
+        Fb[n, i, 3] = fb.value[n, 3, i] + 0.5f0 * fb.partials[1][n, 3, i]
+        Fb[n, i, 4] = fb.value[n, 4, i] + 0.5f0 * fb.partials[1][n, 4, i]
     end
 end
 
@@ -838,14 +838,14 @@ end
     compute_bflux_array!(fb, ub, eq, local_grid, op, nd_val, nvar_val)
 
     @turbo for i in Base.OneTo(nd), n in Base.OneTo(nvar)
-        Fb[n, i, 1] = (fb.value[n, 1, i] + 0.5 * fb.partials[1][n, 1, i]
-                       + 1.0 / 3.0 * fb.partials[2][n, 1, i])
-        Fb[n, i, 2] = (fb.value[n, 2, i] + 0.5 * fb.partials[1][n, 2, i]
-                       + 1.0 / 3.0 * fb.partials[2][n, 2, i])
-        Fb[n, i, 3] = (fb.value[n, 3, i] + 0.5 * fb.partials[1][n, 3, i]
-                       + 1.0 / 3.0 * fb.partials[2][n, 3, i])
-        Fb[n, i, 4] = (fb.value[n, 4, i] + 0.5 * fb.partials[1][n, 4, i]
-                       + 1.0 / 3.0 * fb.partials[2][n, 4, i])
+        Fb[n, i, 1] = (fb.value[n, 1, i] + 0.5f0 * fb.partials[1][n, 1, i]
+                       + 1 / 3 * fb.partials[2][n, 1, i])
+        Fb[n, i, 2] = (fb.value[n, 2, i] + 0.5f0 * fb.partials[1][n, 2, i]
+                       + 1 / 3 * fb.partials[2][n, 2, i])
+        Fb[n, i, 3] = (fb.value[n, 3, i] + 0.5f0 * fb.partials[1][n, 3, i]
+                       + 1 / 3 * fb.partials[2][n, 3, i])
+        Fb[n, i, 4] = (fb.value[n, 4, i] + 0.5f0 * fb.partials[1][n, 4, i]
+                       + 1 / 3 * fb.partials[2][n, 4, i])
     end
 end
 
@@ -857,18 +857,18 @@ end
     compute_bflux_array!(fb, ub, eq, local_grid, op, nd_val, nvar_val)
 
     @turbo for i in Base.OneTo(nd), n in Base.OneTo(nvar)
-        Fb[n, i, 1] = (fb.value[n, 1, i] + 0.5 * fb.partials[1][n, 1, i]
-                       + 1.0 / 3.0 * fb.partials[2][n, 1, i]
-                       + 0.25 * fb.partials[3][n, 1, i])
-        Fb[n, i, 2] = (fb.value[n, 2, i] + 0.5 * fb.partials[1][n, 2, i]
-                       + 1.0 / 3.0 * fb.partials[2][n, 2, i]
-                       + 0.25 * fb.partials[3][n, 2, i])
-        Fb[n, i, 3] = (fb.value[n, 3, i] + 0.5 * fb.partials[1][n, 3, i]
-                       + 1.0 / 3.0 * fb.partials[2][n, 3, i]
-                       + 0.25 * fb.partials[3][n, 3, i])
-        Fb[n, i, 4] = (fb.value[n, 4, i] + 0.5 * fb.partials[1][n, 4, i]
-                       + 1.0 / 3.0 * fb.partials[2][n, 4, i]
-                       + 0.25 * fb.partials[3][n, 4, i])
+        Fb[n, i, 1] = (fb.value[n, 1, i] + 0.5f0 * fb.partials[1][n, 1, i]
+                       + 1 / 3 * fb.partials[2][n, 1, i]
+                       + 0.25f0 * fb.partials[3][n, 1, i])
+        Fb[n, i, 2] = (fb.value[n, 2, i] + 0.5f0 * fb.partials[1][n, 2, i]
+                       + 1 / 3 * fb.partials[2][n, 2, i]
+                       + 0.25f0 * fb.partials[3][n, 2, i])
+        Fb[n, i, 3] = (fb.value[n, 3, i] + 0.5f0 * fb.partials[1][n, 3, i]
+                       + 1 / 3 * fb.partials[2][n, 3, i]
+                       + 0.25f0 * fb.partials[3][n, 3, i])
+        Fb[n, i, 4] = (fb.value[n, 4, i] + 0.5f0 * fb.partials[1][n, 4, i]
+                       + 1 / 3 * fb.partials[2][n, 4, i]
+                       + 0.25f0 * fb.partials[3][n, 4, i])
     end
 end
 
@@ -880,22 +880,22 @@ end
     compute_bflux_array!(fb, ub, eq, local_grid, op, nd_val, nvar_val)
 
     @turbo for i in Base.OneTo(nd), n in Base.OneTo(nvar)
-        Fb[n, i, 1] = (fb.value[n, 1, i] + 0.5 * fb.partials[1][n, 1, i]
-                       + 1.0 / 3.0 * fb.partials[2][n, 1, i]
-                       + 0.25 * fb.partials[3][n, 1, i] +
-                       1.0 / 5.0 * fb.partials[4][n, 1, i])
-        Fb[n, i, 2] = (fb.value[n, 2, i] + 0.5 * fb.partials[1][n, 2, i]
-                       + 1.0 / 3.0 * fb.partials[2][n, 2, i]
-                       + 0.25 * fb.partials[3][n, 2, i] +
-                       1.0 / 5.0 * fb.partials[4][n, 2, i])
-        Fb[n, i, 3] = (fb.value[n, 3, i] + 0.5 * fb.partials[1][n, 3, i]
-                       + 1.0 / 3.0 * fb.partials[2][n, 3, i]
-                       + 0.25 * fb.partials[3][n, 3, i] +
-                       1.0 / 5.0 * fb.partials[4][n, 3, i])
-        Fb[n, i, 4] = (fb.value[n, 4, i] + 0.5 * fb.partials[1][n, 4, i]
-                       + 1.0 / 3.0 * fb.partials[2][n, 4, i]
-                       + 0.25 * fb.partials[3][n, 4, i] +
-                       1.0 / 5.0 * fb.partials[4][n, 4, i])
+        Fb[n, i, 1] = (fb.value[n, 1, i] + 0.5f0 * fb.partials[1][n, 1, i]
+                       + 1 / 3 * fb.partials[2][n, 1, i]
+                       + 0.25f0 * fb.partials[3][n, 1, i] +
+                       1 / 5 * fb.partials[4][n, 1, i])
+        Fb[n, i, 2] = (fb.value[n, 2, i] + 0.5f0 * fb.partials[1][n, 2, i]
+                       + 1 / 3 * fb.partials[2][n, 2, i]
+                       + 0.25f0 * fb.partials[3][n, 2, i] +
+                       1 / 5 * fb.partials[4][n, 2, i])
+        Fb[n, i, 3] = (fb.value[n, 3, i] + 0.5f0 * fb.partials[1][n, 3, i]
+                       + 1 / 3 * fb.partials[2][n, 3, i]
+                       + 0.25f0 * fb.partials[3][n, 3, i] +
+                       1 / 5 * fb.partials[4][n, 3, i])
+        Fb[n, i, 4] = (fb.value[n, 4, i] + 0.5f0 * fb.partials[1][n, 4, i]
+                       + 1 / 3 * fb.partials[2][n, 4, i]
+                       + 0.25f0 * fb.partials[3][n, 4, i] +
+                       1 / 5 * fb.partials[4][n, 4, i])
     end
 end
 
