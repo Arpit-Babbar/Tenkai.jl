@@ -24,11 +24,6 @@ function Legendre(n, x)
     elseif n == 1
         value = x
     else
-        # The recurrence coefficients are formed in the arithmetic of `x`.
-        # Written as `(2 * n - 1) / n`, with `n` an integer, they would be
-        # evaluated in `Float64` and would destroy the extra digits of a wider
-        # number type such as `Float64x2`. For `Float64` this is exactly the
-        # same computation as before.
         value = (oftype(x, 2 * n - 1) / n * x * Legendre(n - 1, x)
                  -
                  oftype(x, n - 1) / n * Legendre(n - 2, x))
