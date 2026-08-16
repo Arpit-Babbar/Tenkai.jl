@@ -1,4 +1,4 @@
-# Tests for running Tenkai in an arbitrary floating point arithmetic. The number
+# Claude written tests for Tenkai in arbitrary floating point arithmetic. The number
 # type is taken from the domain of the `Problem` and threaded through the grid,
 # the quadrature nodes and FR operators, the solution arrays and the error
 # computation. The headline test is an order of accuracy study that keeps showing

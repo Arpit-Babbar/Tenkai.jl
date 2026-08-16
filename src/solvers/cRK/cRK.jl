@@ -100,7 +100,7 @@ function solve_ssfr(eq, problem, scheme::Scheme{<:cRKSolver}, param, grid, op, a
     initialize_solution!(eq, grid, op, problem, scheme, param, aux, cache)
 
     # Initialize counters
-    local iter, t, fcount = 0, zero(final_time), 0  # `t` uses the arithmetic of the problem
+    local iter, t, fcount = 0, zero(final_time), 0 
 
     # Save initial solution to file
     fcount = write_soln!("sol", fcount, iter, t, 0.0, eq, grid, problem, param, op,
