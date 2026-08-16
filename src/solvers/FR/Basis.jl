@@ -50,8 +50,6 @@ end
 # Normalize Legendre polynomials to unit L2 norm in [0,1]
 #-------------------------------------------------------------------------------
 function nLegendre(n, x)
-    # `sqrt` is taken in the arithmetic of `x` so that the normalization does
-    # not limit the accuracy to `Float64`.
     value = sqrt(oftype(x, 2 * n + 1)) * Legendre(n, x)
     return value
 end
