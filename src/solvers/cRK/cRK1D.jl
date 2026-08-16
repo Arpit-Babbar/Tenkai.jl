@@ -161,12 +161,9 @@ function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44},
     return nothing
 end
 
-# Number of per-cell and per-face scratch arrays each solver reads out of its
+# Number of per-cell and per-face "helper" arrays each solver reads out of its
 # cache, i.e. the length of the tuples destructured in
-# `compute_cell_residual_cRK!` and in its boundary flux evaluation. This does not
-# depend on the degree, which is how these used to be sized: `cRK44` reads eight
-# face values whatever the degree, where the old sizes allowed six below
-# degree 3 and it indexed past the end.
+# `compute_cell_residual_cRK!` and in its boundary flux evaluation.
 #
 # `cRKSolver` is also the supertype of the IMEX solvers in `TenkaicRK`, which
 # share this `setup_arrays`. Rather than reach across for each of them, an
