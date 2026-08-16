@@ -285,44 +285,8 @@ end
     return dest
 end
 
-#------------------------------------------------------------------------------
-# Rational coefficients
-#
-# The LW, MDRK and cRK procedures weight their stages by rationals (1/6, 1/3,
-# 1/12, 1/24, 1/120, ...). Each solver binds `_1 = one(RealT)` next to its
-# `RealT = eltype(...)` and writes the weights as `(1/6)` in the loops.
-#
-# The more readable `RealT(1 // 6)` is deliberately not used. It is not folded
-# away for non primitive types, MultiFloats converting a `Rational` through
-# `BigFloat`, so written inside a loop it is paid at every use. Summing 1000
-# elements takes 5.3 μs with `(1/6)` against 1456 μs with `RealT(1 // 6)` in
-# `Float64x2`, and 13 μs against 164 μs in `Double64`. `(1/6)` is loop
-# invariant and folds, matching a hardcoded literal.
-#
-# Nothing is lost by the faster spelling: the two agree bit for bit, in every
-# type tried, for all the constants used here. They can differ by an ulp of the
-# last limb in MultiFloats for other rationals, 1/720 and 5/6 among them, where
-# the `BigFloat` conversion is the closer of the two.
-#
-# Constants elsewhere in the solvers follow from the same concern, that a
-# `Float64` literal drags the arithmetic up with it: `Float32 * 8.0` is a
-# `Float64`, so a `Float32` run computes in double precision and rounds back.
-# Three spellings avoid it, in order of preference:
-#
-#   8.0     -> 8            an integer literal takes the type of the other side
-#   0.5     -> 0.5f0        exact in `Float32`, and promotes up to `Float64`,
-#                           `Double64` or `Float64x2` without losing anything
-#   1.8     -> 1.8   for the rest, where `Float32` cannot hold the value
-#
-# The last one needs `RealT` in scope but reproduces the `Float64` literal
-# exactly, so no existing result moves. Reach for it only for empirical
-# constants, the knobs of the shock indicator among them. An exact rational is
-# better written as a division, `(2/3)` rather than `0.666...`,
-# which is what keeps the stage weights above accurate to the last limb of
-# whatever type they are evaluated in; `1.8` carries only the `Float64`
-# rounding of 1.8 into a `Double64`, which is meaningless for a tuning constant
-# and unacceptable for a stage weight.
-#------------------------------------------------------------------------------
+# Constants take the working type: `8`, `0.5f0`, `RealT(1.8)`, `_1 / 6`. Not
+# `RealT(1 // 6)`, which is 275x slower in `Float64x2` (`BigFloat` conversion).
 
 #------------------------------------------------------------------------------
 # A struct which gives zero whenever you try to index it as a zero

@@ -334,9 +334,7 @@ end
 # Select time scheme
 #------------------------------------------------------------------------------
 
-# The time integrator that `time_scheme = "by degree"` selects. The RKFR CFL
-# numbers in `get_cfl` are the stability limits of these, so anything else has
-# to be treated with care; see `warn_if_cfl_not_calibrated`.
+# The time integrator that `time_scheme = "by degree"` selects.
 function default_time_scheme(degree)
     if degree == 0
         return "RK11"
