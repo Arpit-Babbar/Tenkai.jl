@@ -245,7 +245,9 @@ end
 # z = a*x + y
 #------------------------------------------------------------------------------
 function axpyz!(a, x, y, z)
-    @tturbo for i in eachindex(z)
+    # `warn_check_args=false` as in `turbo_copy!` - the fallback loop is the
+    # expected path for the arithmetics LoopVectorization does not support.
+    @tturbo warn_check_args=false for i in eachindex(z)
         z[i] = a * x[i] + y[i]
     end
     return nothing
