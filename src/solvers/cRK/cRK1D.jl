@@ -160,16 +160,29 @@ function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44},
     return nothing
 end
 
-# Number of per-cell and per-face scratch arrays each cRK solver reads out of
-# its cache, i.e. the length of the tuples destructured in
-# `compute_cell_residual_cRK!` and in its boundary flux evaluation. These do not
-# depend on the degree.
-cell_data_size(::cRKSolver) = 0
+# Number of per-cell and per-face scratch arrays each solver reads out of its
+# cache, i.e. the length of the tuples destructured in
+# `compute_cell_residual_cRK!` and in its boundary flux evaluation. This does not
+# depend on the degree, which is how these used to be sized: `cRK44` reads eight
+# face values whatever the degree, where the old sizes allowed six below
+# degree 3 and it indexed past the end.
+#
+# `cRKSolver` is also the supertype of the IMEX solvers in `TenkaicRK`, which
+# share this `setup_arrays`. Rather than reach across for each of them, an
+# unlisted solver gets the largest allocation any solver in the tree has asked
+# for, so it cannot overrun its cache. The arrays are `nvar x nd` and
+# `nvar x 1`, so the spare ones cost nothing worth saving.
+const MAX_CELL_DATA_SIZE = 16
+const MAX_EVAL_DATA_SIZE = 18
+
+cell_data_size(::cRKSolver) = MAX_CELL_DATA_SIZE
+cell_data_size(::cRK11) = 0
 cell_data_size(::cRK22) = 4  # F, f, U, u2
 cell_data_size(::cRK33) = 6  # F, f, U, u2, u3, S
 cell_data_size(::cRK44) = 7  # F, f, U, u2, u3, u4, S
 
-eval_data_size(::cRKSolver) = 0
+eval_data_size(::cRKSolver) = MAX_EVAL_DATA_SIZE
+eval_data_size(::cRK11) = 0
 eval_data_size(::cRK22) = 2  # u2 at 2 faces
 eval_data_size(::cRK33) = 4  # u, u3 at 2 faces
 eval_data_size(::cRK44) = 8  # u, u2, u3, u4 at 2 faces
