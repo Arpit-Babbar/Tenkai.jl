@@ -272,6 +272,8 @@ end
 function eval_bflux!(eq::AbstractEquations{2}, scheme::Scheme{<:cRK44}, grid,
                      cell_data, eval_data, xg, Vl, Vr, F, G, Fb, aux)
     RealT = eltype(xg)
+    # RealT(1 // 6) would read better but is slow; see "Rational coefficients" in FR.jl.
+    _1 = one(RealT)
     nvar = nvariables(eq)
     nd = length(xg)
     refresh!(u) = fill!(u, zero(eltype(u)))
@@ -362,24 +364,24 @@ function eval_bflux!(eq::AbstractEquations{2}, scheme::Scheme{<:cRK44}, grid,
 
         # KLUDGE - Indices order needs to be changed, or something else
         # needs to be done to avoid cache misses
-        multiply_add_to_node_vars!(Fb, (one(RealT) / 6), fl, (one(RealT) / 3), f2l, eq,
+        multiply_add_to_node_vars!(Fb, (_1 / 6), fl, (_1 / 3), f2l, eq,
                                    i, 1)
-        multiply_add_to_node_vars!(Fb, (one(RealT) / 3), f3l, (one(RealT) / 6), f4l, eq,
+        multiply_add_to_node_vars!(Fb, (_1 / 3), f3l, (_1 / 6), f4l, eq,
                                    i, 1)
 
-        multiply_add_to_node_vars!(Fb, (one(RealT) / 6), fr, (one(RealT) / 3), f2r, eq,
+        multiply_add_to_node_vars!(Fb, (_1 / 6), fr, (_1 / 3), f2r, eq,
                                    i, 2)
-        multiply_add_to_node_vars!(Fb, (one(RealT) / 3), f3r, (one(RealT) / 6), f4r, eq,
+        multiply_add_to_node_vars!(Fb, (_1 / 3), f3r, (_1 / 6), f4r, eq,
                                    i, 2)
 
-        multiply_add_to_node_vars!(Fb, (one(RealT) / 6), gd, (one(RealT) / 3), g2d, eq,
+        multiply_add_to_node_vars!(Fb, (_1 / 6), gd, (_1 / 3), g2d, eq,
                                    i, 3)
-        multiply_add_to_node_vars!(Fb, (one(RealT) / 3), g3d, (one(RealT) / 6), g4d, eq,
+        multiply_add_to_node_vars!(Fb, (_1 / 3), g3d, (_1 / 6), g4d, eq,
                                    i, 3)
 
-        multiply_add_to_node_vars!(Fb, (one(RealT) / 6), gu, (one(RealT) / 3), g2u, eq,
+        multiply_add_to_node_vars!(Fb, (_1 / 6), gu, (_1 / 3), g2u, eq,
                                    i, 4)
-        multiply_add_to_node_vars!(Fb, (one(RealT) / 3), g3u, (one(RealT) / 6), g4u, eq,
+        multiply_add_to_node_vars!(Fb, (_1 / 3), g3u, (_1 / 6), g4u, eq,
                                    i, 4)
     end
 end

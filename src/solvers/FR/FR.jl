@@ -286,6 +286,26 @@ end
 end
 
 #------------------------------------------------------------------------------
+# Rational coefficients
+#
+# The LW, MDRK and cRK procedures weight their stages by rationals (1/6, 1/3,
+# 1/12, 1/24, 1/120, ...). Each solver binds `_1 = one(RealT)` next to its
+# `RealT = eltype(...)` and writes the weights as `_1 / 6` in the loops.
+#
+# The more readable `RealT(1 // 6)` is deliberately not used. It is not folded
+# away for non primitive types, MultiFloats converting a `Rational` through
+# `BigFloat`, so written inside a loop it is paid at every use. Summing 1000
+# elements takes 5.3 μs with `_1 / 6` against 1456 μs with `RealT(1 // 6)` in
+# `Float64x2`, and 13 μs against 164 μs in `Double64`. `_1 / 6` is loop
+# invariant and folds, matching a hardcoded literal.
+#
+# Nothing is lost by the faster spelling: the two agree bit for bit, in every
+# type tried, for all the constants used here. They can differ by an ulp of the
+# last limb in MultiFloats for other rationals, 1/720 and 5/6 among them, where
+# the `BigFloat` conversion is the closer of the two.
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
 # A struct which gives zero whenever you try to index it as a zero
 #------------------------------------------------------------------------------
 struct EmptyZeros{RealT <: Real} end

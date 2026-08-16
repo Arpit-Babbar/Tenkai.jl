@@ -75,6 +75,8 @@ function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44},
     @unpack boundary_value, boundary_condition = problem
     left, right = boundary_condition
     RealT = eltype(grid.xc)
+    # RealT(1 // 6) would read better but is slow; see "Rational coefficients" in FR.jl.
+    _1 = one(RealT)
     refresh!(u) = fill!(u, zero(RealT))
 
     ub, fb = zeros(RealT, nvar), zeros(RealT, nvar)
@@ -82,8 +84,8 @@ function update_ghost_values_cRK!(problem, scheme::Scheme{<:cRK44},
     # For Dirichlet bc, use upwind flux at faces by assigning both physical
     # and ghost cells through the bc.
     rk4_time_levels = (0, 0.5, 0.5, 1)
-    rk4_coeff = (one(RealT) / 6, one(RealT) / 3, one(RealT) / 3,
-                 one(RealT) / 6)
+    rk4_coeff = (_1 / 6, _1 / 3, _1 / 3,
+                 _1 / 6)
     if left == dirichlet
         x = xf[1]
         for l in 1:4 # RK4 stages
@@ -444,6 +446,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 
     @unpack cell_data, eval_data, ua, u1, res, Fb, Ub = cache
     RealT = eltype(u1)
+    # RealT(1 // 6) would read better but is slow; see "Rational coefficients" in FR.jl.
+    _1 = one(RealT)
 
     F, f, U, u2, u3, S = cell_data[Threads.threadid()]
 
@@ -513,7 +517,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
                 multiply_add_to_node_vars!(res, lamx * D1[ix, i], F_node, eq, ix, cell)
             end
 
-            s3_node = calc_source(u3_node, x_, t + (2 * one(RealT) / 3) * dt,
+            s3_node = calc_source(u3_node, x_, t + (2 * _1 / 3) * dt,
                                   source_terms, eq)
             multiply_add_to_node_vars!(S, 0.75, s3_node, eq, i)
             S_node = get_node_vars(S, eq, i)
@@ -574,6 +578,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 
     @unpack cell_data, eval_data, ua, u1, res, Fb, Ub = cache
     RealT = eltype(u1)
+    # RealT(1 // 6) would read better but is slow; see "Rational coefficients" in FR.jl.
+    _1 = one(RealT)
 
     F, f, U, u2, u3, u4, S = cell_data[Threads.threadid()]
 
@@ -617,8 +623,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 
             flux1 = flux(x_, u2_node, eq)
 
-            multiply_add_to_node_vars!(F, (one(RealT) / 3), flux1, eq, i)
-            multiply_add_to_node_vars!(U, (one(RealT) / 3), u2_node, eq, i)
+            multiply_add_to_node_vars!(F, (_1 / 3), flux1, eq, i)
+            multiply_add_to_node_vars!(U, (_1 / 3), u2_node, eq, i)
 
             for ii in Base.OneTo(nd) # ut = -lamx * DmT * f
                 multiply_add_to_node_vars!(u3, -0.5 * lamx * Dm[ii, i], flux1, eq, ii)
@@ -631,7 +637,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             u2_node = get_node_vars(u2, eq, i)
             s2_node = calc_source(u2_node, x_, t + 0.5 * dt, source_terms, eq)
             multiply_add_to_node_vars!(u3, 0.5 * dt, s2_node, eq, i)
-            multiply_add_to_node_vars!(S, (one(RealT) / 3), s2_node, eq, i)
+            multiply_add_to_node_vars!(S, (_1 / 3), s2_node, eq, i)
         end
 
         for i in Base.OneTo(nd)
@@ -640,8 +646,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 
             flux1 = flux(x_, u3_node, eq)
 
-            multiply_add_to_node_vars!(F, (one(RealT) / 3), flux1, eq, i)
-            multiply_add_to_node_vars!(U, (one(RealT) / 3), u3_node, eq, i)
+            multiply_add_to_node_vars!(F, (_1 / 3), flux1, eq, i)
+            multiply_add_to_node_vars!(U, (_1 / 3), u3_node, eq, i)
 
             for ii in Base.OneTo(nd) # ut = -lamx * DmT * f
                 multiply_add_to_node_vars!(u4, -lamx * Dm[ii, i], flux1, eq, ii)
@@ -654,7 +660,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             u3_node = get_node_vars(u3, eq, i)
             s3_node = calc_source(u3_node, x_, t + 0.5 * dt, source_terms, eq)
             multiply_add_to_node_vars!(u4, dt, s3_node, eq, i)
-            multiply_add_to_node_vars!(S, (one(RealT) / 3), s3_node, eq, i)
+            multiply_add_to_node_vars!(S, (_1 / 3), s3_node, eq, i)
         end
 
         for i in Base.OneTo(nd)
@@ -663,8 +669,8 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
 
             flux1 = flux(x_, u4_node, eq)
 
-            multiply_add_to_node_vars!(F, (one(RealT) / 6), flux1, eq, i)
-            multiply_add_to_node_vars!(U, (one(RealT) / 6), u4_node, eq, i)
+            multiply_add_to_node_vars!(F, (_1 / 6), flux1, eq, i)
+            multiply_add_to_node_vars!(U, (_1 / 6), u4_node, eq, i)
 
             F_node = get_node_vars(F, eq, i)
             for ix in Base.OneTo(nd)
@@ -672,7 +678,7 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             end
 
             s4_node = calc_source(u4_node, x_, t + dt, source_terms, eq)
-            multiply_add_to_node_vars!(S, (one(RealT) / 6), s4_node, eq, i)
+            multiply_add_to_node_vars!(S, (_1 / 6), s4_node, eq, i)
             S_node = get_node_vars(S, eq, i)
             multiply_add_to_node_vars!(res, -dt, S_node, eq, i, cell)
         end
@@ -725,13 +731,13 @@ function compute_cell_residual_cRK!(eq::AbstractEquations{1}, grid, op,
             f2l, f2r = flux(xl, u2l_node, eq), flux(xr, u2r_node, eq)
             f3l, f3r = flux(xl, u3l_node, eq), flux(xr, u3r_node, eq)
             f4l, f4r = flux(xl, u4l_node, eq), flux(xr, u4r_node, eq)
-            multiply_add_to_node_vars!(Fb, (one(RealT) / 6), fl, (one(RealT) / 3), f2l,
+            multiply_add_to_node_vars!(Fb, (_1 / 6), fl, (_1 / 3), f2l,
                                        eq, 1, cell)
-            multiply_add_to_node_vars!(Fb, (one(RealT) / 3), f3l, (one(RealT) / 6), f4l,
+            multiply_add_to_node_vars!(Fb, (_1 / 3), f3l, (_1 / 6), f4l,
                                        eq, 1, cell)
-            multiply_add_to_node_vars!(Fb, (one(RealT) / 6), fr, (one(RealT) / 3), f2r,
+            multiply_add_to_node_vars!(Fb, (_1 / 6), fr, (_1 / 3), f2r,
                                        eq, 2, cell)
-            multiply_add_to_node_vars!(Fb, (one(RealT) / 3), f3r, (one(RealT) / 6), f4r,
+            multiply_add_to_node_vars!(Fb, (_1 / 3), f3r, (_1 / 6), f4r,
                                        eq, 2, cell)
         end
     end
