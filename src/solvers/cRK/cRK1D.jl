@@ -16,11 +16,11 @@ function get_cfl(eq::AbstractEquations{1}, scheme::Scheme{<:cRKSolver}, param)
     os_vector(v) = OffsetArray(v, OffsetArrays.Origin(0))
     local cfl_radau, cfl_g2
     if dissipation == get_second_node_vars || dissipation isa DCSX
-        cfl_radau = os_vector([1, 0.333, 0.170, 0.103, 0.069])
-        cfl_g2 = os_vector([1, 1, 0.333, 0.170, 0.103])
+        cfl_radau = os_vector([1.0, 0.333, 0.170, 0.103, 0.069])
+        cfl_g2 = os_vector([1.0, 1.000, 0.333, 0.170, 0.103])
     elseif dissipation == get_first_node_vars
-        cfl_radau = os_vector([1, 0.226, 0.117, 0.072, 0.049])
-        cfl_g2 = os_vector([1, 0.465, 0.204, 0.116, 0.060])
+        cfl_radau = os_vector([1.0, 0.226, 0.117, 0.072, 0.049])
+        cfl_g2 = os_vector([1.0, 0.465, 0.204, 0.116, 0.060])
     end
     # Reduce this cfl by a small amount
     if correction_function == "radau"
