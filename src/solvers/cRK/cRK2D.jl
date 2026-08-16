@@ -12,7 +12,7 @@ function get_cfl(eq::AbstractEquations{2}, scheme::Scheme{<:cRKSolver}, param)
     @assert (degree >= 0&&degree < 5) "Invalid degree"
     os_vector(v) = OffsetArray(v, OffsetArrays.Origin(0))
     cfl_radau = os_vector([1, 0.259, 0.170, 0.103, 0.069])
-    cfl_g2 = os_vector([1, 0.511, 0.333, 0.170, 0.103])
+    cfl_g2 = os_vector([1.0, 0.511, 0.333, 0.170, 0.103])
     # Reduce this cfl by a small amount
     if correction_function == "radau"
         return cfl_safety_factor * cfl_radau[degree]
